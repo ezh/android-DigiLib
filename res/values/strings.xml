@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright 2012 Alexey Aksenov ezh@ezh.msk.ru.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and limitations under the License.
+-->
+<resources>
+
+    <string name="error_inetd_notfound">digiINETD not found</string>
+    <string name="error_inetd_notfound_title">digiINETD not found</string>
+    <string name="error_inetd_notfound_content">Install from market? It is possible to use service right from the console. Path to executable files of service will be copied to clipboard if you choose Cancel.</string>
+    <string name="install">install</string>
+    <string name="reinstall">reinstall</string>
+    <string name="error_market_failed_title">error_market_failed_title</string>
+    <string name="error_market_failed_content">error_market_failed_content</string>
+    <string name="notify_n_files_copy_to_clipboard">notify_n_files_copy_to_clipboard</string>
+    <string name="notify_no_files_copy_to_clipboard">notify_no_files_copy_to_clipboard</string>
+    <string name="error_prepare_chmod">error_prepare_chmod</string>
+    <string name="error_prepare_unknown">error_prepare_unknown</string>
+    <string name="error_prepare_description">error_prepare_description</string>
+    <string name="status_initializing">Initializing…</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_error">Error: %1$s</string>
+    <string name="ask_inetd_newconnection_title">ask_inetd_newconnection_title</string>
+    <string name="ask_inetd_newconnection_content">ask_inetd_newconnection_content</string>
+
+</resources>
