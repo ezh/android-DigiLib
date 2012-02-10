@@ -8,19 +8,24 @@ Of course you may use it with your preferred environment like [Netbeans](http://
 
 Feel free to translate or modify documentation, edit wiki or add comments.
 
-Having question, suggestion or idea about the software? Contact us or open issue.
+Having question, suggestion or idea about the software? Contact us or [open issue](http://github.com/ezh/android-DigiLib/issues).
 
 DOCUMENTATION
 -------------
 
   [http://github.com/ezh/android-DigiLib/wiki]
 
+AUTHORS
+-------
+
+* Alexey Aksenov
+
 LICENSE
 -------
 
 The DigiLib Project is licensed to you under the terms of
 the Apache License, version 2.0, a copy of which has been
-included in the LICENSE file (referred to as DISTRIBUTION LICENSE).
+included in the LICENSE file.
 Please check the individual source files for details.
 
 
