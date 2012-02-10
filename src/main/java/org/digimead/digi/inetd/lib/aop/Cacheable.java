@@ -21,13 +21,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * Use this annotation on methods which you want to be weaved by the
- * {@link Logging}.
- * 
- */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)
-public @interface Loggable {
-	boolean result() default true;
+public @interface Cacheable {
+	int namespace() default 0;
+	int period() default 0;
 }
+

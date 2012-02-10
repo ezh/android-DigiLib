@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,9 +18,17 @@ package org.digimead.digi.inetd.lib.aop
 
 import org.aspectj.lang.JoinPoint
 import org.slf4j.LoggerFactory
+import java.io.File
 
 abstract class Logging {
-  val logger = LoggerFactory.getLogger("o.d.d.i.a.Logging")
+  private final val log = LoggerFactory.getLogger("o.d.d.i.a.Logging")
+  private final val pid = try {
+    Integer.parseInt(new File("/proc/self").getCanonicalFile().getName())
+  } catch {
+    case e =>
+      log.warn("get PID failed")
+      -1
+  }
 
   def enteringMethod(joinPoint: JoinPoint) {
     val tid = Thread.currentThread().getId()
@@ -28,21 +36,21 @@ abstract class Logging {
     val signature = joinPoint.getSignature()
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    logger.trace("[T%010d".format(tid) + "] enteringMethod " + className + "::" + methodName + " " + source.getFileName() + ":" + source.getLine())
+    log.trace("[P" + pid + ":T%010d".format(tid) + "] enteringMethod " + className + "::" + methodName + " " + source.getFileName() + ":" + source.getLine())
   }
   def leavingMethod(joinPoint: JoinPoint) {
     val tid = Thread.currentThread().getId()
     val signature = joinPoint.getSignature()
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    logger.trace("[T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName)
+    log.trace("[P" + pid + ":T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName)
   }
   def leavingMethod(joinPoint: JoinPoint, returnValue: Object) {
     val tid = Thread.currentThread().getId()
     val signature = joinPoint.getSignature()
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    logger.trace("[T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
+    log.trace("[P" + pid + ":T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
   }
   def leavingMethodException(joinPoint: JoinPoint, throwable: Exception) {
     val tid = Thread.currentThread().getId()
@@ -50,8 +58,9 @@ abstract class Logging {
     val className = signature.getDeclaringType().getSimpleName();
     val methodName = signature.getName();
     val exceptionMessage = throwable.getMessage();
-    logger.trace("[T%010d".format(tid) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
+    log.trace("[P" + pid + ":T%010d".format(tid) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
   }
+  protected def TRACE(msg: String) = log.trace(msg)
 }
 
 object Logging {
@@ -62,25 +71,35 @@ object Logging {
 
 Example:
 
-import org.digimead.digi.inetd.lib.aspect.Loggable;
+import org.digimead.digi.inetd.lib.aop.Loggable;
 
-privileged public aspect INETD extends org.digimead.digi.inetd.lib.aspect.Logging {
+privileged public final aspect AspectLogging extends
+		org.digimead.digi.inetd.lib.aop.Logging {
+	public pointcut loggingNonVoid() : execution(@Loggable !void *(..));
 
-	public pointcut loggingNonVoid(Loggable loggable) : execution(!void *(..)) && @annotation(loggable);
-	public pointcut loggingVoid(Loggable loggable) : execution(void *(..)) && @annotation(loggable);
-	public pointcut logging(Loggable loggable) : loggingVoid(loggable) || loggingNonVoid(loggable);
-	
-	before(Loggable loggable) : logging(loggable) {
-	    enteringMethod(thisJoinPoint, loggable);
+	public pointcut loggingVoid() : execution(@Loggable void *(..));
+
+	public pointcut logging() : loggingVoid() || loggingNonVoid();
+
+	before() : logging() {
+		if (org.digimead.digi.inetd.lib.aop.Logging.enabled())
+			enteringMethod(thisJoinPoint);
 	}
-	
-    after(Loggable loggable) returning(Object result) : loggingNonVoid(loggable) {
-        leavingMethod(thisJoinPoint, loggable, result);
-    }
 
-    after(Loggable loggable) returning() : loggingVoid(loggable) {
-        leavingMethod(thisJoinPoint, loggable);
-    }
+	after() returning(Object result) : loggingNonVoid() {
+		if (org.digimead.digi.inetd.lib.aop.Logging.enabled())
+			leavingMethod(thisJoinPoint, result);
+	}
+
+	after() returning() : loggingVoid() {
+		if (org.digimead.digi.inetd.lib.aop.Logging.enabled())
+			leavingMethod(thisJoinPoint);
+	}
+
+	after() throwing(Exception ex) : logging() {
+		if (org.digimead.digi.inetd.lib.aop.Logging.enabled())
+			leavingMethodException(thisJoinPoint, ex);
+	}
 }
 
 */

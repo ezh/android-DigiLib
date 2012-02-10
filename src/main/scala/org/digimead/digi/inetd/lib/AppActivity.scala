@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -210,12 +210,12 @@ object AppActivity {
   private var inner: AppActivity = null
   @Loggable
   def init(root: Context, _inner: AppActivity = null) {
-    if (_inner != null) {
+    if (_inner != null)
       inner = _inner
-    } else {
+    else
       inner = new AppActivity(new WeakReference(root))
-    }
     Status(Common.State.initializing)
+    AppCache.init(inner)
   }
   def Inner = if (inner != null) {
     Some(inner)

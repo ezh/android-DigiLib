@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,10 +154,10 @@ object Common {
         log.error("service bind failed")
       }
   }
-  @Loggable
+  @Loggable(result = false)
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList
-  @Loggable
+  @Loggable(result = false)
   def serializeToArray(o: java.io.Serializable): Array[Byte] = {
     val baos = new ByteArrayOutputStream()
     val oos = new ObjectOutputStream(baos)
@@ -165,10 +165,10 @@ object Common {
     oos.close()
     baos.toByteArray()
   }
-  @Loggable
+  @Loggable(result = false)
   def deserializeFromList(s: java.util.List[Byte]): Object =
     deserializeFromArray(s.toList.toArray)
-  @Loggable
+  @Loggable(result = false)
   def deserializeFromArray(s: Array[Byte]): Object = {
     val ois = new ObjectInputStream(new ByteArrayInputStream(s.toList.toArray))
     val o = ois.readObject()
@@ -238,6 +238,10 @@ object Common {
     val componentService = Constant.prefix + "component.service"
   }
   object Option extends Enumeration {
+    // TODO rewrite with nameMap = LongMap(id) -> names and descriptionMap SoftReference
+    val cache_period = Value("cache_period", "cache_period", "cache_period")
+    val cache_folder = Value("cache_dir", "cache_dir", "cache_dir")
+    val cache_class = Value("cache_class", "cache_class", "cache_class")
     val comm_confirmation = Value("comm_confirmation", "comm_confirmation_name", "comm_confirmation_description")
     val comm_writelog = Value("comm_writelog", "comm_writelog_name", "comm_writelog_description")
     val service_asroot = Value("service_asroot", "service_asroot_name", "service_asroot_description")
