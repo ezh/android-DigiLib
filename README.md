@@ -13,7 +13,8 @@ Having question, suggestion or idea about the software? Contact us or [open issu
 DOCUMENTATION
 -------------
 
-  [http://github.com/ezh/android-DigiLib/wiki]
+### [WIKI](http://github.com/ezh/android-DigiLib/wiki)
+### [API](http://ezh.github.com/android-DigiLib/api/)
 
 AUTHORS
 -------
