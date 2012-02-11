@@ -25,41 +25,62 @@ abstract class Caching {
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {
     // TODO val logging = log.isTraceEnabled()
     val tid = Thread.currentThread().getId()
+    val key = if (annotation.examination() && args.nonEmpty) {
+      args(args.length - 1) match {
+        case Caching.BoxedTrue =>
+          // forced
+          val key = longSignature.hashCode() + " " + args.dropRight(1).map(_.hashCode()).mkString(" ")
+          log.trace("[T%010d".format(tid) + "] FORCED " + shortSignature + " with namespace id " + annotation.namespace)
+          return invokeOriginal(invoker, tid, key, annotation.namespace())
+        case Caching.BoxedFalse =>
+          longSignature.hashCode() + " " + args.dropRight(1).map(_.hashCode()).mkString(" ")
+        case _ =>
+          // lost in space? lazy code? something broken? anything you want
+          longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
+      }
+    } else
+      longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
     log.trace("[T%010d".format(tid) + "] " + shortSignature + " with namespace id " + annotation.namespace)
-    val key = longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
     AppCache !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
       case r @ Some(retVal) =>
         log.trace("[T%010d".format(tid) + "] HIT key " + key + " found, returning cached value")
         return r
       case None =>
         log.trace("[T%010d".format(tid) + "] MISS key " + key + " not found, invoking original method")
-        // all cases except "Option" and "Traversable" must throw scala.MatchError
-        // so developer notified about design bug
-        invoker.invoke() match {
-          case r @ Traversable =>
-            // process collection
-            AppCache ! AppCache.Message.UpdateByID(annotation.namespace(), key, r)
-            log.trace("[T%010d".format(tid) + "] key " + key + " updated")
-            r
-          case Nil =>
-            // process Nil
-            log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original method return Nil value")
-            Nil
-          case r @ Some(retVal) =>
-            // process option
-            AppCache ! AppCache.Message.UpdateByID(annotation.namespace(), key, retVal)
-            log.trace("[T%010d".format(tid) + "] key " + key + " updated")
-            r
-          case None =>
-            // process None
-            log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original return None value")
-            None
-        }
+        invokeOriginal(invoker, tid, key, annotation.namespace())
     }
   }
+  def invokeOriginal(invoker: Invoker, tid: Long, key: String, namespaceID: Int) =
+    // all cases except "Option" and "Traversable" must throw scala.MatchError
+    // so developer notified about design bug
+    invoker.invoke() match {
+      case r @ Traversable =>
+        // process collection
+        AppCache ! AppCache.Message.UpdateByID(namespaceID, key, r)
+        log.trace("[T%010d".format(tid) + "] key " + key + " updated")
+        r
+      case Nil =>
+        // process Nil
+        log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original method return Nil value")
+        Nil
+      case r @ Some(retVal) =>
+        // process option
+        AppCache ! AppCache.Message.UpdateByID(namespaceID, key, retVal)
+        log.trace("[T%010d".format(tid) + "] key " + key + " updated")
+        r
+      case None =>
+        // process None
+        log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original return None value")
+        None
+    }
   trait Invoker {
     def invoke(): AnyRef
   }
+}
+
+object Caching {
+  private final val BoxedTrue = Boolean.box(true)
+  private final val BoxedFalse = Boolean.box(false)
 }
 
 /*

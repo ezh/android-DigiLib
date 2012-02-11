@@ -87,7 +87,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
     serviceInstance.get match {
       case serviceInstance: IINETDHost =>
         Some(serviceInstance)
-      case _ =>
+      case null =>
         val t = new Throwable("Intospecting stack frame")
         t.fillInStackTrace()
         log.error("uninitialized IINETDHost at AppService: " + t.getStackTraceString)
