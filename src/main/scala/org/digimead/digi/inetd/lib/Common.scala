@@ -93,7 +93,7 @@ object Common {
   def listPreparedFiles(context: Context): Option[Seq[File]] = for {
     inner <- AppActivity.Inner
     appNativePath <- inner.appNativePath
-  } yield context.getAssets.list(inner.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)
+  } yield context.getAssets.list(Common.Constant.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)
   @Loggable
   def copyPreparedFilesToClipboard(context: Context) = {
     val files = Common.listPreparedFiles(context).mkString("\n")
@@ -207,9 +207,9 @@ object Common {
     }
   }
   class ServiceEnvironment(val id: Int,
-    val commandLine: Array[String],
+    val commandLine: Seq[String],
     val port: Int,
-    val env: Array[String] = Array(),
+    val env: Seq[String] = Seq(),
     val active: Boolean = true) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
     assert(port > 0 && id <= 0xFFFF)
@@ -221,13 +221,18 @@ object Common {
     val environment = "environment"
   }
   object Constant {
-    val toastTimeout = 5
-    val marketPackage = "org.digimead.digi.inetd"
-    val prefix = "org.digimead.digi.inetd."
-    val serviceContentProviderSuffix = ".data"
+    final val toastTimeout = 5
+    final val marketPackage = "org.digimead.digi.inetd"
+    final val prefix = "org.digimead.digi.inetd."
+    final val serviceContentProviderSuffix = ".data"
+    final val apkNativePath = "armeabi"
   }
   object State extends Enumeration {
     val initializing, ready, active, error = Value
+  }
+  object Preference {
+    val main = getClass.getPackage.getName + "@main" // shared preferences name
+    val filter = getClass.getPackage.getName + "@filter" // shared preferences name    
   }
   object Intent {
     val update = Constant.prefix + "update"

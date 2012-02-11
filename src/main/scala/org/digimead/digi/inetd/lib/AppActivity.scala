@@ -38,10 +38,7 @@ import org.digimead.digi.inetd.lib.aop.Loggable
 protected class AppActivity private (var root: WeakReference[Context]) extends Actor {
   private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.inetd", "o.d.d.i"))
   private var status: AtomicReference[AppActivity.Status] = new AtomicReference()
-  val prefMain = getClass.getName + "@main" // shared preferences name
-  val prefFilter = getClass.getName + "@filter" // shared preferences name
-  lazy val apkNativePath = "armeabi"
-  lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + apkNativePath + "/"))
+  lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
   lazy val appNativeDescription = appNativePath.map(appNativePath => new File(appNativePath, "description.xml"))
   def act = {
     loop {
@@ -71,7 +68,7 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
   def getStatus() = status.get
   def filters(): Seq[String] = get() match {
     case Some(root) =>
-      root.getSharedPreferences(prefFilter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
+      root.getSharedPreferences(Common.Preference.filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
     case None =>
       Seq()
   }
@@ -86,11 +83,11 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
       if (!prepareNativePath(caller))
         return false
       val am = ctx.getAssets()
-      val files = am.list(apkNativePath)
-      val from = files.map(name => apkNativePath + "/" + name)
+      val files = am.list(Common.Constant.apkNativePath)
+      val from = files.map(name => Common.Constant.apkNativePath + "/" + name)
       val to = files.map(name => new File(appNativePath, name))
       val xmlOriginal: Option[Node] = try {
-        Some(scala.xml.XML.load(am.open(apkNativePath + "/description.xml")))
+        Some(scala.xml.XML.load(am.open(Common.Constant.apkNativePath + "/description.xml")))
       } catch {
         case e =>
           log.error(e.getMessage, e)
@@ -209,23 +206,45 @@ object AppActivity {
   private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.inetd", "o.d.d.i"))
   private var inner: AppActivity = null
   @Loggable
-  def init(root: Context, _inner: AppActivity = null) {
+  def init(root: Context, _inner: AppActivity = null) = synchronized {
+    AppCache.init(root)
+    log.info("initialize AppActivity for " + root.getPackageName())
+    assert(inner == null)
     if (_inner != null)
       inner = _inner
     else
       inner = new AppActivity(new WeakReference(root))
     Status(Common.State.initializing)
-    AppCache.init(inner)
   }
-  def Inner = if (inner != null) {
-    Some(inner)
-  } else {
-    val t = new Throwable("Intospecting stack frame")
-    t.fillInStackTrace()
-    log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
-    None
+  def deinit(): Unit = synchronized {
+    val context = inner.root.get
+    log.info("deinitialize AppActivity for " + context.map(_.getPackageName()).getOrElse("UNKNOWN"))
+    assert(inner != null)
+    val _inner = inner
+    inner = null
+    if (AppActivity.initialized)
+      for {
+        rootApp <- _inner.root.get;
+        innerSrv <- AppService.Inner;
+        rootSrv <- innerSrv.root.get
+      } if (rootApp == rootSrv) {
+        log.info("AppActivity and AppService share the same context. Clear.")
+        AppService.deinit()
+      }
+    AppCache.deinit()
+  }
+  def Inner = synchronized {
+    if (inner != null) {
+      Some(inner)
+    } else {
+      val t = new Throwable("Intospecting stack frame")
+      t.fillInStackTrace()
+      log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
+      None
+    }
   }
   def Context = Inner.flatMap(_.get())
+  def initialized = synchronized { inner != null }
   object Message {
     sealed abstract class Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract

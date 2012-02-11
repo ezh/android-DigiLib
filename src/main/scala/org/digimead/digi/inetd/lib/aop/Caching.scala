@@ -20,39 +20,39 @@ import org.slf4j.LoggerFactory
 import org.digimead.digi.inetd.lib.AppCache
 
 abstract class Caching {
-  val log = LoggerFactory.getLogger("o.d.d.i.a.Logging")
+  val log = LoggerFactory.getLogger("o.d.d.i.a.Caching")
 
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {
     // TODO val logging = log.isTraceEnabled()
     val tid = Thread.currentThread().getId()
-    log.trace("[T%010d".format(tid) + "] CACHE: " + shortSignature + " with namespace id " + annotation.namespace)
+    log.trace("[T%010d".format(tid) + "] " + shortSignature + " with namespace id " + annotation.namespace)
     val key = longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
     AppCache !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
       case r @ Some(retVal) =>
-        log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " found, returning cached value")
+        log.trace("[T%010d".format(tid) + "] HIT key " + key + " found, returning cached value")
         return r
       case None =>
-        log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " not found, invoking original method")
+        log.trace("[T%010d".format(tid) + "] MISS key " + key + " not found, invoking original method")
         // all cases except "Option" and "Traversable" must throw scala.MatchError
         // so developer notified about design bug
         invoker.invoke() match {
           case r @ Traversable =>
             // process collection
             AppCache ! AppCache.Message.UpdateByID(annotation.namespace(), key, r)
-            log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " updated")
+            log.trace("[T%010d".format(tid) + "] key " + key + " updated")
             r
           case Nil =>
             // process Nil
-            log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " NOT saved, original method return Nil value")
+            log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original method return Nil value")
             Nil
           case r @ Some(retVal) =>
             // process option
             AppCache ! AppCache.Message.UpdateByID(annotation.namespace(), key, retVal)
-            log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " updated")
+            log.trace("[T%010d".format(tid) + "] key " + key + " updated")
             r
           case None =>
             // process None
-            log.trace("[T%010d".format(tid) + "] CACHE: key " + key + " NOT saved, original return None value")
+            log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original return None value")
             None
         }
     }

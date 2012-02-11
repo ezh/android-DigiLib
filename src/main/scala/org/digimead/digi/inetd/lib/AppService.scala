@@ -87,7 +87,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
     serviceInstance.get match {
       case serviceInstance: IINETDHost =>
         Some(serviceInstance)
-      case null =>
+      case _ =>
         val t = new Throwable("Intospecting stack frame")
         t.fillInStackTrace()
         log.error("uninitialized IINETDHost at AppService: " + t.getStackTraceString)
@@ -205,22 +205,42 @@ object AppService {
   private var inner: AppService = null
   log.debug("alive")
   @Loggable
-  def init(root: Context, _inner: AppService = null) {
+  def init(root: Context, _inner: AppService = null) = synchronized {
+    log.info("initialize AppService for " + root.getPackageName())
+    assert(inner == null)
     if (_inner != null) {
       inner = _inner
     } else {
       inner = new AppService(new WeakReference(root))
     }
   }
-  def Inner = if (inner != null) {
-    Some(inner)
-  } else {
-    val t = new Throwable("Intospecting stack frame")
-    t.fillInStackTrace()
-    log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
-    None
+  def deinit(): Unit = synchronized {
+    log.info("deinitialize AppService for " + inner.root.get.map(_.getPackageName()).getOrElse("UNKNOWN"))
+    assert(inner != null)
+    val _inner = inner
+    inner = null
+    if (AppActivity.initialized)
+      for {
+        rootSrv <- _inner.root.get;
+        innerApp <- AppActivity.Inner;
+        rootApp <- innerApp.root.get
+      } if (rootApp == rootSrv) {
+        log.info("AppActivity and AppService share the same context. Clear.")
+        AppActivity.deinit()
+      }
+  }
+  def Inner = synchronized {
+    if (inner != null) {
+      Some(inner)
+    } else {
+      val t = new Throwable("Intospecting stack frame")
+      t.fillInStackTrace()
+      log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
+      None
+    }
   }
   def IINETDHost = Inner.flatMap(_.get())
+  def initialized = synchronized { inner != null }
   object Message {
     sealed abstract class Abstract
     object Ping extends Abstract

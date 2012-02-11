@@ -175,6 +175,7 @@ class AppCache extends AppCacheT[String, Any] {
 
 object AppCache extends Actor {
   private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.inetd", "o.d.d.i"))
+  private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
   private var cacheClass = "org.digimead.digi.inetd.lib.AppCache"
@@ -211,36 +212,41 @@ object AppCache extends Actor {
     period = _period
   }
   @Loggable
-  def init(innerApp: AppActivity, innerCache: AppCache = null) {
+  def init(context: Context, innerCache: AppCache = null) = synchronized {
+    contextPackageName = context.getPackageName()
+    log.info("initialize AppCache for " + contextPackageName)
     assert(inner == null)
-    innerApp.get() foreach {
-      context =>
-        val pref = context.getSharedPreferences(innerApp.prefMain, Context.MODE_PRIVATE)
-        period = pref.getLong(Common.Option.cache_period.res, period)
-        cachePath = pref.getString(Common.Option.cache_folder.res, context.getCacheDir + "/")
-        cacheClass = pref.getString(Common.Option.cache_class.res, "org.digimead.digi.inetd.lib.AppCache")
-        if (innerCache != null) {
-          inner = innerCache
-        } else {
-          inner = try {
-            log.debug("create cache with implementation \"" + cacheClass + "\"")
-            Class.forName(cacheClass).newInstance().asInstanceOf[AppCacheT[String, Any]]
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-              new AppCache()
-          }
-        }
-        if (!cacheFolder.exists)
-          if (!cacheFolder.mkdirs) {
-            log.error("cannot create directory: " + cacheFolder)
-            inner = new NilCache()
-          }
-        log.info("set cache directory to \"" + cachePath + "\"")
-        log.info("set cache implementation to \"" + inner.getClass.getName() + "\"")
-        start()
+    val pref = context.getSharedPreferences(Common.Preference.main, Context.MODE_PRIVATE)
+    period = pref.getLong(Common.Option.cache_period.res, period)
+    cachePath = pref.getString(Common.Option.cache_folder.res, context.getCacheDir + "/")
+    cacheClass = pref.getString(Common.Option.cache_class.res, "org.digimead.digi.inetd.lib.AppCache")
+    if (innerCache != null) {
+      inner = innerCache
+    } else {
+      inner = try {
+        log.debug("create cache with implementation \"" + cacheClass + "\"")
+        Class.forName(cacheClass).newInstance().asInstanceOf[AppCacheT[String, Any]]
+      } catch {
+        case e =>
+          log.warn(e.getMessage(), e)
+          new AppCache()
+      }
     }
+    if (!cacheFolder.exists)
+      if (!cacheFolder.mkdirs) {
+        log.error("cannot create directory: " + cacheFolder)
+        inner = new NilCache()
+      }
+    log.info("set cache directory to \"" + cachePath + "\"")
+    log.info("set cache implementation to \"" + inner.getClass.getName() + "\"")
+    start()
   }
+  def deinit() = synchronized {
+    log.info("deinitialize AppCache for " + contextPackageName)
+    assert(inner != null)
+    inner = null
+  }
+  def initialized = synchronized { inner != null }
   object Message {
     case class Get(namespace: scala.Enumeration#Value, key: String, period: Long = getDefaultPeriod())
     case class GetByID(namespaceId: Int, key: String, period: Long = getDefaultPeriod())

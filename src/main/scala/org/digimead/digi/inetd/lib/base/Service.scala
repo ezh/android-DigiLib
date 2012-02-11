@@ -17,11 +17,17 @@
 package org.digimead.digi.inetd.lib.base
 
 import org.digimead.digi.inetd.lib.aop.Loggable
+import org.digimead.digi.inetd.lib.AppService
 
-import android.app.{ Service => AService }
+import android.app.{Service => AService}
 
 trait Service extends AService with AnyBase {
   @Loggable
   override def onCreate(): Unit =
     onCreateBase(this, { Service.super.onCreate() })
+  @Loggable
+  override def onDestroy() = {
+    AppService.deinit()
+    super.onDestroy()
+  }
 }

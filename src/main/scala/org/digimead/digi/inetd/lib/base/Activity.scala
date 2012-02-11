@@ -17,6 +17,7 @@
 package org.digimead.digi.inetd.lib.base
 
 import org.digimead.digi.inetd.lib.aop.Loggable
+import org.digimead.digi.inetd.lib.AppActivity
 
 import android.app.{Activity => AActivity}
 import android.os.Bundle
@@ -25,4 +26,9 @@ trait Activity extends AActivity with AnyBase {
   @Loggable
   override def onCreate(savedInstanceState: Bundle): Unit =
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
+  @Loggable
+  override def onDestroy() = {
+    AppActivity.deinit()
+    super.onDestroy()
+  }
 }
