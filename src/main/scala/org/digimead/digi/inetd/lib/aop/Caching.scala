@@ -25,17 +25,23 @@ abstract class Caching {
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {
     // TODO val logging = log.isTraceEnabled()
     val tid = Thread.currentThread().getId()
+    /*
+     * last argument is inappropriate, for example scala compiler add Manifest[_] to tail
+     * there may be other bytecode generators
+     */
     val key = if (annotation.examination() && args.nonEmpty) {
-      args(args.length - 1) match {
+      args.head match {
         case Caching.BoxedTrue =>
           // forced
-          val key = longSignature.hashCode() + " " + args.dropRight(1).map(_.hashCode()).mkString(" ")
+          val key = longSignature.hashCode() + " " + args.tail.map(_.hashCode()).mkString(" ")
           log.trace("[T%010d".format(tid) + "] FORCED " + shortSignature + " with namespace id " + annotation.namespace)
           return invokeOriginal(invoker, tid, key, annotation.namespace())
         case Caching.BoxedFalse =>
-          longSignature.hashCode() + " " + args.dropRight(1).map(_.hashCode()).mkString(" ")
+          longSignature.hashCode() + " " + args.tail.map(_.hashCode()).mkString(" ")
         case _ =>
-          // lost in space? lazy code? something broken? anything you want
+          // lost in space? lazy code? something broken? null? something modify bytecode or other reasons...
+          // nothing critical, but notify someone
+          log.warn("[T%010d".format(tid) + "] UNKNOWN TYPE of cacheable method 1st argument, " + shortSignature + " with namespace id " + annotation.namespace)
           longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
       }
     } else

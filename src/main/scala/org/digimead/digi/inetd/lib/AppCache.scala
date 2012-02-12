@@ -188,17 +188,49 @@ object AppCache extends Actor {
     loop {
       react {
         case Message.Get(namespace, key, period) =>
-          reply(inner.get(namespace, key, period))
+          try {
+            reply(inner.get(namespace, key, period))
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+              reply(None)
+          }
         case Message.GetByID(namespaceID, key, period) =>
-          reply(inner.get(namespaceID, key, period))
+          try {
+            reply(inner.get(namespaceID, key, period))
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+              reply(None)
+          }
         case Message.Update(namespace, key, value) =>
-          reply(inner.update(namespace, key, value))
+          try {
+            inner.update(namespace, key, value)
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
         case Message.UpdateByID(namespaceID, key, value) =>
-          reply(inner.update(namespaceID, key, value))
+          try {
+            inner.update(namespaceID, key, value)
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
         case Message.UpdateMany(namespace, updates) =>
-          reply(inner.update(namespace, updates))
+          try {
+            inner.update(namespace, updates)
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
         case Message.Clear(namespace) =>
-          reply(inner.clear(namespace))
+          try {
+            inner.clear(namespace)
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
         case unknown =>
           log.error("unknown message " + unknown)
       }
