@@ -26,14 +26,13 @@ import scala.collection.JavaConversions._
 import scala.ref.WeakReference
 import scala.xml.Node
 
-import org.apache.maven.artifact.versioning.DefaultArtifactVersion
+import org.digimead.digi.inetd.lib.aop.Loggable
+import org.digimead.digi.inetd.lib.versioning.DefaultArtifactVersion
 import org.slf4j.LoggerFactory
 
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-
-import org.digimead.digi.inetd.lib.aop.Loggable
 
 protected class AppActivity private (var root: WeakReference[Context]) extends Actor {
   private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.inetd", "o.d.d.i"))
