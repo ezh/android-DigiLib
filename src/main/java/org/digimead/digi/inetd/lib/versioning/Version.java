@@ -26,7 +26,7 @@ import java.util.StringTokenizer;
  *
  * @author <a href="mailto:brett@apache.org">Brett Porter</a>
  */
-public class DefaultArtifactVersion
+public class Version
     implements ArtifactVersion
 {
     private Integer majorVersion;
@@ -41,7 +41,7 @@ public class DefaultArtifactVersion
 
     private ComparableVersion comparable;
 
-    public DefaultArtifactVersion( String version )
+    public Version( String version )
     {
         parseVersion( version );
     }
@@ -70,13 +70,13 @@ public class DefaultArtifactVersion
 
     public int compareTo( ArtifactVersion otherVersion )
     {
-        if ( otherVersion instanceof DefaultArtifactVersion )
+        if ( otherVersion instanceof Version )
         {
-            return this.comparable.compareTo( ( (DefaultArtifactVersion) otherVersion).comparable );
+            return this.comparable.compareTo( ( (Version) otherVersion).comparable );
         }
         else
         {
-            return compareTo( new DefaultArtifactVersion( otherVersion.toString() ) );
+            return compareTo( new Version( otherVersion.toString() ) );
         }
     }
 

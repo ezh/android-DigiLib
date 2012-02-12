@@ -151,7 +151,7 @@ public class VersionRange
             }
             else
             {
-                version = new DefaultArtifactVersion( process );
+                version = new Version( process );
                 restrictions.add( Restriction.EVERYTHING );
             }
         }
@@ -178,7 +178,7 @@ public class VersionRange
                 throw new InvalidVersionSpecificationException( "Single version must be surrounded by []: " + spec );
             }
 
-            ArtifactVersion version = new DefaultArtifactVersion( process );
+            ArtifactVersion version = new Version( process );
 
             restriction = new Restriction( version, lowerBoundInclusive, version, upperBoundInclusive );
         }
@@ -194,12 +194,12 @@ public class VersionRange
             ArtifactVersion lowerVersion = null;
             if ( lowerBound.length() > 0 )
             {
-                lowerVersion = new DefaultArtifactVersion( lowerBound );
+                lowerVersion = new Version( lowerBound );
             }
             ArtifactVersion upperVersion = null;
             if ( upperBound.length() > 0 )
             {
-                upperVersion = new DefaultArtifactVersion( upperBound );
+                upperVersion = new Version( upperBound );
             }
 
             if ( upperVersion != null && lowerVersion != null && upperVersion.compareTo( lowerVersion ) < 0 )
@@ -216,7 +216,7 @@ public class VersionRange
     public static VersionRange createFromVersion( String version )
     {
         List<Restriction> restrictions = Collections.emptyList();
-        return new VersionRange( new DefaultArtifactVersion( version ), restrictions );
+        return new VersionRange( new Version( version ), restrictions );
     }
 
     /**

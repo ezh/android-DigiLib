@@ -27,7 +27,7 @@ import scala.ref.WeakReference
 import scala.xml.Node
 
 import org.digimead.digi.inetd.lib.aop.Loggable
-import org.digimead.digi.inetd.lib.versioning.DefaultArtifactVersion
+import org.digimead.digi.inetd.lib.versioning.Version
 import org.slf4j.LoggerFactory
 
 import android.app.Activity
@@ -177,8 +177,8 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
     else if (xmlInstalled == None)
       return false
     try {
-      val versionOriginal = new DefaultArtifactVersion((xmlOriginal.get \ "info" \ "version").text)
-      val versionInstalled = new DefaultArtifactVersion((xmlInstalled.get \ "info" \ "version").text)
+      val versionOriginal = new Version((xmlOriginal.get \ "info" \ "version").text)
+      val versionInstalled = new Version((xmlInstalled.get \ "info" \ "version").text)
       log.debug("compare versions original: " + versionOriginal + ", installed: " + versionInstalled)
       versionOriginal.compareTo(versionInstalled) <= 0 // original version (from apk) <= installed version
     } catch {
