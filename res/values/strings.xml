@@ -15,9 +15,9 @@
 -->
 <resources>
 
-    <string name="error_inetd_notfound">digiINETD not found</string>
-    <string name="error_inetd_notfound_title">digiINETD not found</string>
-    <string name="error_inetd_notfound_content">Install from market? It is possible to use service right from the console. Path to executable files of service will be copied to clipboard if you choose Cancel.</string>
+    <string name="error_control_notfound">DigiControl not found</string>
+    <string name="error_control_notfound_title">DigiControl not found</string>
+    <string name="error_control_notfound_content">Install from market? It is possible to use service right from the console. Path to executable files of service will be copied to clipboard if you choose Cancel.</string>
     <string name="install">install</string>
     <string name="reinstall">reinstall</string>
     <string name="error_market_failed_title">error_market_failed_title</string>
@@ -30,7 +30,7 @@
     <string name="status_initializing">Initializing…</string>
     <string name="status_ready">Ready</string>
     <string name="status_error">Error: %1$s</string>
-    <string name="ask_inetd_newconnection_title">ask_inetd_newconnection_title</string>
-    <string name="ask_inetd_newconnection_content">ask_inetd_newconnection_content</string>
+    <string name="ask_control_newconnection_title">ask_control_newconnection_title</string>
+    <string name="ask_control_newconnection_content">ask_control_newconnection_content</string>
 
 </resources>

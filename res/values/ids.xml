@@ -15,7 +15,7 @@
   -->
 <resources>
 
-    <item name="dialog_InstallINETD" type="id"/>
+    <item name="dialog_InstallControl" type="id"/>
     <item name="dialog_FailedMarket" type="id"/>
 
 </resources>
