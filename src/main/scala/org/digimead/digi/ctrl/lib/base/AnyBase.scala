@@ -16,17 +16,33 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import scala.actors.scheduler.DaemonScheduler
+import scala.actors.scheduler.ResizableThreadPoolScheduler
+import scala.ref.WeakReference
+
+import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.slf4j.LoggerFactory
 
 import android.content.Context
-import org.digimead.digi.ctrl.lib.aop.Loggable
 
 private[base] trait AnyBase {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
-  System.setProperty("actors.enableForkJoin", "false")
   @Loggable
   protected def onCreateBase(ctx: Context, callSuper: => Any): Boolean = {
     callSuper
+    AnyBase.init(ctx)
+  }
+}
+
+object AnyBase {
+  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+  System.setProperty("actors.enableForkJoin", "false")
+  System.setProperty("actors.corePoolSize", "256")
+  private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
+  log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
+      + weakScheduler.get.get.toString + "[name,priority,group]")
+  log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
+      ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
+  def init(ctx: Context) = {
     org.digimead.digi.ctrl.lib.AppActivity.init(ctx)
     org.digimead.digi.ctrl.lib.AppService.init(ctx)
     log.debug("start AppActivity singleton actor")
@@ -37,6 +53,6 @@ private[base] trait AnyBase {
         true
       case None =>
         false
-    } 
+    }
   }
 }

@@ -52,6 +52,8 @@ trait AppCacheT[K, V] {
   def update(namespace: scala.Enumeration#Value, key: K, value: V)
   def update(namespaceID: Int, key: K, value: V)
   def update(namespace: scala.Enumeration#Value, updates: Iterable[(K, V)])
+  def remove(namespace: scala.Enumeration#Value, key: K): Option[V]
+  def remove(namespaceID: Int, key: K): Option[V]
   def clear(namespace: scala.Enumeration#Value): Unit
 }
 
@@ -65,6 +67,8 @@ class NilCache extends AppCacheT[String, Any] {
   def update(namespace: scala.Enumeration#Value, key: String, value: Any): Unit = {}
   def update(namespaceID: Int, key: String, value: Any): Unit = {}
   def update(namespace: scala.Enumeration#Value, updates: Iterable[(String, Any)]): Unit = {}
+  def remove(namespace: scala.Enumeration#Value, key: String): Option[Any] = None
+  def remove(namespaceID: Int, key: String): Option[Any] = None
   def clear(namespace: scala.Enumeration#Value): Unit = {}
 }
 class AppCache extends AppCacheT[String, Any] {
@@ -138,6 +142,29 @@ class AppCache extends AppCacheT[String, Any] {
   }
   def update(namespace: scala.Enumeration#Value, updates: Iterable[(String, Any)]): Unit =
     updates.foreach(t => update(namespace, t._1, t._2))
+  def remove(namespace: scala.Enumeration#Value, key: String): Option[Any] =
+    remove(namespace.id, key)
+  def remove(namespaceID: Int, key: String): Option[Any] = {
+    val ref = namespaceID + " " + key
+    val file = new File(AppCache.cacheFolder, ref)
+    if (file.exists)
+      if (!file.delete())
+        log.error("failed to delete cache file " + file)
+    AppCache.map.remove(ref).flatMap(ref => ref.get.map(t => t._2))
+  }
+  def clear(namespace: scala.Enumeration#Value): Unit = {
+    val prefix = namespace.id + " "
+    AppCache.map.filter(t => t._1.startsWith(prefix)).foreach(t => {
+      log.debug("remove cache ref " + prefix + t._1)
+      AppCache.map.remove(t._1)
+    })
+    AppCache.cacheFolder.listFiles(new FileFilter {
+      override def accept(file: File) = file.getName.startsWith(prefix)
+    }).foreach(f => {
+      log.debug("remove cache file " + f.getName())
+      f.delete()
+    })
+  }
   private def readFile(namespaceID: Int, key: String, file: File): Option[(Long, Any)] = try {
     log.trace("read cached value from file for namespace id " + namespaceID + " and key " + key)
     val ois = new ObjectInputStream(new BufferedInputStream(new FileInputStream(file)))
@@ -157,19 +184,6 @@ class AppCache extends AppCacheT[String, Any] {
   } catch {
     case e =>
       log.warn("failed update cache file " + file + ", " + e.getMessage, e)
-  }
-  def clear(namespace: scala.Enumeration#Value): Unit = {
-    val prefix = namespace.id + " "
-    AppCache.map.filter(t => t._1.startsWith(prefix)).foreach(t => {
-      log.debug("remove cache ref " + prefix + t._1)
-      AppCache.map.remove(t._1)
-    })
-    AppCache.cacheFolder.listFiles(new FileFilter {
-      override def accept(file: File) = file.getName.startsWith(prefix)
-    }).foreach(f => {
-      log.debug("remove cache file " + f.getName())
-      f.delete()
-    })
   }
 }
 
@@ -220,6 +234,20 @@ object AppCache extends Actor {
         case Message.UpdateMany(namespace, updates) =>
           try {
             inner.update(namespace, updates)
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
+        case Message.Remove(namespace, key) =>
+          try {
+            reply(inner.remove(namespace, key))
+          } catch {
+            case e =>
+              log.warn(e.getMessage(), e)
+          }
+        case Message.RemoveByID(namespaceID, key) =>
+          try {
+            reply(inner.remove(namespaceID, key))
           } catch {
             case e =>
               log.warn(e.getMessage(), e)
@@ -285,6 +313,8 @@ object AppCache extends Actor {
     case class Update(namespace: scala.Enumeration#Value, key: String, value: Any)
     case class UpdateByID(namespaceId: Int, key: String, value: Any)
     case class UpdateMany(namespace: scala.Enumeration#Value, updates: Iterable[(String, Any)])
+    case class Remove(namespace: scala.Enumeration#Value, key: String)
+    case class RemoveByID(namespaceId: Int, key: String)
     case class Clear(namespace: scala.Enumeration#Value)
   }
 }

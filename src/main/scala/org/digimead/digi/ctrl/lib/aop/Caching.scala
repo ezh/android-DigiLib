@@ -67,7 +67,8 @@ abstract class Caching {
         r
       case Nil =>
         // process Nil
-        log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original method return Nil value")
+        AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
+        log.trace("[T%010d".format(tid) + "] key " + key + "  removed, original method return Nil value")
         Nil
       case r @ Some(retVal) =>
         // process option
@@ -76,7 +77,8 @@ abstract class Caching {
         r
       case None =>
         // process None
-        log.trace("[T%010d".format(tid) + "] key " + key + " NOT saved, original return None value")
+        AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
+        log.trace("[T%010d".format(tid) + "] key " + key + " removed, original return None value")
         None
     }
   trait Invoker {

@@ -58,6 +58,7 @@ abstract class Logging {
 
 object Logging {
   final var enabled = true
+  def tid = "[T%010d".format(Thread.currentThread().getId()) + "] "
 }
 
 /*
