@@ -206,8 +206,10 @@ object AppService {
   log.debug("alive")
   @Loggable
   def init(root: Context, _inner: AppService = null) = synchronized {
-    log.info("initialize AppService for " + root.getPackageName())
-    assert(inner == null)
+    if (inner != null)
+      log.info("reinitialize AppService core subsystem for " + root.getPackageName())
+    else
+      log.info("initialize AppService for " + root.getPackageName())
     if (_inner != null) {
       inner = _inner
     } else {
@@ -242,7 +244,7 @@ object AppService {
   def ICtrlHost = Inner.flatMap(_.get())
   def initialized = synchronized { inner != null }
   object Message {
-    sealed abstract class Abstract
+    sealed trait Abstract
     object Ping extends Abstract
     case class Start(serviceActivity: String, onComplete: (Boolean) => Unit = null) extends Abstract
     case class StartAll(onComplete: (Boolean) => Unit = null) extends Abstract

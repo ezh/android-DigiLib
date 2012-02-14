@@ -259,6 +259,9 @@ object AppCache extends Actor {
             case e =>
               log.warn(e.getMessage(), e)
           }
+        case Message.Reinitialize(context, innerCache) =>
+          inner = null
+          init(context, innerCache)
         case unknown =>
           log.error("unknown message " + unknown)
       }
@@ -272,10 +275,19 @@ object AppCache extends Actor {
     period = _period
   }
   @Loggable
-  def init(context: Context, innerCache: AppCache = null) = synchronized {
+  def init(context: Context, innerCache: AppCache = null): Unit = synchronized {
     contextPackageName = context.getPackageName()
-    log.info("initialize AppCache for " + contextPackageName)
-    assert(inner == null)
+    if (inner != null) {
+      log.info("reinitialize AppCache core subsystem for " + contextPackageName)
+      /*
+       * since actor is a single point of entry
+       * process all requests
+       * and then reinitialize
+       */
+      this ! Message.Reinitialize(context, innerCache)
+      return
+    } else
+      log.info("initialize AppCache for " + contextPackageName)
     val pref = context.getSharedPreferences(Common.Preference.main, Context.MODE_PRIVATE)
     period = pref.getLong(Common.Option.cache_period.res, period)
     cachePath = pref.getString(Common.Option.cache_folder.res, context.getCacheDir + "/")
@@ -316,5 +328,6 @@ object AppCache extends Actor {
     case class Remove(namespace: scala.Enumeration#Value, key: String)
     case class RemoveByID(namespaceId: Int, key: String)
     case class Clear(namespace: scala.Enumeration#Value)
+    case class Reinitialize(context: Context, innerCache: AppCache)
   }
 }

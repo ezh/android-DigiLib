@@ -207,8 +207,10 @@ object AppActivity {
   @Loggable
   def init(root: Context, _inner: AppActivity = null) = synchronized {
     AppCache.init(root)
-    log.info("initialize AppActivity for " + root.getPackageName())
-    assert(inner == null)
+    if (inner != null)
+      log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
+    else
+      log.info("initialize AppActivity for " + root.getPackageName())
     if (_inner != null)
       inner = _inner
     else
@@ -245,7 +247,7 @@ object AppActivity {
   def Context = Inner.flatMap(_.get())
   def initialized = synchronized { inner != null }
   object Message {
-    sealed abstract class Abstract
+    sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
   }
   case class Status(val state: Common.State.Value, val data: Any = null, val onClickCallback: () => Any = () => {
