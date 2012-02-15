@@ -34,6 +34,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.RemoteException
+import scala.collection.JavaConversions._
 
 protected class AppService private (var root: WeakReference[Context]) extends Actor {
   private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
@@ -62,16 +63,17 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
         // TODO suspend actor as scala.actors.Actor.State.Suspended when service lost
         case AppService.Message.Ping =>
           reply()
-        case AppService.Message.Start(serviceActivity, onComplete) =>
-          if (onComplete != null) onComplete(serviceStart(serviceActivity)) else serviceStart(serviceActivity)
-        case AppService.Message.StartAll(onComplete) =>
-          if (onComplete != null) onComplete(serviceStartAll()) else serviceStartAll()
-        case AppService.Message.Status(serviceActivity, onComplete) =>
-          serviceStatus(serviceActivity)
-        case AppService.Message.Stop(serviceActivity, onComplete) =>
-          if (onComplete != null) onComplete(serviceStop(serviceActivity)) else serviceStop(serviceActivity)
-        case AppService.Message.StopAll(onComplete) =>
-          if (onComplete != null) onComplete(serviceStopAll()) else serviceStopAll()
+        case AppService.Message.Start(componentPackage, onCompleteCallback) =>
+          if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
+        case AppService.Message.StartAll(onCompleteCallback) =>
+          if (onCompleteCallback != null) onCompleteCallback(componentStartAll()) else componentStartAll()
+        case AppService.Message.Status(componentPackage, onCompleteCallback) =>
+          assert(onCompleteCallback != null)
+          onCompleteCallback(componentStatus(componentPackage))
+        case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
+          if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
+        case AppService.Message.StopAll(onCompleteCallback) =>
+          if (onCompleteCallback != null) onCompleteCallback(componentStopAll()) else componentStopAll()
         case unknown =>
           log.error("unknown message " + unknown)
       }
@@ -162,42 +164,50 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
     }
   }
   @Loggable
-  protected def serviceStart(serviceActivity: String): Boolean =
-    get match {
-      case Some(service) => service.start(serviceActivity)
-      case None => false
-    }
+  protected def componentStart(componentPackage: String): Boolean = get match {
+    case Some(service) => service.start(componentPackage)
+    case None => false
+  }
   @Loggable
-  protected def serviceStartAll(): Boolean =
-    get match {
-      case Some(service) => service.startAll()
-      case None => false
-    }
+  protected def componentStartAll(): Boolean = get match {
+    case Some(service) => service.startAll()
+    case None => false
+  }
   @Loggable
-  protected def serviceStatus(serviceActivity: String): Either[String, java.util.Map[String, Any]] =
-    AppService.ICtrlHost match {
-      case Some(service) =>
-        try {
-          Right(service.status().asInstanceOf[java.util.Map[String, Any]])
-        } catch {
-          case e: RemoteException =>
-            Left(e.getMessage)
+  protected def componentStatus(componentPackage: String): Either[String, Common.ComponentStatus] = get match {
+    case Some(service) =>
+      try {
+        service.status(componentPackage) match {
+          case list: java.util.List[_] =>
+            Common.deserializeFromList(list.asInstanceOf[List[Byte]]) match {
+              case obj: Common.ComponentStatus =>
+                log.debug("deserialization of Common.ComponentStatus successful")
+                Right(obj)
+              case _ =>
+                log.debug("deserialization of Common.ComponentStatus failed")
+                Left("status failed")
+            }
+          case null =>
+            log.debug("service return null instread of Common.ComponentStatus")
+            Left("status failed")
         }
-      case None =>
-        Left("service unreachable")
-    }
+      } catch {
+        case e: RemoteException =>
+          Left(e.getMessage)
+      }
+    case None =>
+      Left("service unreachable")
+  }
   @Loggable
-  protected def serviceStop(serviceActivity: String): Boolean =
-    get match {
-      case Some(service) => service.stop(serviceActivity)
-      case None => false
-    }
+  protected def componentStop(componentPackage: String): Boolean = get match {
+    case Some(service) => service.stop(componentPackage)
+    case None => false
+  }
   @Loggable
-  protected def serviceStopAll(): Boolean =
-    get match {
-      case Some(service) => service.stopAll()
-      case None => false
-    }
+  protected def componentStopAll(): Boolean = get match {
+    case Some(service) => service.stopAll()
+    case None => false
+  }
 }
 
 object AppService {
@@ -246,11 +256,11 @@ object AppService {
   object Message {
     sealed trait Abstract
     object Ping extends Abstract
-    case class Start(serviceActivity: String, onComplete: (Boolean) => Unit = null) extends Abstract
-    case class StartAll(onComplete: (Boolean) => Unit = null) extends Abstract
-    case class Status(serviceActivity: String, onComplete: (Boolean) => Unit = null) extends Abstract
-    case class Stop(serviceActivity: String, onComplete: (Boolean) => Unit = null) extends Abstract
-    case class StopAll(onComplete: (Boolean) => Unit = null) extends Abstract
+    case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
+    case class StartAll(onCompleteCallback: (Boolean) => Unit = null) extends Abstract
+    case class Status(componentPackage: String, onCompleteCallback: (Either[String, Common.ComponentStatus]) => Unit = null) extends Abstract
+    case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
+    case class StopAll(onCompleteCallback: (Boolean) => Unit = null) extends Abstract
     object ListInterfaces extends Abstract
     object Disconnect extends Abstract
   }

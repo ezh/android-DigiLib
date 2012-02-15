@@ -206,6 +206,21 @@ object Common {
       log.debug("unexpectedly disconnected from " + className + " service")
     }
   }
+  class ComponentStatus(val componentPackage: String,
+    val serviceStatus: List[ServiceStatus],
+    val active: Boolean) extends java.io.Serializable {
+  }
+  // like ServiceEnvironment, keep it separate
+  class ServiceStatus(val id: Int,
+    val commandLine: Seq[String],
+    val port: Int,
+    val env: Seq[String] = Seq(),
+    val active: Boolean) extends java.io.Serializable {
+    assert(id >= 0 && id <= 0xFFFF)
+    assert(port > 0 && id <= 0xFFFF)
+    assert(commandLine.nonEmpty)
+  }
+  // like ServiceStatus, keep it separate
   class ServiceEnvironment(val id: Int,
     val commandLine: Seq[String],
     val port: Int,
