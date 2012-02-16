@@ -18,13 +18,13 @@ package org.digimead.digi.ctrl.lib.aop
 
 import org.slf4j.LoggerFactory
 import org.digimead.digi.ctrl.lib.AppCache
+import org.digimead.digi.ctrl.lib.Common
 
-abstract class Caching {
-  val log = LoggerFactory.getLogger("o.d.d.c.a.Caching")
+abstract class Caching extends Logging {
+  val log = Logging.getLogger(this)
 
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {
     // TODO val logging = log.isTraceEnabled()
-    val tid = Thread.currentThread().getId()
     /*
      * last argument is inappropriate, for example scala compiler add Manifest[_] to tail
      * there may be other bytecode generators
@@ -34,51 +34,51 @@ abstract class Caching {
         case Caching.BoxedTrue =>
           // forced
           val key = longSignature.hashCode() + " " + args.tail.map(_.hashCode()).mkString(" ")
-          log.trace("[T%010d".format(tid) + "] FORCED " + shortSignature + " with namespace id " + annotation.namespace)
-          return invokeOriginal(invoker, tid, key, annotation.namespace())
+          log.trace("FORCED " + shortSignature + " with namespace id " + annotation.namespace)
+          return invokeOriginal(invoker, key, annotation.namespace())
         case Caching.BoxedFalse =>
           longSignature.hashCode() + " " + args.tail.map(_.hashCode()).mkString(" ")
         case _ =>
           // lost in space? lazy code? something broken? null? something modify bytecode or other reasons...
           // nothing critical, but notify someone
-          log.warn("[T%010d".format(tid) + "] UNKNOWN TYPE of cacheable method 1st argument, " + shortSignature + " with namespace id " + annotation.namespace)
+          log.warn("UNKNOWN TYPE of cacheable method 1st argument, " + shortSignature + " with namespace id " + annotation.namespace)
           longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
       }
     } else
       longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
-    log.trace("[T%010d".format(tid) + "] " + shortSignature + " with namespace id " + annotation.namespace)
+    log.trace(shortSignature + " with namespace id " + annotation.namespace)
     AppCache !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
       case r @ Some(retVal) =>
-        log.trace("[T%010d".format(tid) + "] HIT key " + key + " found, returning cached value")
+        log.trace("HIT key " + key + " found, returning cached value")
         return r
       case None =>
-        log.trace("[T%010d".format(tid) + "] MISS key " + key + " not found, invoking original method")
-        invokeOriginal(invoker, tid, key, annotation.namespace())
+        log.trace("MISS key " + key + " not found, invoking original method")
+        invokeOriginal(invoker, key, annotation.namespace())
     }
   }
-  def invokeOriginal(invoker: Invoker, tid: Long, key: String, namespaceID: Int) =
+  def invokeOriginal(invoker: Invoker, key: String, namespaceID: Int) =
     // all cases except "Option" and "Traversable" must throw scala.MatchError
     // so developer notified about design bug
     invoker.invoke() match {
       case r @ Traversable =>
         // process collection
         AppCache ! AppCache.Message.UpdateByID(namespaceID, key, r)
-        log.trace("[T%010d".format(tid) + "] key " + key + " updated")
+        log.trace("key " + key + " updated")
         r
       case Nil =>
         // process Nil
         AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
-        log.trace("[T%010d".format(tid) + "] key " + key + "  removed, original method return Nil value")
+        log.trace("key " + key + "  removed, original method return Nil value")
         Nil
       case r @ Some(retVal) =>
         // process option
         AppCache ! AppCache.Message.UpdateByID(namespaceID, key, retVal)
-        log.trace("[T%010d".format(tid) + "] key " + key + " updated")
+        log.trace("key " + key + " updated")
         r
       case None =>
         // process None
         AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
-        log.trace("[T%010d".format(tid) + "] key " + key + " removed, original return None value")
+        log.trace("key " + key + " removed, original return None value")
         None
     }
   trait Invoker {

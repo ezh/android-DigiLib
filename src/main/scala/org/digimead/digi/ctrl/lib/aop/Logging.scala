@@ -14,85 +14,139 @@
  * limitations under the License.
  */
 
+/*
+ * best viewer is *nix console with command line
+ * grcat - generic colouriser grcat by Radovan Garabík
+ * adb logcat -v threadtime | awk '{for(i=1;i<=NF;i++)if(i!=1&&i!=2)printf$i OFS;print""}' | grcat adb.conf
+ * 
+ * OR
+ * 
+ * adb logcat -v threadtime | awk '{
+ *  for (i=1; i<=NF; i++) {
+ *#    if (i==1) printf$i OFS;printf ""
+ *#    if (i==2) printf$i OFS;printf ""
+ *    if (i==3) printf(" P%05d",$i);
+ *    if (i==4) printf(" T%05d",$i);
+ *    if (i==5) printf(" %1s",$i);
+ *    if (i==6) printf(" %-24s",$i);
+ *    if (i>6) printf$i OFS;printf"";
+ *  }
+ *  print ""
+ *}' | grcat adb.conf
+ *
+ *
+ * example adb.conf
+ *regexp=.*exceeds maximum length of 23 characters,.*
+ *skip=yes
+ *count=more
+ *-
+ *regexp=^ P\d{5} T\d{5} . @.*$
+ *colours=bold
+ *count=more
+ *-
+ *regexp=^ P\d{5} T\d{5} V @.*$
+ *colours=bold black
+ *count=more
+ *
+ * we may highlight with colors everything
+ * anything like PID/TID/Class/File/Line/Level
+ * and than filter or search
+ */
+
 package org.digimead.digi.ctrl.lib.aop
 
 import org.aspectj.lang.JoinPoint
+import org.digimead.digi.ctrl.lib.Common
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.File
+import org.aspectj.lang.Signature
 
-abstract class Logging {
-  private final val log = LoggerFactory.getLogger("o.d.d.c.a.Logging")
-
-  def enteringMethod(joinPoint: JoinPoint) {
-    val tid = Thread.currentThread().getId()
-    val source = joinPoint.getSourceLocation()
-    val signature = joinPoint.getSignature()
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
-    log.trace("[T%010d".format(tid) + "] enteringMethod " + className + "::" + methodName + " " + source.getFileName() + ":" + source.getLine())
-  }
-  def leavingMethod(joinPoint: JoinPoint) {
-    val tid = Thread.currentThread().getId()
-    val signature = joinPoint.getSignature()
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
-    log.trace("[T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName)
-  }
-  def leavingMethod(joinPoint: JoinPoint, returnValue: Object) {
-    val tid = Thread.currentThread().getId()
-    val signature = joinPoint.getSignature()
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
-    log.trace("[T%010d".format(tid) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
-  }
-  def leavingMethodException(joinPoint: JoinPoint, throwable: Exception) {
-    val tid = Thread.currentThread().getId()
-    val signature = joinPoint.getSignature();
-    val className = signature.getDeclaringType().getSimpleName();
-    val methodName = signature.getName();
-    val exceptionMessage = throwable.getMessage();
-    log.trace("[T%010d".format(tid) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
-  }
-  protected def TRACE(msg: String) = log.trace(msg)
+trait Logging {
+  @transient
+  protected val log: Logger
 }
 
 object Logging {
+  var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
   final var enabled = true
-  def tid = "[T%010d".format(Thread.currentThread().getId()) + "] "
+  def enteringMethod(file: String, line: Int, signature: Signature, obj: Logging) {
+    val className = signature.getDeclaringType().getSimpleName()
+    val methodName = signature.getName()
+    obj.log.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName)
+  }
+  def leavingMethod(file: String, line: Int, signature: Signature, obj: Logging) {
+    val className = signature.getDeclaringType().getSimpleName()
+    val methodName = signature.getName()
+    obj.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName)
+  }
+  def leavingMethod(file: String, line: Int, signature: Signature, obj: Logging, returnValue: Object) {
+    val className = signature.getDeclaringType().getSimpleName()
+    val methodName = signature.getName()
+    obj.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
+  }
+  def leavingMethodException(file: String, line: Int, signature: Signature, obj: Logging, throwable: Exception) {
+    val className = signature.getDeclaringType().getSimpleName()
+    val methodName = signature.getName()
+    val exceptionMessage = throwable.getMessage();
+    obj.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
+  }
+  def getLogger(obj: Logging): Logger = {
+    val stack = Thread.currentThread.getStackTrace()(3) // constant location
+    val fileRaw = stack.getFileName.split("""\.""")
+    val fileParsed = if (fileRaw.length > 1)
+      fileRaw.dropRight(1).mkString(".")
+    else
+      fileRaw.head
+    if (obj.getClass().toString.last == '$') // add object mart to file name
+      LoggerFactory.getLogger(logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$")
+    else
+      LoggerFactory.getLogger(logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed)
+  }
 }
 
 /*
 
 Example:
 
-import org.digimead.digi.ctrl.lib.aop.Loggable;
+import org.aspectj.lang.reflect.SourceLocation;
 
-privileged public final aspect AspectLogging extends
-		org.digimead.digi.ctrl.lib.aop.Logging {
-	public pointcut loggingNonVoid() : execution(@Loggable !void *(..));
+privileged public final aspect AspectLogging {
+	public pointcut loggingNonVoid(Logging obj, Loggable loggable) : target(obj) && execution(@Loggable !void *(..)) && @annotation(loggable);
 
-	public pointcut loggingVoid() : execution(@Loggable void *(..));
+	public pointcut loggingVoid(Logging obj, Loggable loggable) : target(obj) && execution(@Loggable void *(..)) && @annotation(loggable);
 
-	public pointcut logging() : loggingVoid() || loggingNonVoid();
+	public pointcut logging(Logging obj, Loggable loggable) : loggingVoid(obj, loggable) || loggingNonVoid(obj, loggable);
 
-	before() : logging() {
-		if (org.digimead.digi.ctrl.lib.aop.Logging.enabled())
-			enteringMethod(thisJoinPoint);
+	before(final Logging obj, final Loggable loggable) : logging(obj, loggable) {
+		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
+		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enteringMethod(
+					location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
-	after() returning(Object result) : loggingNonVoid() {
-		if (org.digimead.digi.ctrl.lib.aop.Logging.enabled())
-			leavingMethod(thisJoinPoint, result);
+	after(final Logging obj, final Loggable loggable) returning(final Object result) : loggingNonVoid(obj, loggable) {
+		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
+		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
+			if (loggable.result())
+				org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.leavingMethod(
+						location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj, result);
+			else
+				org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+						.leavingMethod(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
-	after() returning() : loggingVoid() {
-		if (org.digimead.digi.ctrl.lib.aop.Logging.enabled())
-			leavingMethod(thisJoinPoint);
+	after(final Logging obj, final Loggable loggable) returning() : loggingVoid(obj, loggable) {
+		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
+		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+					.leavingMethod(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
-	after() throwing(Exception ex) : logging() {
-		if (org.digimead.digi.ctrl.lib.aop.Logging.enabled())
-			leavingMethodException(thisJoinPoint, ex);
+	after(final Logging obj, final Loggable loggable) throwing(final Exception ex) : logging(obj, loggable) {
+		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
+		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+					.leavingMethodException(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj, ex);
 	}
 }
 

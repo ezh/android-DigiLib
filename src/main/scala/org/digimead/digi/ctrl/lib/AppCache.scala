@@ -38,6 +38,7 @@ import scala.collection.mutable.HashMap
 import scala.ref.SoftReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.slf4j.LoggerFactory
 
 import android.content.Context
@@ -71,8 +72,8 @@ class NilCache extends AppCacheT[String, Any] {
   def remove(namespaceID: Int, key: String): Option[Any] = None
   def clear(namespace: scala.Enumeration#Value): Unit = {}
 }
-class AppCache extends AppCacheT[String, Any] {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+class AppCache extends AppCacheT[String, Any] with Logging {
+  protected val log = Logging.getLogger(this)
   def get(namespace: scala.Enumeration#Value, key: String) =
     get(namespace, key, AppCache.getDefaultPeriod())
   def get(namespace: scala.Enumeration#Value, key: String, period: Long): Option[Any] =
@@ -187,8 +188,8 @@ class AppCache extends AppCacheT[String, Any] {
   }
 }
 
-object AppCache extends Actor {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object AppCache extends Actor with Logging {
+  protected val log = Logging.getLogger(this)
   private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes

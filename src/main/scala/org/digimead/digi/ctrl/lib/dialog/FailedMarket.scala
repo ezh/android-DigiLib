@@ -17,7 +17,9 @@
 package org.digimead.digi.ctrl.lib.dialog
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.Android
+import org.digimead.digi.ctrl.lib.Common
 import org.slf4j.LoggerFactory
 
 import android.app.Activity
@@ -26,8 +28,8 @@ import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 
-object FailedMarket {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object FailedMarket extends Logging {
+  protected val log = Logging.getLogger(this)
   def getId(context: Context) = context.getResources().getIdentifier("dialog_FailedMarket", "id", context.getPackageName())
   @Loggable
   def createDialog(activity: Activity): Dialog = {

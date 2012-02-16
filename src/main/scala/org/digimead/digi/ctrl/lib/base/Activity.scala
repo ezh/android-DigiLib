@@ -17,12 +17,13 @@
 package org.digimead.digi.ctrl.lib.base
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.AppActivity
 
 import android.app.{Activity => AActivity}
 import android.os.Bundle
 
-trait Activity extends AActivity with AnyBase {
+trait Activity extends AActivity with AnyBase with Logging {
   @Loggable
   override def onCreate(savedInstanceState: Bundle): Unit =
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })

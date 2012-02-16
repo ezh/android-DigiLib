@@ -21,11 +21,13 @@ import scala.actors.scheduler.ResizableThreadPoolScheduler
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.Common
 import org.slf4j.LoggerFactory
 
 import android.content.Context
 
-private[base] trait AnyBase {
+private[base] trait AnyBase extends Logging {
   @Loggable
   protected def onCreateBase(ctx: Context, callSuper: => Any): Boolean = {
     callSuper
@@ -33,8 +35,8 @@ private[base] trait AnyBase {
   }
 }
 
-object AnyBase {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object AnyBase extends Logging {
+  protected val log = Logging.getLogger(this)
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "256")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])

@@ -26,16 +26,13 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
-
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
-
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.ICtrlComponent
 import org.slf4j.LoggerFactory
-
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -44,9 +41,10 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
+import org.digimead.digi.ctrl.lib.aop.Logging
 
-object Common {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object Common extends Logging {
+  protected val log = Logging.getLogger(this)
   log.debug("alive")
   @Loggable
   def onCreateDialog(id: Int, activity: Activity) = id match {
@@ -264,9 +262,9 @@ object Common {
     val cache_class = Value("cache_class", "cache_class", "cache_class")
     val comm_confirmation = Value("comm_confirmation", "comm_confirmation_name", "comm_confirmation_description")
     val comm_writelog = Value("comm_writelog", "comm_writelog_name", "comm_writelog_description")
-    val service_asroot = Value("service_asroot", "service_asroot_name", "service_asroot_description")
-    val service_running = Value("service_running", "service_running_name", "service_running_description")
-    val service_onboot = Value("service_onboot", "service_onboot_name", "service_onboot_description")
+    val asroot = Value("asroot", "service_asroot_name", "service_asroot_description")
+    val running = Value("running", "service_running_name", "service_running_description")
+    val onboot = Value("onboot", "service_onboot_name", "service_onboot_description")
     class OptVal(val res: String, val name: String, val description: String) extends Val(nextId, name) {
       def name(context: Context) = Android.getString(context, res)
       def description(context: Context) = Android.getString(context, res)

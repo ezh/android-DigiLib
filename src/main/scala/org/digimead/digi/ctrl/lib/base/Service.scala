@@ -17,11 +17,12 @@
 package org.digimead.digi.ctrl.lib.base
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.AppService
 
 import android.app.{ Service => AService }
 
-trait Service extends AService with AnyBase {
+trait Service extends AService with AnyBase with Logging {
   @Loggable
   override def onCreate(): Unit =
     onCreateBase(this, { Service.super.onCreate() })

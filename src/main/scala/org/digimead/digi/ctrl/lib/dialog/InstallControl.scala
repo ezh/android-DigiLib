@@ -17,6 +17,7 @@
 package org.digimead.digi.ctrl.lib.dialog
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.Android
 import org.digimead.digi.ctrl.lib.AppActivity
 import org.digimead.digi.ctrl.lib.Common
@@ -31,8 +32,8 @@ import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 
-object InstallControl {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object InstallControl extends Logging {
+  protected val log = Logging.getLogger(this)
   def getId(context: Context) = context.getResources().getIdentifier("dialog_InstallControl", "id", context.getPackageName())
   @Loggable
   def createDialog(activity: Activity): Dialog = {

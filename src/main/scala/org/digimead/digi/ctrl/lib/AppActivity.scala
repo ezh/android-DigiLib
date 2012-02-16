@@ -27,6 +27,7 @@ import scala.ref.WeakReference
 import scala.xml.Node
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Version
 import org.slf4j.LoggerFactory
 
@@ -34,8 +35,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 
-protected class AppActivity private (var root: WeakReference[Context]) extends Actor {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+protected class AppActivity private (var root: WeakReference[Context]) extends Actor with Logging {
+  protected val log = Logging.getLogger(this)
   private var status: AtomicReference[AppActivity.Status] = new AtomicReference()
   lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
   lazy val appNativeDescription = appNativePath.map(appNativePath => new File(appNativePath, "description.xml"))
@@ -201,8 +202,8 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
     }*/
 }
 
-object AppActivity {
-  private val log = LoggerFactory.getLogger(getClass.getName().replaceFirst("org.digimead.digi.ctrl", "o.d.d.c"))
+object AppActivity extends Logging {
+  protected val log = Logging.getLogger(this)
   private var inner: AppActivity = null
   @Loggable
   def init(root: Context, _inner: AppActivity = null) = synchronized {

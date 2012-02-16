@@ -17,10 +17,11 @@
 package org.digimead.digi.ctrl.lib.base
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 
 import android.content.ContentProvider
 
-trait Provider extends ContentProvider with AnyBase {
+trait Provider extends ContentProvider with AnyBase with Logging {
   @Loggable
   override def onCreate(): Boolean =
     onCreateBase(getContext(), {})
