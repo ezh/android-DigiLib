@@ -164,14 +164,18 @@ object Common extends Logging {
     baos.toByteArray()
   }
   @Loggable(result = false)
-  def deserializeFromList(s: java.util.List[Byte]): Object =
+  def deserializeFromList(s: java.util.List[Byte]): Option[Object] =
     deserializeFromArray(s.toList.toArray)
   @Loggable(result = false)
-  def deserializeFromArray(s: Array[Byte]): Object = {
+  def deserializeFromArray(s: Array[Byte]): Option[Object] = try {
     val ois = new ObjectInputStream(new ByteArrayInputStream(s.toList.toArray))
     val o = ois.readObject()
     ois.close()
-    o
+    Some(o)
+  } catch {
+    case e =>
+      log.error(e.getMessage())
+      None
   }
   /**
    * Write to a stream
@@ -206,14 +210,14 @@ object Common extends Logging {
   }
   class ComponentStatus(val componentPackage: String,
     val serviceStatus: List[ServiceStatus],
-    val active: Boolean) extends java.io.Serializable {
+    val state: State.Value) extends java.io.Serializable {
   }
   // like ServiceEnvironment, keep it separate
   class ServiceStatus(val id: Int,
     val commandLine: Seq[String],
     val port: Int,
     val env: Seq[String] = Seq(),
-    val active: Boolean) extends java.io.Serializable {
+    val state: State.Value) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
     assert(port > 0 && id <= 0xFFFF)
     assert(commandLine.nonEmpty)
@@ -223,10 +227,15 @@ object Common extends Logging {
     val commandLine: Seq[String],
     val port: Int,
     val env: Seq[String] = Seq(),
-    val active: Boolean = true) extends java.io.Serializable {
+    val state: State.Value) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
     assert(port > 0 && id <= 0xFFFF)
     assert(commandLine.nonEmpty)
+  }
+  object Timeout {
+    val fast = 5000
+    val normal = 10000
+    val long = 60000
   }
   object Content {
     val commandline = "commandline"
@@ -241,7 +250,7 @@ object Common extends Logging {
     final val apkNativePath = "armeabi"
   }
   object State extends Enumeration {
-    val initializing, ready, active, error = Value
+    val Initializing, Broken, Passive, Busy, Active = Value
   }
   object Preference {
     val main = getClass.getPackage.getName + "@main" // shared preferences name
@@ -257,14 +266,14 @@ object Common extends Logging {
   }
   object Option extends Enumeration {
     // TODO rewrite with nameMap = LongMap(id) -> names and descriptionMap SoftReference
-    val cache_period = Value("cache_period", "cache_period", "cache_period")
-    val cache_folder = Value("cache_dir", "cache_dir", "cache_dir")
-    val cache_class = Value("cache_class", "cache_class", "cache_class")
-    val comm_confirmation = Value("comm_confirmation", "comm_confirmation_name", "comm_confirmation_description")
-    val comm_writelog = Value("comm_writelog", "comm_writelog_name", "comm_writelog_description")
-    val asroot = Value("asroot", "service_asroot_name", "service_asroot_description")
-    val running = Value("running", "service_running_name", "service_running_description")
-    val onboot = Value("onboot", "service_onboot_name", "service_onboot_description")
+    val CachePeriod = Value("cache_period", "cache_period", "cache_period")
+    val CacheFolder = Value("cache_dir", "cache_dir", "cache_dir")
+    val CacheClass = Value("cache_class", "cache_class", "cache_class")
+    val CommConfirmation = Value("comm_confirmation", "comm_confirmation_name", "comm_confirmation_description")
+    val CommWriteLog = Value("comm_writelog", "comm_writelog_name", "comm_writelog_description")
+    val AsRoot = Value("asroot", "service_asroot_name", "service_asroot_description")
+    val Running = Value("running", "service_running_name", "service_running_description")
+    val OnBoot = Value("onboot", "service_onboot_name", "service_onboot_description")
     class OptVal(val res: String, val name: String, val description: String) extends Val(nextId, name) {
       def name(context: Context) = Android.getString(context, res)
       def description(context: Context) = Android.getString(context, res)

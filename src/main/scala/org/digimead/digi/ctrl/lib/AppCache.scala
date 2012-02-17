@@ -290,9 +290,9 @@ object AppCache extends Actor with Logging {
     } else
       log.info("initialize AppCache for " + contextPackageName)
     val pref = context.getSharedPreferences(Common.Preference.main, Context.MODE_PRIVATE)
-    period = pref.getLong(Common.Option.cache_period.res, period)
-    cachePath = pref.getString(Common.Option.cache_folder.res, context.getCacheDir + "/")
-    cacheClass = pref.getString(Common.Option.cache_class.res, "org.digimead.digi.ctrl.lib.AppCache")
+    period = pref.getLong(Common.Option.CachePeriod.res, period)
+    cachePath = pref.getString(Common.Option.CacheFolder.res, context.getCacheDir + "/")
+    cacheClass = pref.getString(Common.Option.CacheClass.res, "org.digimead.digi.ctrl.lib.AppCache")
     if (innerCache != null) {
       inner = innerCache
     } else {

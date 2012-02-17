@@ -66,15 +66,11 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
           reply()
         case AppService.Message.Start(componentPackage, onCompleteCallback) =>
           if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
-        case AppService.Message.StartAll(onCompleteCallback) =>
-          if (onCompleteCallback != null) onCompleteCallback(componentStartAll()) else componentStartAll()
         case AppService.Message.Status(componentPackage, onCompleteCallback) =>
-          assert(onCompleteCallback != null)
+          assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
           onCompleteCallback(componentStatus(componentPackage))
         case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
           if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
-        case AppService.Message.StopAll(onCompleteCallback) =>
-          if (onCompleteCallback != null) onCompleteCallback(componentStopAll()) else componentStopAll()
         case unknown =>
           log.error("unknown message " + unknown)
       }
@@ -118,7 +114,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
               false
             }
             if (!successful)
-              AppActivity.Status(Common.State.error, Android.getString(ctx, "error_control_notfound"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_control_notfound"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
           }
         else
@@ -170,22 +166,15 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
     case None => false
   }
   @Loggable
-  protected def componentStartAll(): Boolean = get match {
-    case Some(service) => service.startAll()
-    case None => false
-  }
-  @Loggable
   protected def componentStatus(componentPackage: String): Either[String, Common.ComponentStatus] = get match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
           case list: java.util.List[_] =>
-            Common.deserializeFromList(list.asInstanceOf[List[Byte]]) match {
-              case obj: Common.ComponentStatus =>
-                log.debug("deserialization of Common.ComponentStatus successful")
-                Right(obj)
-              case _ =>
-                log.debug("deserialization of Common.ComponentStatus failed")
+            Common.deserializeFromList(list.asInstanceOf[java.util.List[Byte]]) match {
+              case Some(obj) =>
+                Right(obj.asInstanceOf[Common.ComponentStatus])
+              case None =>
                 Left("status failed")
             }
           case null =>
@@ -193,7 +182,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
             Left("status failed")
         }
       } catch {
-        case e: RemoteException =>
+        case e =>
           Left(e.getMessage)
       }
     case None =>
@@ -202,11 +191,6 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
   @Loggable
   protected def componentStop(componentPackage: String): Boolean = get match {
     case Some(service) => service.stop(componentPackage)
-    case None => false
-  }
-  @Loggable
-  protected def componentStopAll(): Boolean = get match {
-    case Some(service) => service.stopAll()
     case None => false
   }
 }
@@ -258,14 +242,9 @@ object AppService extends Logging {
     sealed trait Abstract
     object Ping extends Abstract
     case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    case class StartAll(onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    case class Status(componentPackage: String, onCompleteCallback: (Either[String, Common.ComponentStatus]) => Unit = null) extends Abstract
+    case class Status(componentPackage: String, onCompleteCallback: (Either[String, Common.ComponentStatus]) => Unit) extends Abstract
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    case class StopAll(onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    object ListInterfaces extends Abstract
+//    object ListInterfaces extends Abstract
     object Disconnect extends Abstract
-  }
-  object State extends Enumeration {
-    val Initializing, Ready, Active, Error = Value
   }
 }

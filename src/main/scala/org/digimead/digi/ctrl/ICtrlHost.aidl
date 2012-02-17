@@ -19,10 +19,6 @@ package org.digimead.digi.ctrl;
 interface ICtrlHost {
   boolean active();
   boolean start(in String componentPackage);
-  boolean startAll();
-  // serialized to Array[Byte] Common.ComponentStatus
-  List status(in String componentPackage);
+  List status(in String componentPackage); // serialized to Array[Byte] Common.ComponentStatus
   boolean stop(in String componentPackage);
-  boolean stopAll();
-  List<String> listInterfaces();
 }

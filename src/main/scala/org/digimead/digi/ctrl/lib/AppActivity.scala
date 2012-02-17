@@ -105,7 +105,7 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
       }
       if (xmlOriginal == None) {
         log.error("couldn't install native armeabi files without proper description.xml")
-        AppActivity.Status(Common.State.error, Android.getString(ctx, "error_prepare_description"))
+        AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_description"))
         return false
       }
       if (keep && to.forall(_.exists) && xmlInstalled != None && checkEnvironmentVersion(xmlOriginal, xmlInstalled)) {
@@ -128,12 +128,12 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
             val permission = if (makePublic) "a+rx" else "u+x"
             val result = Common.execChmod(permission, entityTo)
             if (!result)
-              AppActivity.Status(Common.State.error, Android.getString(ctx, "error_prepare_chmod"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
             result
           } catch {
             case e =>
-              AppActivity.Status(Common.State.error, Android.getString(ctx, "error_prepare_unknown"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
               false
             // TODO               return "Error process " + outFileName + ": " +!!! e.getMessage()!!!;
@@ -155,7 +155,7 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
           appNativePath.mkdirs()
           val result = Common.execChmod("a+x", appNativePath, true)
           if (!result)
-            AppActivity.Status(Common.State.error, Android.getString(ctx, "error_prepare_chmod"),
+            AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod"),
               () => caller.showDialog(dialog.InstallControl.getId(ctx)))
           result
         } else
@@ -216,7 +216,7 @@ object AppActivity extends Logging {
       inner = _inner
     else
       inner = new AppActivity(new WeakReference(root))
-    Status(Common.State.initializing)
+    Status(Common.State.Initializing)
   }
   def deinit(): Unit = synchronized {
     val context = inner.root.get
