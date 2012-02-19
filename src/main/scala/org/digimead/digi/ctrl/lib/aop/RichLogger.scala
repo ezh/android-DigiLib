@@ -20,7 +20,7 @@ import org.slf4j.Logger
 
 class RichLogger(val logger: Logger) {
   // fast look while development, highlight it in your IDE
-  def _g_a_s_e_(msg: String) {
+  def g_a_s_e(msg: String) {
     fatal("GASE: " + msg)
   }
   // error with stack trace

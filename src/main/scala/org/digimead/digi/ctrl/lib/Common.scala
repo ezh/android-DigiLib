@@ -173,9 +173,10 @@ object Common extends Logging {
   }
   @Loggable(result = false)
   def deserializeFromList(s: java.util.List[Byte]): Option[Object] =
-    deserializeFromArray(s.toList.toArray)
+    if (s == null) None else deserializeFromArray(s.toList.toArray)
   @Loggable(result = false)
   def deserializeFromArray(s: Array[Byte]): Option[Object] = try {
+    if (s == null) return None
     val ois = new ObjectInputStream(new ByteArrayInputStream(s.toList.toArray))
     val o = ois.readObject()
     ois.close()
@@ -272,8 +273,8 @@ object Common extends Logging {
   }
   // like ServiceStatus, keep it separate
   class ServiceEnvironment(val id: Int,
-    val commandLine: Seq[String],
-    val port: Int,
+    val commandLine: Option[Seq[String]],
+    val port: Option[Int],
     val env: Seq[String],
     val state: State.Value,
     val name: String,
@@ -282,8 +283,8 @@ object Common extends Logging {
     val license: String,
     val project: String) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
-    assert(port > 0 && id <= 0xFFFF)
-    assert(commandLine.nonEmpty)
+    assert(port == None || (port.get >= 0 && port.get <= 0xFFFF))
+    assert(commandLine == None || commandLine.get.nonEmpty)
   }
   object Timeout {
     val fast = 5000
