@@ -274,7 +274,12 @@ object Common extends Logging {
     val commandLine: Seq[String],
     val port: Int,
     val env: Seq[String] = Seq(),
-    val state: State.Value) extends java.io.Serializable {
+    val state: State.Value,
+    val name: String,
+    val description: String,
+    val copyright: String,
+    val license: String,
+    val project: String) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
     assert(port > 0 && id <= 0xFFFF)
     assert(commandLine.nonEmpty)
