@@ -26,16 +26,13 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
-
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
-
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.ICtrlComponent
-
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -44,9 +41,11 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
+import scala.collection.mutable.SynchronizedMap
 
 object Common extends Logging {
   protected val log = Logging.getLogger(this)
+  private val doComponentServicePool = new scala.collection.mutable.HashMap[String, ICtrlComponent] with SynchronizedMap[String, ICtrlComponent]
   log.debug("alive")
   @Loggable
   def onCreateDialog(id: Int, activity: Activity) = id match {
@@ -130,31 +129,58 @@ object Common extends Logging {
       true
   }
   @Loggable
-  def doComponentService(componentPackage: String)(f: (ICtrlComponent) => Any) = AppActivity.Context map {
+  def doComponentService(componentPackage: String, reuse: Boolean = true)(f: (ICtrlComponent) => Any) = AppActivity.Context map {
     context =>
-      // lock for bindService
-      val lock = new Lock
-      // service itself
-      var service: ICtrlComponent = null
-      // service connection
-      val connection = new ComponentServiceConnection((_service) => {
-        service = _service
-        lock.release
-      })
-      val intent = new Intent(Common.Intent.componentService)
-      intent.setPackage(componentPackage)
-      lock.available = false
-      if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
-        lock.acquire
-        try {
-          if (service != null)
-            f(service)
-        } finally {
-          service = null
-          context.unbindService(connection)
-        }
+      if (reuse) {
+        if (!doComponentServicePool.isDefinedAt(componentPackage)) {
+          // lock for bindService
+          val lock = new Lock
+          // service itself
+          var service: ICtrlComponent = null
+          // service connection
+          val connection = new ComponentServiceConnection((_service) => {
+            service = _service
+            lock.release
+          })
+          val intent = new Intent(Common.Intent.componentService)
+          intent.setPackage(componentPackage)
+          lock.available = false
+          if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+            lock.acquire
+            if (service != null) {
+              doComponentServicePool(componentPackage) = service
+              f(service)
+            }
+          } else {
+            log.error("service bind failed")
+          }
+        } else
+          f(doComponentServicePool(componentPackage))
       } else {
-        log.error("service bind failed")
+        // lock for bindService
+        val lock = new Lock
+        // service itself
+        var service: ICtrlComponent = null
+        // service connection
+        val connection = new ComponentServiceConnection((_service) => {
+          service = _service
+          lock.release
+        })
+        val intent = new Intent(Common.Intent.componentService)
+        intent.setPackage(componentPackage)
+        lock.available = false
+        if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+          lock.acquire
+          try {
+            if (service != null)
+              f(service)
+          } finally {
+            service = null
+            context.unbindService(connection)
+          }
+        } else {
+          log.error("service bind failed")
+        }
       }
   }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
