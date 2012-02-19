@@ -35,8 +35,10 @@ object FailedMarket extends Logging {
   def createDialog(activity: Activity): Dialog = {
     log.debug("createDialog(...)")
     new AlertDialog.Builder(activity).
-      setTitle(Android.getString(activity, "error_market_failed_title")).
-      setMessage(Android.getString(activity, "error_market_failed_content")).
+      setTitle(Android.getString(activity, "error_market_failed_title").
+          getOrElse("Market failed")).
+      setMessage(Android.getString(activity, "error_market_failed_content").
+          getOrElse("Market application not found on the device")).
       setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) {}

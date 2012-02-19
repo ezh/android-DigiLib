@@ -26,22 +26,27 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
+
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
+
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.ICtrlComponent
-import org.slf4j.LoggerFactory
+
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.text.ClipboardManager
+import android.util.DisplayMetrics
 import android.widget.Toast
-import org.digimead.digi.ctrl.lib.aop.Logging
 
 object Common extends Logging {
   protected val log = Logging.getLogger(this)
@@ -99,9 +104,11 @@ object Common extends Logging {
       val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
       // TODO
       clipboard.setText(files)
-      Android.getString(context, "notify_n_files_copy_to_clipboard").format(files.size)
+      Android.getString(context, "notify_n_files_copy_to_clipboard").map(_.format(files.size)).
+        getOrElse("Copy files to clipboard")
     } else {
-      Android.getString(context, "notify_no_files_copy_to_clipboard")
+      Android.getString(context, "notify_no_files_copy_to_clipboard").
+        getOrElse("There are no files to copy to clipboard")
     }
     Toast.makeText(context, text, Constant.toastTimeout).show()
   }
@@ -208,6 +215,46 @@ object Common extends Logging {
       log.debug("unexpectedly disconnected from " + className + " service")
     }
   }
+  case class ComponentInfo(val id: String,
+    val name: String,
+    val version: String, // Version Not Serializable
+    val description: String,
+    val project: String, // Uri Not Serializable
+    val thumb: Option[Array[Byte]], // Bitmap Not Serializable
+    val copyright: String,
+    val license: String,
+    val email: String,
+    val iconHDPI: Array[Byte], // Bitmap Not Serializable
+    val iconLDPI: Array[Byte], // Bitmap Not Serializable
+    val iconMDPI: Array[Byte], // Bitmap Not Serializable
+    val iconXHDPI: Array[Byte], // Bitmap Not Serializable
+    val market: String,
+    val componentPackage: String) extends java.io.Serializable {
+    def getDescription(): String = {
+      Seq("Name: " + name,
+        "Version: " + version,
+        "Description: " + description,
+        "Project: " + project,
+        "Market: " + market,
+        "License: " + license,
+        "E-Mail: " + email,
+        "Publisher: " + copyright).mkString("\n")
+    }
+    def getBitmap(context: Context) = context.getResources.getDisplayMetrics.densityDpi match {
+      case DisplayMetrics.DENSITY_LOW =>
+        BitmapFactory.decodeByteArray(iconLDPI, 0, iconLDPI.length)
+      case DisplayMetrics.DENSITY_MEDIUM =>
+        BitmapFactory.decodeByteArray(iconMDPI, 0, iconMDPI.length)
+      case DisplayMetrics.DENSITY_HIGH =>
+        BitmapFactory.decodeByteArray(iconHDPI, 0, iconHDPI.length)
+      case low if low < DisplayMetrics.DENSITY_LOW =>
+        BitmapFactory.decodeByteArray(iconLDPI, 0, iconLDPI.length)
+      case large if large > DisplayMetrics.DENSITY_HIGH =>
+        BitmapFactory.decodeByteArray(iconXHDPI, 0, iconXHDPI.length)
+    }
+    def getDrawable(context: Context) =
+      new BitmapDrawable(getBitmap(context))
+  }
   class ComponentStatus(val componentPackage: String,
     val serviceStatus: List[ServiceStatus],
     val state: State.Value) extends java.io.Serializable {
@@ -250,7 +297,7 @@ object Common extends Logging {
     final val apkNativePath = "armeabi"
   }
   object State extends Enumeration {
-    val Initializing, Broken, Passive, Busy, Active = Value
+    val Initializing, Broken, Passive, Busy, Active, Unknown = Value
   }
   object Preference {
     val main = getClass.getPackage.getName + "@main" // shared preferences name

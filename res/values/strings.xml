@@ -20,8 +20,8 @@
     <string name="error_control_notfound_content">Install from market? It is possible to use service right from the console. Path to executable files of service will be copied to clipboard if you choose Cancel.</string>
     <string name="install">install</string>
     <string name="reinstall">reinstall</string>
-    <string name="error_market_failed_title">error_market_failed_title</string>
-    <string name="error_market_failed_content">error_market_failed_content</string>
+    <string name="error_market_failed_title">Market failed</string>
+    <string name="error_market_failed_content">Market application not found on the device</string>
     <string name="notify_n_files_copy_to_clipboard">notify_n_files_copy_to_clipboard</string>
     <string name="notify_no_files_copy_to_clipboard">notify_no_files_copy_to_clipboard</string>
     <string name="error_prepare_chmod">error_prepare_chmod</string>
@@ -32,5 +32,10 @@
     <string name="status_error">Error: %1$s</string>
     <string name="ask_control_newconnection_title">ask_control_newconnection_title</string>
     <string name="ask_control_newconnection_content">ask_control_newconnection_content</string>
-
+    <string name="state_Initializing">&lt;font color=&quot;white&quot;&gt;&lt;i&gt;Initializing&lt;/i&gt;&lt;/font&gt;</string>
+    <string name="state_Broken">&lt;font color=&quot;red&quot;&gt;Broken&lt;/font&gt;</string>
+    <string name="state_Passive">Passive</string>
+    <string name="state_Busy">&lt;font color=&quot;yellow&quot;&gt;&lt;i&gt;Busy&lt;/i&gt;&lt;/font&gt;</string>
+    <string name="state_Active">&lt;font color=&quot;white&quot;&gt;Active&lt;/font&gt;</string>
+    <string name="state_Unknown">Unknown</string>
 </resources>

@@ -19,6 +19,30 @@ package org.digimead.digi.ctrl.lib
 import android.content.Context
 
 object Android {
-  def getString(context: Context, name: String) =
-    context.getString(context.getResources().getIdentifier(name, "string", context.getPackageName()))
+  def getString(context: Context, name: String): Option[String] =
+    getId(context, name, "string") match {
+      case 0 =>
+        None
+      case id =>
+        Option(context.getString(id))
+    }
+  def getString(context: Context, name: String, formatArgs: AnyRef*): Option[String] =
+    getId(context, name, "string") match {
+      case 0 =>
+        None
+      case id =>
+        Option(context.getString(id, formatArgs: _*))
+    }
+  def getCapitalized(context: Context, name: String) =
+    getString(context, name).map(s => if (s.length > 1)
+      s(0).toUpper + s.substring(1)
+    else
+      s.toUpperCase)
+  def getCapitalized(context: Context, name: String, formatArgs: AnyRef*) =
+    getString(context, name, formatArgs: _*).map(s => if (s.length > 1)
+      s(0).toUpper + s.substring(1)
+    else
+      s.toUpperCase)
+  def getId(context: Context, name: String, scope: String = "id") =
+    context.getResources().getIdentifier(name, scope, context.getPackageName())
 }

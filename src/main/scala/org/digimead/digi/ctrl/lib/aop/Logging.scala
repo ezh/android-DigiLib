@@ -63,7 +63,7 @@ import org.aspectj.lang.Signature
 
 trait Logging {
   @transient
-  protected val log: Logger
+  protected val log: RichLogger
 }
 
 object Logging {
@@ -90,7 +90,7 @@ object Logging {
     val exceptionMessage = throwable.getMessage();
     obj.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
   }
-  def getLogger(obj: Logging): Logger = {
+  def getLogger(obj: Logging): RichLogger = {
     val stack = Thread.currentThread.getStackTrace()(3) // constant location
     val fileRaw = stack.getFileName.split("""\.""")
     val fileParsed = if (fileRaw.length > 1)
@@ -98,9 +98,11 @@ object Logging {
     else
       fileRaw.head
     if (obj.getClass().toString.last == '$') // add object mart to file name
-      LoggerFactory.getLogger(logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$")
+      new RichLogger(LoggerFactory.getLogger(logPrefix +
+          obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"))
     else
-      LoggerFactory.getLogger(logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed)
+      new RichLogger(LoggerFactory.getLogger(logPrefix +
+          obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed))
   }
 }
 

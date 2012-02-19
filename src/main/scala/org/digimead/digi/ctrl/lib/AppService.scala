@@ -37,7 +37,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import scala.collection.JavaConversions._
 
-protected class AppService private (var root: WeakReference[Context]) extends Actor with Logging {
+protected class AppService private (final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
   protected val ctrlBindCounter = new AtomicInteger()
@@ -53,7 +53,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
     }
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
-      log.debug("disconnected from Control service")
+      log.debug("unexpected disconnect from Control service")
       serviceInstance.set(null)
     }
   }
@@ -71,8 +71,10 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
           onCompleteCallback(componentStatus(componentPackage))
         case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
           if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
-        case unknown =>
-          log.error("unknown message " + unknown)
+        case message: AnyRef =>
+          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+        case message =>
+          log.error("skip unknown message " + message)
       }
     }
   }
@@ -128,6 +130,7 @@ protected class AppService private (var root: WeakReference[Context]) extends Ac
         if (serviceInstance.get != null) {
           log.debug("unbind service")
           ctx.unbindService(ctrlConnection)
+          serviceInstance.set(null)
         } else
           log.warn("service already unbinded")
     })

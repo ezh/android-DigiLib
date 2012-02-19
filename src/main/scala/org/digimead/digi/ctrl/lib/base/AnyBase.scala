@@ -23,7 +23,6 @@ import scala.ref.WeakReference
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.Common
-import org.slf4j.LoggerFactory
 
 import android.content.Context
 
@@ -38,7 +37,7 @@ private[base] trait AnyBase extends Logging {
 object AnyBase extends Logging {
   protected val log = Logging.getLogger(this)
   System.setProperty("actors.enableForkJoin", "false")
-  System.setProperty("actors.corePoolSize", "256")
+  System.setProperty("actors.corePoolSize", "128")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
   log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
       + weakScheduler.get.get.toString + "[name,priority,group]")

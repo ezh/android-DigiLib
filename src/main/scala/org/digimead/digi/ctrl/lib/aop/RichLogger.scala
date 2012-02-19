@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl;
+package org.digimead.digi.ctrl.lib.aop
 
-interface ICtrlComponent {
-  // serialized to Array[Byte] Common.ComponentInfo
-  List info();
-  int uid();
-  int size();
-  boolean pre(in int id, in String workdir);
-  // serialized to Array[Byte] Common.ServiceEnvironment
-  List executable(in int id, in String workdir);
-  boolean post(in int id, in String workdir);
+import org.slf4j.Logger
+
+class RichLogger(val logger: Logger) {
+  // fast look while development, highlight it in your IDE
+  def _g_a_s_e_(msg: String) {
+    fatal("GASE: " + msg)
+  }
+  // error with stack trace
+  def fatal(msg: String) {
+    val t = new Throwable("Intospecting stack frame")
+    t.fillInStackTrace()
+    logger.error(msg + "\n" + t.getStackTraceString)    
+  }
+}
+
+object RichLogger {
+  implicit def rich2plain(rich: RichLogger): Logger = rich.logger
 }

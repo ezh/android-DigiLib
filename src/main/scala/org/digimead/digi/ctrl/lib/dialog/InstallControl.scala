@@ -45,15 +45,17 @@ object InstallControl extends Logging {
     val yesString = if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
       // install
       log.info("install " + Common.Constant.marketPackage)
-      Android.getString(activity, "install")
+      Android.getString(activity, "install").getOrElse("install")
     } else {
       // reinstall
       log.info("reinstall " + Common.Constant.marketPackage)
-      Android.getString(activity, "reinstall")
+      Android.getString(activity, "reinstall").getOrElse("reinstall")
     }
     new AlertDialog.Builder(activity).
-      setTitle(Android.getString(activity, "error_control_notfound_title")).
-      setMessage(Android.getString(activity, "error_control_notfound_content")).
+      setTitle(Android.getString(activity, "error_control_notfound_title").
+          getOrElse("DigiControl failed")).
+      setMessage(Android.getString(activity, "error_control_notfound_content").
+          getOrElse("DigiControl application not found on the device")).
       setPositiveButton(yesString, new DialogInterface.OnClickListener() {
         @Loggable
         def onClick(dialog: DialogInterface, whichButton: Int) {

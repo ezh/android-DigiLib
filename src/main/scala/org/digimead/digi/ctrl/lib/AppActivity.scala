@@ -35,7 +35,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 
-protected class AppActivity private (var root: WeakReference[Context]) extends Actor with Logging {
+protected class AppActivity private (final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
   private var status: AtomicReference[AppActivity.Status] = new AtomicReference()
   lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
@@ -48,6 +48,10 @@ protected class AppActivity private (var root: WeakReference[Context]) extends A
             prepareEnvironment(activity, keep, public)
           else
             callback(prepareEnvironment(activity, keep, public))
+        case message: AnyRef =>
+          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+        case message =>
+          log.error("skip unknown message " + message)
       }
     }
   }

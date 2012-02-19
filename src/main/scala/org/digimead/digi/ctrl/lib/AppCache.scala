@@ -263,8 +263,10 @@ object AppCache extends Actor with Logging {
         case Message.Reinitialize(context, innerCache) =>
           inner = null
           init(context, innerCache)
-        case unknown =>
-          log.error("unknown message " + unknown)
+        case message: AnyRef =>
+          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+        case message =>
+          log.error("skip unknown message " + message)
       }
     }
   }
