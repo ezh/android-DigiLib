@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.actors.Actor
 import scala.collection.JavaConversions._
 import scala.ref.WeakReference
-import scala.xml.Node
+import scala.xml._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
@@ -35,11 +35,23 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 
-protected class AppActivity private (final val root: WeakReference[Context]) extends Actor with Logging {
+protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
   private var status: AtomicReference[AppActivity.Status] = new AtomicReference()
   lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
-  lazy val appNativeDescription = appNativePath.map(appNativePath => new File(appNativePath, "description.xml"))
+  lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
+  lazy val nativeManifest = try {
+    root.get.map(ctx => XML.load(ctx.getAssets().open(Common.Constant.apkNativePath + "/NativeManifest.xml")))
+  } catch {
+    case e => log.error(e.getMessage, e); None
+  }
+  lazy val applicationManifest = try {
+    root.get.map(ctx => XML.load(ctx.getAssets().open(Common.Constant.apkNativePath + "/ApplicationManifest.xml")))
+  } catch {
+    case e => log.error(e.getMessage, e); None
+  }
+  //appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
+  //lazy val nativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   def act = {
     loop {
       react {
@@ -90,15 +102,8 @@ protected class AppActivity private (final val root: WeakReference[Context]) ext
       val files = am.list(Common.Constant.apkNativePath)
       val from = files.map(name => Common.Constant.apkNativePath + "/" + name)
       val to = files.map(name => new File(appNativePath, name))
-      val xmlOriginal: Option[Node] = try {
-        Some(scala.xml.XML.load(am.open(Common.Constant.apkNativePath + "/description.xml")))
-      } catch {
-        case e =>
-          log.error(e.getMessage, e)
-          None
-      }
-      val xmlInstalled: Option[Node] = try {
-        to.find(_.getName() == "description.xml") match {
+      val nativeManifestInstalled: Option[Node] = try {
+        to.find(_.getName() == "NativeManifest.xml") match {
           case Some(description) => Some(scala.xml.XML.loadFile(description))
           case None => None
         }
@@ -107,12 +112,14 @@ protected class AppActivity private (final val root: WeakReference[Context]) ext
           log.error(e.getMessage, e)
           None
       }
-      if (xmlOriginal == None) {
-        log.error("couldn't install native armeabi files without proper description.xml")
-        AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_description"))
+      if (nativeManifest == None) {
+        log.error("couldn't install native armeabi files without proper manifest")
+        AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_manifest").
+          getOrElse("Error prepare environment, manifest for native files not found"))
         return false
       }
-      if (keep && to.forall(_.exists) && xmlInstalled != None && checkEnvironmentVersion(xmlOriginal, xmlInstalled)) {
+      if (keep && to.forall(_.exists) && nativeManifestInstalled != None &&
+        checkEnvironmentVersion(nativeManifest, nativeManifestInstalled)) {
         log.debug("skip, armeabi files already installed")
         true
       } else {
@@ -132,12 +139,14 @@ protected class AppActivity private (final val root: WeakReference[Context]) ext
             val permission = if (makePublic) "a+rx" else "u+x"
             val result = Common.execChmod(permission, entityTo)
             if (!result)
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+                getOrElse("Error prepare environment, chmod failed"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
             result
           } catch {
             case e =>
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown").
+                getOrElse("Error prepare environment, unknown error"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
               false
             // TODO               return "Error process " + outFileName + ": " +!!! e.getMessage()!!!;
@@ -159,7 +168,8 @@ protected class AppActivity private (final val root: WeakReference[Context]) ext
           appNativePath.mkdirs()
           val result = Common.execChmod("a+x", appNativePath, true)
           if (!result)
-            AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod"),
+            AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+              getOrElse("Error prepare native path, chmod failed"),
               () => caller.showDialog(dialog.InstallControl.getId(ctx)))
           result
         } else
@@ -255,7 +265,7 @@ object AppActivity extends Logging {
     sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
   }
-  case class Status(val state: Common.State.Value, val data: Any = null, val onClickCallback: () => Any = () => {
+  case class Status(val state: Common.State.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.debug("default onClick callback for " + getClass().getName())
   }) {
     AppActivity.this.synchronized {

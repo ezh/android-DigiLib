@@ -68,7 +68,8 @@ trait Logging {
 
 object Logging {
   var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  final var enabled = true
+  @volatile
+  var enabled = true
   def enteringMethod(file: String, line: Int, signature: Signature, obj: Logging) {
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()

@@ -37,7 +37,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import scala.collection.JavaConversions._
 
-protected class AppService private (final val root: WeakReference[Context]) extends Actor with Logging {
+protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
   protected val ctrlBindCounter = new AtomicInteger()
@@ -116,7 +116,8 @@ protected class AppService private (final val root: WeakReference[Context]) exte
               false
             }
             if (!successful)
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_control_notfound"),
+              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_control_notfound").
+                getOrElse("Bind failed, DigiControl application not found"),
                 () => caller.showDialog(dialog.InstallControl.getId(ctx)))
           }
         else
@@ -247,7 +248,7 @@ object AppService extends Logging {
     case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
     case class Status(componentPackage: String, onCompleteCallback: (Either[String, Common.ComponentStatus]) => Unit) extends Abstract
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-//    object ListInterfaces extends Abstract
+    //    object ListInterfaces extends Abstract
     object Disconnect extends Abstract
   }
 }

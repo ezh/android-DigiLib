@@ -41,11 +41,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.text.ClipboardManager
-import android.util.DisplayMetrics
 import android.widget.Toast
 
 object Common extends Logging {
@@ -160,10 +157,8 @@ object Common extends Logging {
         log.error("service bind failed")
       }
   }
-  @Loggable(result = false)
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList
-  @Loggable(result = false)
   def serializeToArray(o: java.io.Serializable): Array[Byte] = {
     val baos = new ByteArrayOutputStream()
     val oos = new ObjectOutputStream(baos)
@@ -171,10 +166,8 @@ object Common extends Logging {
     oos.close()
     baos.toByteArray()
   }
-  @Loggable(result = false)
   def deserializeFromList(s: java.util.List[Byte]): Option[Object] =
     if (s == null) None else deserializeFromArray(s.toList.toArray)
-  @Loggable(result = false)
   def deserializeFromArray(s: Array[Byte]): Option[Object] = try {
     if (s == null) return None
     val ois = new ObjectInputStream(new ByteArrayInputStream(s.toList.toArray))
@@ -217,67 +210,27 @@ object Common extends Logging {
       log.debug("unexpectedly disconnected from " + className + " service")
     }
   }
-  case class ComponentInfo(val id: String,
-    val name: String,
-    val version: String, // Version Not Serializable
-    val description: String,
-    val project: String, // Uri Not Serializable
-    val thumb: Option[Array[Byte]], // Bitmap Not Serializable
-    val origin: String,
-    val license: String,
-    val email: String,
-    val iconHDPI: Array[Byte], // Bitmap Not Serializable
-    val iconLDPI: Array[Byte], // Bitmap Not Serializable
-    val iconMDPI: Array[Byte], // Bitmap Not Serializable
-    val iconXHDPI: Array[Byte], // Bitmap Not Serializable
-    val market: String,
-    val componentPackage: String) extends java.io.Serializable {
-    def getDescription(): String = {
-      Seq("Name: " + name,
-        "Version: " + version,
-        "Description: " + description,
-        "Project: " + project,
-        "Market: " + market,
-        "License: " + license,
-        "E-Mail: " + email,
-        "Origin: " + origin).mkString("\n")
-    }
-    def getBitmap(context: Context) = context.getResources.getDisplayMetrics.densityDpi match {
-      case DisplayMetrics.DENSITY_LOW =>
-        BitmapFactory.decodeByteArray(iconLDPI, 0, iconLDPI.length)
-      case DisplayMetrics.DENSITY_MEDIUM =>
-        BitmapFactory.decodeByteArray(iconMDPI, 0, iconMDPI.length)
-      case DisplayMetrics.DENSITY_HIGH =>
-        BitmapFactory.decodeByteArray(iconHDPI, 0, iconHDPI.length)
-      case low if low < DisplayMetrics.DENSITY_LOW =>
-        BitmapFactory.decodeByteArray(iconLDPI, 0, iconLDPI.length)
-      case large if large > DisplayMetrics.DENSITY_HIGH =>
-        BitmapFactory.decodeByteArray(iconXHDPI, 0, iconXHDPI.length)
-    }
-    def getDrawable(context: Context) =
-      new BitmapDrawable(getBitmap(context))
-  }
+
   class ComponentStatus(val componentPackage: String,
     val serviceStatus: List[ServiceStatus],
     val state: State.Value) extends java.io.Serializable {
   }
-  // like ServiceEnvironment, keep it separate
   class ServiceStatus(val id: Int,
-    val commandLine: Seq[String],
-    val port: Int,
+    val commandLine: Option[Seq[String]],
+    val port: Option[Int],
     val env: Seq[String] = Seq(),
     val state: State.Value) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
-    assert(port > 0 && id <= 0xFFFF)
-    assert(commandLine.nonEmpty)
+    assert(port == None || (port.get >= 0 && port.get <= 0xFFFF))
+    assert(commandLine == None || commandLine.get.nonEmpty)
   }
-  // like ServiceStatus, keep it separate
   class ServiceEnvironment(val id: Int,
     val commandLine: Option[Seq[String]],
     val port: Option[Int],
     val env: Seq[String],
     val state: State.Value,
     val name: String,
+    val version: String,
     val description: String,
     val origin: String,
     val license: String,
