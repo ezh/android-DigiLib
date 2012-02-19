@@ -29,5 +29,13 @@ the Apache License, version 2.0, a copy of which has been
 included in the LICENSE file.
 Please check the individual source files for details.
 
+Copyright
+---------
+
+Copyright ©  2011-2012 Alexey B. Aksenov/Ezh. All rights reserved.
+
+
 
 _PS FYI GitHub Wikis are the simplest way to contribute content. Any GitHub user can create and edit pages to use for documentation, examples, support or anything you wish._
+
+

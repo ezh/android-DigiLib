@@ -150,7 +150,8 @@ object Common extends Logging {
       if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
         lock.acquire
         try {
-          f(service)
+          if (service != null)
+            f(service)
         } finally {
           service = null
           context.unbindService(connection)
@@ -221,7 +222,7 @@ object Common extends Logging {
     val description: String,
     val project: String, // Uri Not Serializable
     val thumb: Option[Array[Byte]], // Bitmap Not Serializable
-    val copyright: String,
+    val origin: String,
     val license: String,
     val email: String,
     val iconHDPI: Array[Byte], // Bitmap Not Serializable
@@ -238,7 +239,7 @@ object Common extends Logging {
         "Market: " + market,
         "License: " + license,
         "E-Mail: " + email,
-        "Publisher: " + copyright).mkString("\n")
+        "Origin: " + origin).mkString("\n")
     }
     def getBitmap(context: Context) = context.getResources.getDisplayMetrics.densityDpi match {
       case DisplayMetrics.DENSITY_LOW =>
@@ -273,11 +274,11 @@ object Common extends Logging {
   class ServiceEnvironment(val id: Int,
     val commandLine: Seq[String],
     val port: Int,
-    val env: Seq[String] = Seq(),
+    val env: Seq[String],
     val state: State.Value,
     val name: String,
     val description: String,
-    val copyright: String,
+    val origin: String,
     val license: String,
     val project: String) extends java.io.Serializable {
     assert(id >= 0 && id <= 0xFFFF)
