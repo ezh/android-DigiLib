@@ -253,6 +253,7 @@ object Common extends Logging {
     assert(commandLine == None || commandLine.get.nonEmpty)
   }
   object Timeout {
+    val fastest = 1000
     val fast = 5000
     val normal = 10000
     val long = 60000

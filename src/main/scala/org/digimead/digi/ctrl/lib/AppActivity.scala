@@ -20,27 +20,31 @@ import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicReference
-
 import scala.actors.Actor
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
 import scala.ref.WeakReference
 import scala.xml._
-
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.ICtrlComponent
-
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import scala.concurrent.SyncVar
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
-  private var status: AtomicReference[AppActivity.Status] = new AtomicReference()
+  val status = new SyncVar[AppActivity.Status]() {
+    override def set(x: AppActivity.Status) = synchronized {
+      super.set(x)
+      log.debug("set status to \"" + x + "\"")
+      AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.update)))
+    }
+  }
   lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
@@ -244,7 +248,7 @@ object AppActivity extends Logging {
       inner = _inner
     else
       inner = new AppActivity(new WeakReference(root))
-    Status(Common.State.Initializing)
+    inner.status.set(Status(Common.State.Initializing))
   }
   def deinit(): Unit = synchronized {
     val context = inner.root.get
@@ -290,12 +294,6 @@ object AppActivity extends Logging {
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
   }
   case class Status(val state: Common.State.Value, val data: String = null, val onClickCallback: () => Any = () => {
-    log.debug("default onClick callback for " + getClass().getName())
-  }) {
-    AppActivity.this.synchronized {
-      AppActivity.Inner.foreach(_.status.set(this))
-      AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.update)))
-      log.debug("set status to \"" + state + "\"")
-    }
-  }
+    log.g_a_s_e("default onClick callback for " + getClass().getName())
+  })
 }
