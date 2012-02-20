@@ -23,17 +23,20 @@ import java.util.concurrent.atomic.AtomicReference
 
 import scala.actors.Actor
 import scala.collection.JavaConversions._
+import scala.collection.mutable.SynchronizedMap
+import scala.collection.mutable.HashMap
 import scala.ref.WeakReference
 import scala.xml._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Version
-import org.slf4j.LoggerFactory
+import org.digimead.digi.ctrl.ICtrlComponent
 
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
@@ -50,6 +53,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   } catch {
     case e => log.error(e.getMessage, e); None
   }
+  private[lib] val bindedICtrlPool = new HashMap[String, (ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (ServiceConnection, ICtrlComponent)]
   //appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   //lazy val nativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   def act = {
@@ -222,9 +226,19 @@ object AppActivity extends Logging {
   @Loggable
   def init(root: Context, _inner: AppActivity = null) = synchronized {
     AppCache.init(root)
-    if (inner != null)
+    if (inner != null) {
       log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
-    else
+      // unbind services from bindedICtrlPool
+      inner.root.get.map {
+        context =>
+          inner.bindedICtrlPool.keys.foreach(key => {
+            inner.bindedICtrlPool.remove(key).map(record => {
+              log.debug("remove service connection to " + key + " from bindedICtrlPool")
+              context.unbindService(record._1)
+            })
+          })
+      }
+    } else
       log.info("initialize AppActivity for " + root.getPackageName())
     if (_inner != null)
       inner = _inner
@@ -247,6 +261,16 @@ object AppActivity extends Logging {
         log.info("AppActivity and AppService share the same context. Clear.")
         AppService.deinit()
       }
+    // unbind services from bindedICtrlPool
+    _inner.root.get.map {
+      context =>
+        _inner.bindedICtrlPool.keys.foreach(key => {
+          _inner.bindedICtrlPool.remove(key).map(record => {
+            log.debug("remove service connection to " + key + " from bindedICtrlPool")
+            context.unbindService(record._1)
+          })
+        })
+    }
     AppCache.deinit()
   }
   def Inner = synchronized {
