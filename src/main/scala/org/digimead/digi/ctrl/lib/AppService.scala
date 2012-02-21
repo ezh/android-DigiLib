@@ -102,7 +102,10 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
   }
   @Loggable
   def bind(caller: Activity) = synchronized {
-    root.get.foreach(ctx => {
+    for {
+      ctx <- root.get
+      innerApp <- AppActivity.Inner
+    } {
       if (ctrlBindCounter.incrementAndGet() == 1)
         if (serviceInstance.get == null)
           future {
@@ -116,13 +119,13 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
               false
             }
             if (!successful)
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_control_notfound").
+              innerApp.state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_control_notfound").
                 getOrElse("Bind failed, DigiControl application not found"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx)))
+                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
           }
         else
           log.error("service " + Common.Intent.hostService + " already binded")
-    })
+    }
   }
   @Loggable
   def unbind() = synchronized {

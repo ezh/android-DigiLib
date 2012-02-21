@@ -38,11 +38,24 @@ import scala.concurrent.SyncVar
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val log = Logging.getLogger(this)
-  val status = new SyncVar[AppActivity.Status]() {
-    override def set(x: AppActivity.Status) = synchronized {
-      super.set(x)
+  val state = new SyncVar[AppActivity.State]() {
+    private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(Common.State.Unknown))
+    override def set(x: AppActivity.State) = synchronized {
+      if (x.code == Common.State.Busy) {
+        busyCounter = (busyCounter._1 + 1, busyCounter._2)
+        super.set(x)
+      } else if (busyCounter._1 != 0) {
+        busyCounter = (busyCounter._1, x)
+      } else
+        super.set(x)
       log.debug("set status to \"" + x + "\"")
       AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.update)))
+    }
+    def freeBusy() {
+      if (busyCounter._1 > 0)
+        busyCounter = (busyCounter._1 - 1, busyCounter._2)
+      if (busyCounter._1 == 0)
+        set(busyCounter._2)
     }
   }
   lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
@@ -89,7 +102,6 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
         None
     }
   }
-  def getStatus() = status.get
   def filters(): Seq[String] = get() match {
     case Some(root) =>
       root.getSharedPreferences(Common.Preference.filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
@@ -122,8 +134,8 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       }
       if (nativeManifest == None) {
         log.error("couldn't install native armeabi files without proper manifest")
-        AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_manifest").
-          getOrElse("Error prepare environment, manifest for native files not found"))
+        state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_manifest").
+          getOrElse("Error prepare environment, manifest for native files not found")))
         return false
       }
       if (keep && to.forall(_.exists) && nativeManifestInstalled != None &&
@@ -147,15 +159,15 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
             val permission = if (makePublic) "a+rx" else "u+x"
             val result = Common.execChmod(permission, entityTo)
             if (!result)
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+              state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
                 getOrElse("Error prepare environment, chmod failed"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx)))
+                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
             result
           } catch {
             case e =>
-              AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown").
+              state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown").
                 getOrElse("Error prepare environment, unknown error"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx)))
+                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
               false
             // TODO               return "Error process " + outFileName + ": " +!!! e.getMessage()!!!;
           }
@@ -176,9 +188,9 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
           appNativePath.mkdirs()
           val result = Common.execChmod("a+x", appNativePath, true)
           if (!result)
-            AppActivity.Status(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+            state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
               getOrElse("Error prepare native path, chmod failed"),
-              () => caller.showDialog(dialog.InstallControl.getId(ctx)))
+              () => caller.showDialog(dialog.InstallControl.getId(ctx))))
           result
         } else
           true
@@ -248,7 +260,7 @@ object AppActivity extends Logging {
       inner = _inner
     else
       inner = new AppActivity(new WeakReference(root))
-    inner.status.set(Status(Common.State.Initializing))
+    inner.state.set(State(Common.State.Initializing))
   }
   def deinit(): Unit = synchronized {
     val context = inner.root.get
@@ -293,7 +305,7 @@ object AppActivity extends Logging {
     sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
   }
-  case class Status(val state: Common.State.Value, val data: String = null, val onClickCallback: () => Any = () => {
+  case class State(val code: Common.State.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
   })
 }
