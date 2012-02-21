@@ -30,6 +30,7 @@
     <string name="status_initializing">Initializing…</string>
     <string name="status_ready">Ready</string>
     <string name="status_error">Error: %1$s</string>
+    <string name="status_busy">Busy</string>
     <string name="ask_control_newconnection_title">ask_control_newconnection_title</string>
     <string name="ask_control_newconnection_content">ask_control_newconnection_content</string>
     <string name="state_Initializing">&lt;font color=&quot;white&quot;&gt;&lt;i&gt;Initializing&lt;/i&gt;&lt;/font&gt;</string>
