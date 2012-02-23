@@ -22,7 +22,7 @@ interface ICtrlComponent {
   int uid();
   int size();
   boolean pre(in int id, in String workdir);
-  // serialized to Array[Byte] Common.ServiceEnvironment
+  // serialized to Array[Byte] Common.ExecutableEnvironment
   List executable(in int id, in String workdir);
   boolean post(in int id, in String workdir);
 }

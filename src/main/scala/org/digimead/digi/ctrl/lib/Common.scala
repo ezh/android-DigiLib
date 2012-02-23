@@ -224,10 +224,10 @@ object Common extends Logging {
   }
 
   class ComponentStatus(val componentPackage: String,
-    val serviceStatus: List[ServiceStatus],
+    val executableState: List[ExecutableState],
     val state: State.Value) extends java.io.Serializable {
   }
-  class ServiceStatus(val id: Int,
+  class ExecutableState(val id: Int,
     val commandLine: Option[Seq[String]],
     val port: Option[Int],
     val env: Seq[String] = Seq(),
@@ -236,7 +236,7 @@ object Common extends Logging {
     assert(port == None || (port.get >= 0 && port.get <= 0xFFFF))
     assert(commandLine == None || commandLine.get.nonEmpty)
   }
-  class ServiceEnvironment(val id: Int,
+  class ExecutableEnvironment(val id: Int,
     val commandLine: Option[Seq[String]],
     val port: Option[Int],
     val env: Seq[String],

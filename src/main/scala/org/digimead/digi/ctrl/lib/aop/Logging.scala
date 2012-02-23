@@ -59,7 +59,6 @@ import org.aspectj.lang.Signature
 import org.slf4j.LoggerFactory
 
 trait Logging {
-  @transient
   implicit protected val log: RichLogger = Logging.getLogger(this)
 }
 
