@@ -26,16 +26,15 @@ import scala.ref.WeakReference
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.ICtrlHost
-import org.slf4j.LoggerFactory
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.os.RemoteException
-import scala.collection.JavaConversions._
+import android.os.Process
 
 protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
@@ -206,10 +205,12 @@ object AppService extends Logging {
   log.debug("alive")
   @Loggable
   def init(root: Context, _inner: AppService = null) = synchronized {
-    if (inner != null)
+    if (inner != null) {
       log.info("reinitialize AppService core subsystem for " + root.getPackageName())
-    else
+    } else {
       log.info("initialize AppService for " + root.getPackageName())
+      resetNatives(root)
+    }
     if (_inner != null) {
       inner = _inner
     } else {
@@ -230,6 +231,7 @@ object AppService extends Logging {
         log.info("AppActivity and AppService share the same context. Clear.")
         AppActivity.deinit()
       }
+    _inner.root.get.foreach(resetNatives)
   }
   def Inner = synchronized {
     if (inner != null) {
@@ -242,7 +244,20 @@ object AppService extends Logging {
     }
   }
   def ICtrlHost = Inner.flatMap(_.get())
-  def initialized = synchronized { inner != null }
+  def initialized() = synchronized { inner != null }
+  @Loggable
+  private def resetNatives(context: Context) = future {
+/*    val myUID = Process.myUid
+    val actvityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
+    val processes = actvityManager.getRunningAppProcesses()
+    for (i <- 0 until processes.size() if processes.get(i).uid == myUID) {
+      val processInfo = processes.get(i)
+    }*/
+    val args = Array("pkill", "-P", "1") // children of init
+    log.debug("exec " + args.mkString(" "))
+    val p = Runtime.getRuntime().exec(args)
+    p.waitFor()
+  }
   object Message {
     sealed trait Abstract
     object Ping extends Abstract

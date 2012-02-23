@@ -89,7 +89,9 @@ object Logging {
     obj.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
   }
   def getLogger(obj: Logging): RichLogger = {
-    val stack = Thread.currentThread.getStackTrace()(3) // constant location
+    val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
+    val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)
+      stackArray(1) else stackArray(2)
     val fileRaw = stack.getFileName.split("""\.""")
     val fileParsed = if (fileRaw.length > 1)
       fileRaw.dropRight(1).mkString(".")
@@ -97,10 +99,10 @@ object Logging {
       fileRaw.head
     if (obj.getClass().toString.last == '$') // add object mart to file name
       new RichLogger(LoggerFactory.getLogger(logPrefix +
-          obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"))
+        obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"))
     else
       new RichLogger(LoggerFactory.getLogger(logPrefix +
-          obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed))
+        obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed))
   }
 }
 
