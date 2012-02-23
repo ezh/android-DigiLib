@@ -35,7 +35,6 @@ private[base] trait AnyBase extends Logging {
 }
 
 object AnyBase extends Logging {
-  protected val log = Logging.getLogger(this)
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "128")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])

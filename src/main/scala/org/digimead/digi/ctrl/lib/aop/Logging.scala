@@ -55,15 +55,12 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
-import org.aspectj.lang.JoinPoint
-import org.digimead.digi.ctrl.lib.Common
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.aspectj.lang.Signature
+import org.slf4j.LoggerFactory
 
 trait Logging {
   @transient
-  protected val log: RichLogger
+  implicit protected val log: RichLogger = Logging.getLogger(this)
 }
 
 object Logging {

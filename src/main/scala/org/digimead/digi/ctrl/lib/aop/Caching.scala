@@ -16,13 +16,9 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
-import org.slf4j.LoggerFactory
 import org.digimead.digi.ctrl.lib.AppCache
-import org.digimead.digi.ctrl.lib.Common
 
 abstract class Caching extends Logging {
-  val log = Logging.getLogger(this)
-
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {
     // TODO val logging = log.isTraceEnabled()
     /*

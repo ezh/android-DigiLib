@@ -16,9 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.util;
 
-import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.security.MessageDigest
 
 object Hash {
   private val chars = Map(0 -> '0', 1 -> '1', 2 -> '2', 3 -> '3', 4 -> '4', 5 -> '5', 6 -> '6', 7 -> '7',

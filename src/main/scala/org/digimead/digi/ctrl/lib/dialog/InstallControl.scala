@@ -33,7 +33,6 @@ import android.content.Intent
 import android.net.Uri
 
 object InstallControl extends Logging {
-  protected val log = Logging.getLogger(this)
   def getId(context: Context) = context.getResources().getIdentifier("dialog_InstallControl", "id", context.getPackageName())
   @Loggable
   def createDialog(activity: Activity): Dialog = {

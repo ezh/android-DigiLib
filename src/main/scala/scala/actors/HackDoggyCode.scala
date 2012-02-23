@@ -25,16 +25,12 @@
 
 package scala.actors
 
-import org.slf4j.LoggerFactory
-import scala.actors.scheduler.DaemonScheduler
-import scala.actors.scheduler.DelegatingScheduler
 import scala.actors.scheduler.ThreadPoolConfig
 import scala.actors.scheduler.ResizableThreadPoolScheduler
-import org.digimead.digi.ctrl.lib.Common
+
 import org.digimead.digi.ctrl.lib.aop.Logging
 
 object HackDoggyCode extends Logging {
-  protected val log = Logging.getLogger(this)
   log.debug("alive")
   def getCurrentThreadPoolCoreSize = ThreadPoolConfig.corePoolSize
   def getCurrentThreadPoolMaxSize = ThreadPoolConfig.maxPoolSize

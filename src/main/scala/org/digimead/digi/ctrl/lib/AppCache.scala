@@ -73,7 +73,6 @@ class NilCache extends AppCacheT[String, Any] {
   def clear(namespace: scala.Enumeration#Value): Unit = {}
 }
 class AppCache extends AppCacheT[String, Any] with Logging {
-  protected val log = Logging.getLogger(this)
   def get(namespace: scala.Enumeration#Value, key: String) =
     get(namespace, key, AppCache.getDefaultPeriod())
   def get(namespace: scala.Enumeration#Value, key: String, period: Long): Option[Any] =
@@ -189,7 +188,6 @@ class AppCache extends AppCacheT[String, Any] with Logging {
 }
 
 object AppCache extends Actor with Logging {
-  protected val log = Logging.getLogger(this)
   private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes

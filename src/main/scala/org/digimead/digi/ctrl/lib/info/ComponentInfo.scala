@@ -71,7 +71,6 @@ case class ComponentInfo(val id: String,
     getIconBitmap(context).map(new BitmapDrawable(_))
 }
 object ComponentInfo extends Logging {
-  protected val log = Logging.getLogger(this)
   final protected val stringLimit = 1024
   val emailPattern = Pattern.compile("""^[a-z0-9._%-]+@(?:[a-z0-9-]+\.)+[a-z]{2,4}$""", Pattern.CASE_INSENSITIVE)
   val packagePattern = Pattern.compile("""^([a-z_]{1}[a-z0-9_]*(\.[a-z_]{1}[a-z0-9_]*)*)$""", Pattern.CASE_INSENSITIVE)

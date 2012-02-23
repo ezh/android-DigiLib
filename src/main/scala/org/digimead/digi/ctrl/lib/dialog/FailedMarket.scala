@@ -29,7 +29,6 @@ import android.content.Context
 import android.content.DialogInterface
 
 object FailedMarket extends Logging {
-  protected val log = Logging.getLogger(this)
   def getId(context: Context) = context.getResources().getIdentifier("dialog_FailedMarket", "id", context.getPackageName())
   @Loggable
   def createDialog(activity: Activity): Dialog = {

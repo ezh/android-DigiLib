@@ -46,7 +46,6 @@ import android.text.ClipboardManager
 import android.widget.Toast
 
 object Common extends Logging {
-  protected val log = Logging.getLogger(this)
   log.debug("alive")
   @Loggable
   def onCreateDialog(id: Int, activity: Activity) = id match {

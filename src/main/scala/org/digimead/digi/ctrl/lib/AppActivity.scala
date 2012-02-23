@@ -37,7 +37,6 @@ import android.content.ServiceConnection
 import scala.concurrent.SyncVar
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
-  protected val log = Logging.getLogger(this)
   val state = new SyncVar[AppActivity.State]() {
     private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(Common.State.Unknown))
     override def set(x: AppActivity.State) = synchronized {
@@ -237,7 +236,6 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
 }
 
 object AppActivity extends Logging {
-  protected val log = Logging.getLogger(this)
   private var inner: AppActivity = null
   @Loggable
   def init(root: Context, _inner: AppActivity = null) = synchronized {

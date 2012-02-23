@@ -38,7 +38,6 @@ import android.os.RemoteException
 import scala.collection.JavaConversions._
 
 protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
-  protected val log = Logging.getLogger(this)
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
   protected val ctrlBindCounter = new AtomicInteger()
   protected val ctrlConnection = new ServiceConnection() {
@@ -203,7 +202,6 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
 }
 
 object AppService extends Logging {
-  protected val log = Logging.getLogger(this)
   private var inner: AppService = null
   log.debug("alive")
   @Loggable
