@@ -18,15 +18,12 @@ package org.digimead.digi.ctrl.lib
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicInteger
-
 import scala.actors.Futures.future
 import scala.actors.Actor
 import scala.ref.WeakReference
-
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.ICtrlHost
-
 import android.app.Activity
 import android.app.ActivityManager
 import android.content.ComponentName
@@ -35,6 +32,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Process
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
@@ -247,16 +246,27 @@ object AppService extends Logging {
   def initialized() = synchronized { inner != null }
   @Loggable
   private def resetNatives(context: Context) = future {
-/*    val myUID = Process.myUid
+    /*    val myUID = Process.myUid
     val actvityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
     val processes = actvityManager.getRunningAppProcesses()
     for (i <- 0 until processes.size() if processes.get(i).uid == myUID) {
       val processInfo = processes.get(i)
     }*/
-    val args = Array("pkill", "-P", "1") // children of init
+    val args = Array("pkill", "-9", "-P", "1") // children of init
     log.debug("exec " + args.mkString(" "))
     val p = Runtime.getRuntime().exec(args)
+    val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
     p.waitFor()
+    val retcode = p.exitValue()
+    if (retcode != 0) {
+      var error = err.readLine()
+      while (error != null) {
+        log.error("pkill error: " + error)
+        error = err.readLine()
+      }
+      false
+    } else
+      true
   }
   object Message {
     sealed trait Abstract
