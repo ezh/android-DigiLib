@@ -48,7 +48,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       } else
         super.set(x)
       log.debug("set status to \"" + x + "\"")
-      AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.update)))
+      AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.Update)))
     }
     def freeBusy() {
       if (busyCounter._1 > 0)
@@ -103,7 +103,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   }
   def filters(): Seq[String] = get() match {
     case Some(root) =>
-      root.getSharedPreferences(Common.Preference.filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
+      root.getSharedPreferences(Common.Preference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
     case None =>
       Seq()
   }

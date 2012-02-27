@@ -147,7 +147,7 @@ object Common extends Logging {
       service = _service
       lock.release
     })
-    val intent = new Intent(Common.Intent.componentService)
+    val intent = new Intent(Common.Intent.ComponentService)
     intent.setPackage(componentPackage)
     lock.available = false
     if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
@@ -273,16 +273,20 @@ object Common extends Logging {
     val Initializing, Broken, Passive, Busy, Active, Unknown = Value
   }
   object Preference {
-    val main = getClass.getPackage.getName + "@main" // shared preferences name
-    val filter = getClass.getPackage.getName + "@filter" // shared preferences name    
+    val Main = getClass.getPackage.getName + "@main" // shared preferences name
+    val Filter = getClass.getPackage.getName + "@filter" // shared preferences name
   }
   object Intent {
-    val update = Constant.prefix + "update"
-    val connection = Constant.prefix + "connection"
-    val hostActivity = Constant.prefix + "host.activity"
-    val hostService = Constant.prefix + "host.service"
-    val componentActivity = Constant.prefix + "component.activity"
-    val componentService = Constant.prefix + "component.service"
+    val Message = Constant.prefix + "message"
+    val Update = Constant.prefix + "update"
+    val Connection = Constant.prefix + "connection"
+    val HostActivity = Constant.prefix + "host.activity"
+    val HostService = Constant.prefix + "host.service"
+    val ComponentActivity = Constant.prefix + "component.activity"
+    val ComponentService = Constant.prefix + "component.service"
+  }
+  object Permission {
+    val Base = "org.digimead.digi.ctrl"
   }
   object Option extends Enumeration {
     // TODO rewrite with nameMap = LongMap(id) -> names and descriptionMap SoftReference

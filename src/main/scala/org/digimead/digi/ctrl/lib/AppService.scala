@@ -106,13 +106,13 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
       if (ctrlBindCounter.incrementAndGet() == 1)
         if (serviceInstance.get == null)
           future {
-            val intent = new Intent(Common.Intent.hostService)
+            val intent = new Intent(Common.Intent.HostService)
             intent.putExtra("packageName", ctx.getPackageName())
             val successful = if (isInstalled(ctx)) {
-              log.info("bind to " + Common.Intent.hostService)
+              log.info("bind to " + Common.Intent.HostService)
               ctx.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)
             } else {
-              log.warn(Common.Intent.hostService + " not installed")
+              log.warn(Common.Intent.HostService + " not installed")
               false
             }
             if (!successful)
@@ -121,7 +121,7 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
                 () => caller.showDialog(dialog.InstallControl.getId(ctx))))
           }
         else
-          log.error("service " + Common.Intent.hostService + " already binded")
+          log.error("service " + Common.Intent.HostService + " already binded")
     }
   }
   @Loggable
@@ -139,7 +139,7 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
   @Loggable
   def isInstalled(ctx: Context): Boolean = {
     val pm = ctx.getPackageManager()
-    val intent = new Intent(Common.Intent.hostService)
+    val intent = new Intent(Common.Intent.HostService)
     val info = pm.resolveService(intent, 0);
     info != null
   }
