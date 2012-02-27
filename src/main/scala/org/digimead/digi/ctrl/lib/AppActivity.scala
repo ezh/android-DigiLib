@@ -107,6 +107,11 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
     case None =>
       Seq()
   }
+  @Loggable def sendPrivateBroadcast(intent: Intent) =
+    root.get.foreach(context => {
+      intent.putExtra("__private__", true)
+      context.sendBroadcast(intent, Common.Permission.Base)
+    })
   @Loggable
   protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
     for {

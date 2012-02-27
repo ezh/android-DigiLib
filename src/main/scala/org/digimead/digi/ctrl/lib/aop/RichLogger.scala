@@ -16,8 +16,11 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
+import scala.annotation.implicitNotFound
+
 import org.slf4j.Logger
 
+@implicitNotFound(msg = "please define implicit RichLogger")
 class RichLogger(val logger: Logger) {
   // fast look while development, highlight it in your IDE
   def g_a_s_e(msg: String) {
@@ -27,7 +30,7 @@ class RichLogger(val logger: Logger) {
   def fatal(msg: String) {
     val t = new Throwable("Intospecting stack frame")
     t.fillInStackTrace()
-    logger.error(msg + "\n" + t.getStackTraceString)    
+    logger.error(msg + "\n" + t.getStackTraceString)
   }
 }
 
