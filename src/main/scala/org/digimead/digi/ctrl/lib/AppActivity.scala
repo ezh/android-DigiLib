@@ -110,6 +110,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   @Loggable def sendPrivateBroadcast(intent: Intent) =
     root.get.foreach(context => {
       intent.putExtra("__private__", true)
+      intent.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
       context.sendBroadcast(intent, Common.Permission.Base)
     })
   @Loggable
