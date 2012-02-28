@@ -203,7 +203,7 @@ object AppService extends Logging {
   private var inner: AppService = null
   log.debug("alive")
   @Loggable
-  def init(root: Context, _inner: AppService = null) = synchronized {
+  private[lib] def init(root: Context, _inner: AppService = null) = synchronized {
     if (inner != null) {
       log.info("reinitialize AppService core subsystem for " + root.getPackageName())
     } else {
@@ -216,7 +216,11 @@ object AppService extends Logging {
       inner = new AppService(new WeakReference(root))
     }
   }
-  def deinit(): Unit = synchronized {
+  private[lib] def safe(root: Context) {
+    if (inner == null)
+      init(root)
+  }
+  private[lib] def deinit(): Unit = synchronized {
     log.info("deinitialize AppService for " + inner.root.get.map(_.getPackageName()).getOrElse("UNKNOWN"))
     assert(inner != null)
     val _inner = inner

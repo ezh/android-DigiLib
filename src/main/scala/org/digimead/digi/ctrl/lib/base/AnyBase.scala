@@ -42,9 +42,22 @@ object AnyBase extends Logging {
       + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
       ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
-  def init(ctx: Context) = {
+  private def init(ctx: Context) = {
     org.digimead.digi.ctrl.lib.AppActivity.init(ctx)
     org.digimead.digi.ctrl.lib.AppService.init(ctx)
+    log.debug("start AppActivity singleton actor")
+    org.digimead.digi.ctrl.lib.AppActivity.Inner match {
+      case Some(inner) =>
+        // start activity singleton actor
+        inner.start
+        true
+      case None =>
+        false
+    }
+  }
+  def safeInit(ctx: Context) = {
+    org.digimead.digi.ctrl.lib.AppActivity.safe(ctx)
+    org.digimead.digi.ctrl.lib.AppService.safe(ctx)
     log.debug("start AppActivity singleton actor")
     org.digimead.digi.ctrl.lib.AppActivity.Inner match {
       case Some(inner) =>

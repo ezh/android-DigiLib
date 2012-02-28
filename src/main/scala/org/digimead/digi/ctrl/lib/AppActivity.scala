@@ -107,12 +107,18 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
     case None =>
       Seq()
   }
-  @Loggable def sendPrivateBroadcast(intent: Intent) =
-    root.get.foreach(context => {
-      intent.putExtra("__private__", true)
-      intent.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY)
-      context.sendBroadcast(intent, Common.Permission.Base)
-    })
+  @Loggable
+  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq(Intent.FLAG_RECEIVER_REGISTERED_ONLY)) = root.get.foreach(context => {
+    intent.putExtra("__private__", true)
+    flags.foreach(intent.setFlags)
+    context.sendBroadcast(intent, Common.Permission.Base)
+  })
+  @Loggable
+  def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
+    intent.putExtra("__private__", true)
+    flags.foreach(intent.setFlags)
+    context.sendOrderedBroadcast(intent, Common.Permission.Base)
+  })
   @Loggable
   protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
     for {
@@ -244,7 +250,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
 object AppActivity extends Logging {
   private var inner: AppActivity = null
   @Loggable
-  def init(root: Context, _inner: AppActivity = null) = synchronized {
+  private[lib] def init(root: Context, _inner: AppActivity = null) = synchronized {
     AppCache.init(root)
     if (inner != null) {
       log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
@@ -266,7 +272,11 @@ object AppActivity extends Logging {
       inner = new AppActivity(new WeakReference(root))
     inner.state.set(State(Common.State.Initializing))
   }
-  def deinit(): Unit = synchronized {
+  private[lib] def safe(root: Context) {
+    if (inner == null)
+      init(root)
+  }
+  private[lib] def deinit(): Unit = synchronized {
     val context = inner.root.get
     log.info("deinitialize AppActivity for " + context.map(_.getPackageName()).getOrElse("UNKNOWN"))
     assert(inner != null)
