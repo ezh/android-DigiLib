@@ -216,7 +216,7 @@ object AppService extends Logging {
       inner = new AppService(new WeakReference(root))
     }
   }
-  private[lib] def safe(root: Context) {
+  private[lib] def safe(root: Context) = synchronized {
     if (inner == null)
       init(root)
   }

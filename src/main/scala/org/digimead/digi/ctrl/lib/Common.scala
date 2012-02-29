@@ -27,11 +27,15 @@ import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
 
+import scala.Array.canBuildFrom
+import scala.Option.option2Iterable
+import scala.annotation.elidable
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.ICtrlComponent
@@ -41,9 +45,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
+import annotation.elidable.ASSERTION
 
 object Common extends Logging {
   log.debug("alive")
@@ -284,6 +290,11 @@ object Common extends Logging {
     val HostService = Constant.prefix + "host.service"
     val ComponentActivity = Constant.prefix + "component.activity"
     val ComponentService = Constant.prefix + "component.service"
+  }
+  object Provider {
+    val authority = "org.digimead.digi.ctrl"
+    val Session = Uri.parse("content://" + authority + "/session")
+    val SessionID = Uri.parse("content://" + authority + "/session/#")
   }
   object Permission {
     val Base = "org.digimead.digi.ctrl"

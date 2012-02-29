@@ -108,7 +108,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       Seq()
   }
   @Loggable
-  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq(Intent.FLAG_RECEIVER_REGISTERED_ONLY)) = root.get.foreach(context => {
+  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
     intent.putExtra("__private__", true)
     flags.foreach(intent.setFlags)
     context.sendBroadcast(intent, Common.Permission.Base)
@@ -272,7 +272,7 @@ object AppActivity extends Logging {
       inner = new AppActivity(new WeakReference(root))
     inner.state.set(State(Common.State.Initializing))
   }
-  private[lib] def safe(root: Context) {
+  private[lib] def safe(root: Context) = synchronized {
     if (inner == null)
       init(root)
   }
