@@ -14,33 +14,48 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib
+package org.digimead.digi.ctrl.lib.base
 
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.atomic.AtomicReference
+
+import scala.Array.canBuildFrom
 import scala.actors.Actor
+import scala.annotation.elidable
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
+import scala.concurrent.SyncVar
 import scala.ref.WeakReference
-import scala.xml._
+import scala.xml.Node
+import scala.xml.XML
+
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.declaration.DIntent
+import org.digimead.digi.ctrl.lib.declaration.DPermission
+import org.digimead.digi.ctrl.lib.declaration.DPreference
+import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.ICtrlComponent
+
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import scala.concurrent.SyncVar
+import annotation.elidable.ASSERTION
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
   val state = new SyncVar[AppActivity.State]() {
-    private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(Common.State.Unknown))
+    private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(DState.Unknown))
     override def set(x: AppActivity.State) = synchronized {
-      if (x.code == Common.State.Busy) {
+      if (x.code == DState.Busy) {
         busyCounter = (busyCounter._1 + 1, busyCounter._2)
         super.set(x)
       } else if (busyCounter._1 != 0) {
@@ -48,7 +63,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       } else
         super.set(x)
       log.debug("set status to \"" + x + "\"")
-      AppActivity.Context.foreach(_.sendBroadcast(new Intent(Common.Intent.Update)))
+      AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     def freeBusy() {
       if (busyCounter._1 > 0)
@@ -57,15 +72,15 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
         set(busyCounter._2)
     }
   }
-  lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + Common.Constant.apkNativePath + "/"))
+  lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + DConstant.apkNativePath + "/"))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
-    root.get.map(ctx => XML.load(ctx.getAssets().open(Common.Constant.apkNativePath + "/NativeManifest.xml")))
+    root.get.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
   lazy val applicationManifest = try {
-    root.get.map(ctx => XML.load(ctx.getAssets().open(Common.Constant.apkNativePath + "/ApplicationManifest.xml")))
+    root.get.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
@@ -103,7 +118,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   }
   def filters(): Seq[String] = get() match {
     case Some(root) =>
-      root.getSharedPreferences(Common.Preference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
+      root.getSharedPreferences(DPreference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
     case None =>
       Seq()
   }
@@ -111,13 +126,13 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
     intent.putExtra("__private__", true)
     flags.foreach(intent.setFlags)
-    context.sendBroadcast(intent, Common.Permission.Base)
+    context.sendBroadcast(intent, DPermission.Base)
   })
   @Loggable
   def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
     intent.putExtra("__private__", true)
     flags.foreach(intent.setFlags)
-    context.sendOrderedBroadcast(intent, Common.Permission.Base)
+    context.sendOrderedBroadcast(intent, DPermission.Base)
   })
   @Loggable
   protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
@@ -130,8 +145,8 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       if (!prepareNativePath(caller))
         return false
       val am = ctx.getAssets()
-      val files = am.list(Common.Constant.apkNativePath)
-      val from = files.map(name => Common.Constant.apkNativePath + "/" + name)
+      val files = am.list(DConstant.apkNativePath)
+      val from = files.map(name => DConstant.apkNativePath + "/" + name)
       val to = files.map(name => new File(appNativePath, name))
       val nativeManifestInstalled: Option[Node] = try {
         to.find(_.getName() == "NativeManifest.xml") match {
@@ -144,8 +159,8 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
           None
       }
       if (nativeManifest == None) {
-        log.error("couldn't install native armeabi files without proper manifest")
-        state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_manifest").
+        log.fatal("couldn't install native armeabi files without proper manifest")
+        state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_manifest").
           getOrElse("Error prepare environment, manifest for native files not found")))
         return false
       }
@@ -170,15 +185,15 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
             val permission = if (makePublic) "a+rx" else "u+x"
             val result = Common.execChmod(permission, entityTo)
             if (!result)
-              state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+              state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
                 getOrElse("Error prepare environment, chmod failed"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
+                () => caller.showDialog(InstallControl.getId(ctx))))
             result
           } catch {
             case e =>
-              state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_unknown").
+              state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_unknown").
                 getOrElse("Error prepare environment, unknown error"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
+                () => caller.showDialog(InstallControl.getId(ctx))))
               false
             // TODO               return "Error process " + outFileName + ": " +!!! e.getMessage()!!!;
           }
@@ -199,9 +214,9 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
           appNativePath.mkdirs()
           val result = Common.execChmod("a+x", appNativePath, true)
           if (!result)
-            state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_prepare_chmod").
+            state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
               getOrElse("Error prepare native path, chmod failed"),
-              () => caller.showDialog(dialog.InstallControl.getId(ctx))))
+              () => caller.showDialog(InstallControl.getId(ctx))))
           result
         } else
           true
@@ -270,7 +285,7 @@ object AppActivity extends Logging {
       inner = _inner
     else
       inner = new AppActivity(new WeakReference(root))
-    inner.state.set(State(Common.State.Initializing))
+    inner.state.set(State(DState.Initializing))
   }
   private[lib] def safe(root: Context) = synchronized {
     if (inner == null)
@@ -319,7 +334,7 @@ object AppActivity extends Logging {
     sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
   }
-  case class State(val code: Common.State.Value, val data: String = null, val onClickCallback: () => Any = () => {
+  case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
   })
 }

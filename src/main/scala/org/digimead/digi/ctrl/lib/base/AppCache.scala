@@ -21,7 +21,8 @@
  * lack a lot of cool futures, but deadline is the only point of view
  * Ezh
  */
-package org.digimead.digi.ctrl.lib
+
+package org.digimead.digi.ctrl.lib.base
 
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -33,15 +34,19 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 
 import scala.actors.Actor
+import scala.annotation.elidable
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
 import scala.ref.SoftReference
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
-import org.slf4j.LoggerFactory
+import org.digimead.digi.ctrl.lib.declaration.DOption
+import org.digimead.digi.ctrl.lib.declaration.DPreference
 
 import android.content.Context
+import annotation.elidable.ASSERTION
 
 trait AppCacheT[K, V] {
   def get(namespace: scala.Enumeration#Value, key: K): Option[V]
@@ -149,7 +154,7 @@ class AppCache extends AppCacheT[String, Any] with Logging {
     val file = new File(AppCache.cacheFolder, ref)
     if (file.exists)
       if (!file.delete())
-        log.error("failed to delete cache file " + file)
+        log.fatal("failed to delete cache file " + file)
     AppCache.map.remove(ref).flatMap(ref => ref.get.map(t => t._2))
   }
   def clear(namespace: scala.Enumeration#Value): Unit = {
@@ -191,7 +196,7 @@ object AppCache extends Actor with Logging {
   private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
-  private var cacheClass = "org.digimead.digi.ctrl.lib.AppCache"
+  private var cacheClass = "org.digimead.digi.ctrl.lib.base.AppCache"
   private var cachePath = "."
   private lazy val cacheFolder = new File(cachePath)
   // key -> (timestamp, data)
@@ -289,10 +294,10 @@ object AppCache extends Actor with Logging {
       return
     } else
       log.info("initialize AppCache for " + contextPackageName)
-    val pref = context.getSharedPreferences(Common.Preference.Main, Context.MODE_PRIVATE)
-    period = pref.getLong(Common.Option.CachePeriod.res, period)
-    cachePath = pref.getString(Common.Option.CacheFolder.res, context.getCacheDir + "/")
-    cacheClass = pref.getString(Common.Option.CacheClass.res, "org.digimead.digi.ctrl.lib.AppCache")
+    val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
+    period = pref.getLong(DOption.CachePeriod.res, period)
+    cachePath = pref.getString(DOption.CacheFolder.res, context.getCacheDir + "/")
+    cacheClass = pref.getString(DOption.CacheClass.res, cacheClass)
     if (innerCache != null) {
       inner = innerCache
     } else {
@@ -307,7 +312,7 @@ object AppCache extends Actor with Logging {
     }
     if (!cacheFolder.exists)
       if (!cacheFolder.mkdirs) {
-        log.error("cannot create directory: " + cacheFolder)
+        log.fatal("cannot create directory: " + cacheFolder)
         inner = new NilCache()
       }
     log.info("set cache directory to \"" + cachePath + "\"")

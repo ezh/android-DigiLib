@@ -55,7 +55,10 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
+import scala.annotation.implicitNotFound
+
 import org.aspectj.lang.Signature
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.slf4j.LoggerFactory
 
 trait Logging {

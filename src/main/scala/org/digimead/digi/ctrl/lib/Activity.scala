@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib.base
+package org.digimead.digi.ctrl.lib
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
-import org.digimead.digi.ctrl.lib.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppActivity
 
 import android.app.{Activity => AActivity}
 import android.os.Bundle

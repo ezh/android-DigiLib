@@ -16,13 +16,14 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
-import org.digimead.digi.ctrl.lib.Android
-import org.digimead.digi.ctrl.lib.AppActivity
-import org.digimead.digi.ctrl.lib.Common
+import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.ICtrlHost
-import org.slf4j.LoggerFactory
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -43,11 +44,11 @@ object InstallControl extends Logging {
     val packagename = intent.getPackage()
     val yesString = if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
       // install
-      log.info("install " + Common.Constant.marketPackage)
+      log.info("install " + DConstant.marketPackage)
       Android.getString(activity, "install").getOrElse("install")
     } else {
       // reinstall
-      log.info("reinstall " + Common.Constant.marketPackage)
+      log.info("reinstall " + DConstant.marketPackage)
       Android.getString(activity, "reinstall").getOrElse("reinstall")
     }
     new AlertDialog.Builder(activity).
@@ -60,7 +61,7 @@ object InstallControl extends Logging {
         def onClick(dialog: DialogInterface, whichButton: Int) {
           log.info("install DigiControl from market")
           try {
-            val intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=pname:" + Common.Constant.marketPackage))
+            val intent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=pname:" + DConstant.marketPackage))
             intent.addCategory(Intent.CATEGORY_BROWSABLE)
             activity.startActivity(intent)
           } catch {

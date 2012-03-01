@@ -14,26 +14,36 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib
+package org.digimead.digi.ctrl.lib.base
 
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicInteger
+
 import scala.actors.Futures.future
 import scala.actors.Actor
+import scala.annotation.elidable
 import scala.ref.WeakReference
+
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.declaration.DIntent
+import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.info.ComponentState
+import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.Common
+import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.ICtrlHost
-import android.app.Activity
-import android.app.ActivityManager
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.os.Process
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import annotation.elidable.ASSERTION
 
 protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
   protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
@@ -106,22 +116,22 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
       if (ctrlBindCounter.incrementAndGet() == 1)
         if (serviceInstance.get == null)
           future {
-            val intent = new Intent(Common.Intent.HostService)
+            val intent = new Intent(DIntent.HostService)
             intent.putExtra("packageName", ctx.getPackageName())
             val successful = if (isInstalled(ctx)) {
-              log.info("bind to " + Common.Intent.HostService)
+              log.info("bind to " + DIntent.HostService)
               ctx.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)
             } else {
-              log.warn(Common.Intent.HostService + " not installed")
+              log.warn(DIntent.HostService + " not installed")
               false
             }
             if (!successful)
-              innerApp.state.set(AppActivity.State(Common.State.Broken, Android.getString(ctx, "error_control_notfound").
+              innerApp.state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_control_notfound").
                 getOrElse("Bind failed, DigiControl application not found"),
-                () => caller.showDialog(dialog.InstallControl.getId(ctx))))
+                () => caller.showDialog(InstallControl.getId(ctx))))
           }
         else
-          log.error("service " + Common.Intent.HostService + " already binded")
+          log.fatal("service " + DIntent.HostService + " already binded")
     }
   }
   @Loggable
@@ -139,7 +149,7 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
   @Loggable
   def isInstalled(ctx: Context): Boolean = {
     val pm = ctx.getPackageManager()
-    val intent = new Intent(Common.Intent.HostService)
+    val intent = new Intent(DIntent.HostService)
     val info = pm.resolveService(intent, 0);
     info != null
   }
@@ -170,19 +180,19 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
     case None => false
   }
   @Loggable
-  protected def componentStatus(componentPackage: String): Either[String, Common.ComponentStatus] = get match {
+  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
           case list: java.util.List[_] =>
             Common.deserializeFromList(list.asInstanceOf[java.util.List[Byte]]) match {
               case Some(obj) =>
-                Right(obj.asInstanceOf[Common.ComponentStatus])
+                Right(obj.asInstanceOf[ComponentState])
               case None =>
                 Left("status failed")
             }
           case null =>
-            log.debug("service return null instread of Common.ComponentStatus")
+            log.debug("service return null instread of DComponentStatus")
             Left("status failed")
         }
       } catch {
@@ -265,7 +275,7 @@ object AppService extends Logging {
     if (retcode != 0) {
       var error = err.readLine()
       while (error != null) {
-        log.error("pkill error: " + error)
+        log.fatal("pkill error: " + error)
         error = err.readLine()
       }
       false
@@ -276,7 +286,7 @@ object AppService extends Logging {
     sealed trait Abstract
     object Ping extends Abstract
     case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    case class Status(componentPackage: String, onCompleteCallback: (Either[String, Common.ComponentStatus]) => Unit) extends Abstract
+    case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit) extends Abstract
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
     //    object ListInterfaces extends Abstract
     object Disconnect extends Abstract

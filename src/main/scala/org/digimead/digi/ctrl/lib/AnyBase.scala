@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib.base
+package org.digimead.digi.ctrl.lib
 
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
-import org.digimead.digi.ctrl.lib.Common
+import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppService
 
 import android.content.Context
 
-private[base] trait AnyBase extends Logging {
+private[lib] trait AnyBase extends Logging {
   @Loggable
   protected def onCreateBase(ctx: Context, callSuper: => Any): Boolean = {
     callSuper
@@ -39,14 +41,14 @@ object AnyBase extends Logging {
   System.setProperty("actors.corePoolSize", "128")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
   log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
-      + weakScheduler.get.get.toString + "[name,priority,group]")
+    + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
-      ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
+    ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
   private def init(ctx: Context) = {
-    org.digimead.digi.ctrl.lib.AppActivity.init(ctx)
-    org.digimead.digi.ctrl.lib.AppService.init(ctx)
+    AppActivity.init(ctx)
+    AppService.init(ctx)
     log.debug("start AppActivity singleton actor")
-    org.digimead.digi.ctrl.lib.AppActivity.Inner match {
+    AppActivity.Inner match {
       case Some(inner) =>
         // start activity singleton actor
         inner.start
@@ -56,10 +58,10 @@ object AnyBase extends Logging {
     }
   }
   def safeInit(ctx: Context) = {
-    org.digimead.digi.ctrl.lib.AppActivity.safe(ctx)
-    org.digimead.digi.ctrl.lib.AppService.safe(ctx)
+    AppActivity.safe(ctx)
+    AppService.safe(ctx)
     log.debug("start AppActivity singleton actor")
-    org.digimead.digi.ctrl.lib.AppActivity.Inner match {
+    AppActivity.Inner match {
       case Some(inner) =>
         // start activity singleton actor
         inner.start

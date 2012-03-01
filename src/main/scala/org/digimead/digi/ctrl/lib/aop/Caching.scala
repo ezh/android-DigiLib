@@ -16,7 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
-import org.digimead.digi.ctrl.lib.AppCache
+import scala.Array.canBuildFrom
+
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
+import org.digimead.digi.ctrl.lib.base.AppCache
 
 abstract class Caching extends Logging {
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {

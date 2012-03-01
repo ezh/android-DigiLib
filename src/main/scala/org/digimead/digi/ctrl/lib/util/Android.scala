@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib
+package org.digimead.digi.ctrl.lib.util
 
 import android.content.Context
 

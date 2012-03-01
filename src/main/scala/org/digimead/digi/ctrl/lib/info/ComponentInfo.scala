@@ -21,15 +21,19 @@ import java.net.MalformedURLException
 import java.net.URL
 import java.util.regex.Pattern
 
-import scala.xml._
+import scala.Option.option2Iterable
+import scala.xml.NodeSeq.seqToNodeSeq
+import scala.xml.Elem
+import scala.xml.Node
+import scala.xml.NodeSeq
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Version
 
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
-import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.DisplayMetrics
 

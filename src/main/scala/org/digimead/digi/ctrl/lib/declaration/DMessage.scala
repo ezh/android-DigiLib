@@ -14,48 +14,48 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib
+package org.digimead.digi.ctrl.lib.declaration
 
 import scala.annotation.implicitNotFound
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.RichLogger
-import org.slf4j.Logger
 
-sealed trait Message extends java.io.Serializable {
+sealed trait DMessage extends java.io.Serializable {
   val logger: RichLogger
-  val origin: Message.Origin
+  val origin: DMessage.Origin
   val message: String
-  val dispatcher: Message.Dispatcher
+  val dispatcher: DMessage.Dispatcher
 }
 
-object Message {
+object DMessage {
   case class IAmBusy(val origin: Origin,
     val message: String)(implicit @transient val logger: RichLogger,
-      @transient val dispatcher: Dispatcher) extends Message {
+      @transient val dispatcher: Dispatcher) extends DMessage {
     logger.info("BUSY: " + message)
     dispatcher.process(this)
   }
   case class IAmReady(val origin: Origin,
     val message: String)(implicit @transient val logger: RichLogger,
-      @transient val dispatcher: Dispatcher) extends Message {
+      @transient val dispatcher: Dispatcher) extends DMessage {
     logger.info("READY: " + message)
     dispatcher.process(this)
   }
   case class IAmMumble(val origin: Origin, val message: String,
     @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
-      @transient val dispatcher: Dispatcher) extends Message {
+      @transient val dispatcher: Dispatcher) extends DMessage {
     logger.info(message)
     dispatcher.process(this)
   }
   case class IAmWarn(val origin: Origin, val message: String,
     @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
-      @transient val dispatcher: Dispatcher) extends Message {
+      @transient val dispatcher: Dispatcher) extends DMessage {
     logger.warn(message)
     dispatcher.process(this)
   }
   case class IAmYell(val origin: Origin, val message: String, val stackTrace: String,
     @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
-      @transient val dispatcher: Dispatcher) extends Message {
+      @transient val dispatcher: Dispatcher) extends DMessage {
     def this(origin: Origin, message: String, t: Throwable)(implicit logger: RichLogger, dispatcher: Dispatcher) =
       this(origin, message, t.getMessage + "\n" + t.getStackTraceString, None)(logger, dispatcher)
     def this(origin: Origin, message: String, onClickCallback: Option[() => Unit])(implicit logger: RichLogger, dispatcher: Dispatcher) =
@@ -94,7 +94,7 @@ object Message {
   }
   @implicitNotFound(msg = "don't know what to do with message, please define implicit Dispatcher")
   trait Dispatcher {
-    def process(message: Message)
+    def process(message: DMessage)
   }
   case class Origin private (val code: Int, val name: String) extends java.io.Serializable
   object Origin {

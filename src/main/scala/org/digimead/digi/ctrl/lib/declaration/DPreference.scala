@@ -14,21 +14,9 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib.base
+package org.digimead.digi.ctrl.lib.declaration
 
-import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
-import org.digimead.digi.ctrl.lib.AppService
-
-import android.app.{ Service => AService }
-
-trait Service extends AService with AnyBase with Logging {
-  @Loggable
-  override def onCreate(): Unit =
-    onCreateBase(this, { Service.super.onCreate() })
-  @Loggable
-  override def onDestroy() = {
-    AppService.deinit()
-    super.onDestroy()
-  }
+object DPreference {
+  val Main = getClass.getPackage.getName + "@main" // shared preferences name
+  val Filter = getClass.getPackage.getName + "@filter" // shared preferences name
 }
