@@ -17,7 +17,8 @@
 package org.digimead.digi.ctrl;
 
 interface ICtrlHost {
-  boolean active();
+  String prepare(in String componentPackage); // return path to homedir of component
+  boolean active(); // check is service active (at least 1 request already processed)
   boolean start(in String componentPackage);
   List status(in String componentPackage); // serialized to Array[Byte] Common.ComponentStatus
   boolean stop(in String componentPackage);

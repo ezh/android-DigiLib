@@ -40,6 +40,7 @@ import org.digimead.digi.ctrl.lib.declaration.DPermission
 import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.info.ComponentInfo
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.Version
@@ -116,6 +117,39 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
         None
     }
   }
+  @Loggable
+  def getComponentInfo(locale: String, localeLanguage: String,
+    iconExtractor: (Seq[(ComponentInfo.IconType, String)]) => Seq[Option[Array[Byte]]] = (icons: Seq[(ComponentInfo.IconType, String)]) => {
+      icons.map {
+        case (iconType, url) =>
+          iconType match {
+            case icon: ComponentInfo.Thumbnail.type =>
+              None
+            case icon: ComponentInfo.LDPI.type =>
+              None
+            case icon: ComponentInfo.MDPI.type =>
+              None
+            case icon: ComponentInfo.HDPI.type =>
+              None
+            case icon: ComponentInfo.XHDPI.type =>
+              None
+          }
+      }
+    }): Option[ComponentInfo] = {
+    for {
+      inner <- AppActivity.Inner
+      appManifest <- inner.applicationManifest
+    } yield {
+      AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
+        case Some(info) =>
+          Some(info.asInstanceOf[ComponentInfo])
+        case None =>
+          val result = ComponentInfo(appManifest, locale, localeLanguage, iconExtractor)
+          result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString, r))
+          result
+      }
+    }
+  } getOrElse None
   def filters(): Seq[String] = get() match {
     case Some(root) =>
       root.getSharedPreferences(DPreference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)

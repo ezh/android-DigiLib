@@ -41,4 +41,3 @@ object DProvider {
     val SessionID = Value("content://" + authority + "/session/#")
   }
 }
-//  private val session = new HashMap[(Int, Int), Int] with SynchronizedMap[(Int, Int), Int]

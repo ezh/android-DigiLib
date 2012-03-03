@@ -39,4 +39,6 @@
     <string name="state_Busy">&lt;font color=&quot;yellow&quot;&gt;&lt;i&gt;Busy&lt;/i&gt;&lt;/font&gt;</string>
     <string name="state_Active">&lt;font color=&quot;white&quot;&gt;Active&lt;/font&gt;</string>
     <string name="state_Unknown">Unknown</string>
+    <string name="time_minutes">%1$02dm %2$02ds</string>
+    <string name="time_hours">%1$dh %2$02dm %3$02ds</string>
 </resources>
