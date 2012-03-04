@@ -25,6 +25,7 @@ import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.base.AppService
+import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 
 import android.content.Context
 
@@ -37,6 +38,7 @@ private[lib] trait AnyBase extends Logging {
 }
 
 object AnyBase extends Logging {
+  private lazy val uncaughtExceptionHandler = new ExceptionHandler()
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "128")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
@@ -47,6 +49,8 @@ object AnyBase extends Logging {
   private def init(ctx: Context) = {
     AppActivity.init(ctx)
     AppService.init(ctx)
+    Logging.init(ctx)
+    uncaughtExceptionHandler.register(ctx)
     log.debug("start AppActivity singleton actor")
     AppActivity.Inner match {
       case Some(inner) =>
@@ -60,6 +64,8 @@ object AnyBase extends Logging {
   def safeInit(ctx: Context) = {
     AppActivity.safe(ctx)
     AppService.safe(ctx)
+    Logging.init(ctx)
+    uncaughtExceptionHandler.register(ctx)
     log.debug("start AppActivity singleton actor")
     AppActivity.Inner match {
       case Some(inner) =>

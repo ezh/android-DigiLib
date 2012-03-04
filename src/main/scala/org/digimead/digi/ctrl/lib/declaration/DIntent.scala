@@ -24,4 +24,5 @@ object DIntent {
   val HostService = DConstant.prefix + "host.service"
   val ComponentActivity = DConstant.prefix + "component.activity"
   val ComponentService = DConstant.prefix + "component.service"
+  val Error = DConstant.prefix + "error"
 }

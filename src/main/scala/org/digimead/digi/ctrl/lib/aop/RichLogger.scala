@@ -17,11 +17,12 @@
 package org.digimead.digi.ctrl.lib.aop
 
 import scala.annotation.implicitNotFound
-
 import org.slf4j.Logger
+import java.util.Date
 
 @implicitNotFound(msg = "please define implicit RichLogger")
 class RichLogger(val logger: Logger) {
+  private val pid = android.os.Process.myPid
   // fast look while development, highlight it in your IDE
   def g_a_s_e(msg: String) {
     fatal("GASE: " + msg)
@@ -31,6 +32,102 @@ class RichLogger(val logger: Logger) {
     val t = new Throwable("Intospecting stack frame")
     t.fillInStackTrace()
     logger.error(msg + "\n" + t.getStackTraceString)
+  }
+  // trace
+  def trace(msg: String) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'V', logger.getName, msg))
+    logger.trace(msg)
+  }
+  def trace(format: String, arg: Object) = {
+    val msg = format.format(arg)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'V', logger.getName, msg))
+    logger.trace(msg)
+  }
+  def trace(format: String, arg1: Object, arg2: Object) = {
+    val msg = format.format(arg1, arg2)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'V', logger.getName, msg))
+    logger.trace(msg)
+  }
+  def trace(format: String, argArray: Array[AnyRef]) = {
+    val msg = format.format(argArray: _*)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'V', logger.getName, msg))
+    logger.trace(msg)
+  }
+  def trace(msg: String, t: Throwable) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'V', logger.getName, msg + "\n" + t.getStackTraceString))
+    logger.trace(msg, t)
+  }
+  // debug
+  def debug(msg: String) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg))
+    logger.debug(msg)
+  }
+  def debug(format: String, arg: Object) = {
+    val msg = format.format(arg)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg))
+    logger.debug(msg)
+  }
+  def debug(format: String, arg1: Object, arg2: Object) = {
+    val msg = format.format(arg1, arg2)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg))
+    logger.debug(msg)
+  }
+  def debug(format: String, argArray: Array[AnyRef]) = {
+    val msg = format.format(argArray: _*)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg))
+    logger.debug(msg)
+  }
+  def debug(msg: String, t: Throwable) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg + "\n" + t.getStackTraceString))
+    logger.debug(msg, t)
+  }
+  // info
+  def info(msg: String) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg))
+    logger.info(msg)
+  }
+  def info(format: String, arg: Object) = {
+    val msg = format.format(arg)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg))
+    logger.info(msg)
+  }
+  def info(format: String, arg1: Object, arg2: Object) = {
+    val msg = format.format(arg1, arg2)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg))
+    logger.info(msg)
+  }
+  def info(format: String, argArray: Array[AnyRef]) = {
+    val msg = format.format(argArray: _*)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg))
+    logger.info(msg)
+  }
+  def info(msg: String, t: Throwable) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg + "\n" + t.getStackTraceString))
+    logger.info(msg, t)
+  }
+  // error
+  def error(msg: String) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'E', logger.getName, msg))
+    logger.error(msg)
+  }
+  def error(format: String, arg: Object) = {
+    val msg = format.format(arg)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'E', logger.getName, msg))
+    logger.error(msg)
+  }
+  def error(format: String, arg1: Object, arg2: Object) = {
+    val msg = format.format(arg1, arg2)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'E', logger.getName, msg))
+    logger.error(msg)
+  }
+  def error(format: String, argArray: Array[AnyRef]) = {
+    val msg = format.format(argArray: _*)
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'E', logger.getName, msg))
+    logger.error(msg)
+  }
+  def error(msg: String, t: Throwable) = {
+    Logging.Report.queue.offer(new Logging.Report.Record(new Date(), pid, Thread.currentThread.getId, 'E', logger.getName, msg + "\n" + t.getStackTraceString))
+    logger.error(msg, t)
   }
 }
 
