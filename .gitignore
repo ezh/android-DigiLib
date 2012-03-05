@@ -48,6 +48,7 @@ syntax: glob
 *.bak
 #*.off
 *.old
+*.lib
 
 # eclipse conf file
 .settings

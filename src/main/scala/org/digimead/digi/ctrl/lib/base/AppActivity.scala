@@ -21,6 +21,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 import scala.Array.canBuildFrom
+import scala.actors.Futures.future
 import scala.actors.Actor
 import scala.annotation.elidable
 import scala.collection.JavaConversions._
@@ -31,7 +32,6 @@ import scala.ref.WeakReference
 import scala.xml.Node
 import scala.xml.XML
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.declaration.DConstant
@@ -53,7 +53,7 @@ import android.content.ServiceConnection
 import annotation.elidable.ASSERTION
 
 protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
-  val state = new SyncVar[AppActivity.State]() {
+  lazy val state = new SyncVar[AppActivity.State]() {
     private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(DState.Unknown))
     override def set(x: AppActivity.State) = synchronized {
       if (x.code == DState.Busy) {
@@ -300,7 +300,7 @@ object AppActivity extends Logging {
   private var inner: AppActivity = null
   @Loggable
   private[lib] def init(root: Context, _inner: AppActivity = null) = synchronized {
-    AppCache.init(root)
+    future { AppCache.init(root) }
     if (inner != null) {
       log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
       // unbind services from bindedICtrlPool

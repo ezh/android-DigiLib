@@ -46,9 +46,9 @@ import android.os.IBinder
 import annotation.elidable.ASSERTION
 
 protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
-  protected val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
-  protected val ctrlBindCounter = new AtomicInteger()
-  protected val ctrlConnection = new ServiceConnection() {
+  protected lazy val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
+  protected lazy val ctrlBindCounter = new AtomicInteger()
+  protected lazy val ctrlConnection = new ServiceConnection() {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
       log.debug("connected to Control service")

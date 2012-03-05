@@ -198,13 +198,9 @@ object Logging {
       info <- Logging.Report.info.get
       context <- AppActivity.Context
     } {
-      val filter = new FilenameFilter() {
-        def accept(dir: File, name: String) =
-          name.endsWith(".report")
-      }
       log.debug("looking for error reports in: " + info.reportPath)
       val dir = new File(info.reportPath + "/")
-      val reports = Option(dir.list(filter)).flatten
+      val reports = Option(dir.list()).flatten
       if (reports.isEmpty)
         return
       context match {
