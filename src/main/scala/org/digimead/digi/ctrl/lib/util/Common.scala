@@ -26,6 +26,9 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
@@ -40,6 +43,7 @@ import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.Activity
@@ -98,8 +102,7 @@ object Common extends Logging {
   }
   @Loggable
   def listPreparedFiles(context: Context): Option[Seq[File]] = for {
-    inner <- AppActivity.Inner
-    appNativePath <- inner.appNativePath
+    appNativePath <- AppActivity.Inner.appNativePath
   } yield context.getAssets.list(DConstant.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)
   @Loggable
   def copyPreparedFilesToClipboard(context: Context) = {
@@ -137,45 +140,68 @@ object Common extends Logging {
       true
   }
   @Loggable
-  def doComponentService(componentPackage: String, reuse: Boolean = true)(f: (ICtrlComponent) => Any): Unit = for {
-    context <- AppActivity.Context
-    inner <- AppActivity.Inner
-  } {
-    if (inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
-      log.debug("reuse service connection")
-      f(inner.bindedICtrlPool(componentPackage)._2)
-      return
-    }
-    // lock for bindService
-    val lock = new Lock
-    // service itself
-    var service: ICtrlComponent = null
-    // service connection
-    val connection = new ComponentServiceConnection((_service) => {
-      service = _service
-      lock.release
-    })
-    val intent = new Intent(DIntent.ComponentService)
-    intent.setPackage(componentPackage)
-    lock.available = false
-    if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
-      lock.acquire
-      try {
-        if (service != null) {
-          if (reuse) {
-            log.debug("add service connection to bindedICtrlPool")
-            inner.bindedICtrlPool(componentPackage) = (connection, service)
-          }
-          f(service)
-        }
-      } finally {
-        service = null
-        if (!reuse)
-          context.unbindService(connection)
+  def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.normal)(f: (ICtrlComponent) => Any): Unit = AppActivity.Context foreach {
+    context =>
+      val connectionGuard = Executors.newSingleThreadScheduledExecutor()
+      if (AppActivity.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
+        log.debug("reuse service connection")
+        f(AppActivity.Inner.bindedICtrlPool(componentPackage)._2)
+        return
       }
-    } else {
-      log.fatal("service bind failed")
-    }
+      // lock for bindService
+      val lock = new Lock
+      connectionGuard.schedule(new Runnable {
+        def run = {
+          log.warn("doComponentService to \"" + DIntent.ComponentService + "\" hang")
+          lock.release
+        }
+      }, operationTimeout, TimeUnit.MILLISECONDS)
+      // service itself
+      var service: ICtrlComponent = null
+      // service connection
+      val connection = new ComponentServiceConnection((_service) => {
+        service = _service
+        lock.release
+      })
+      val intent = new Intent(DIntent.ComponentService)
+      intent.setPackage(componentPackage)
+      lock.available = false
+      if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+        lock.acquire
+        connectionGuard.shutdownNow
+        val executionGuard = Executors.newSingleThreadExecutor()
+        val executionFuture = executionGuard.submit(new Runnable {
+          def run = try {
+            if (service != null) {
+              if (reuse) {
+                log.debug("add service connection to bindedICtrlPool")
+                AppActivity.Inner.bindedICtrlPool(componentPackage) = (connection, service)
+              }
+              f(service)
+            }
+          } finally {
+            service = null
+            if (!reuse)
+              context.unbindService(connection)
+          }
+        })
+        try {
+          // Execute the job with a time limit  
+          executionFuture.get(operationTimeout, TimeUnit.MILLISECONDS)
+        } catch {
+          case e: TimeoutException =>
+            // Operation timed out, so log it and attempt to cancel the thread
+            log.warn("doComponentService timeout", e)
+            executionFuture.cancel(true)
+            service = null
+            if (!reuse)
+              context.unbindService(connection)
+        } finally {
+          executionGuard.shutdown
+        }
+      } else {
+        log.fatal("service bind failed")
+      }
   }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList
@@ -196,7 +222,7 @@ object Common extends Logging {
     Some(o)
   } catch {
     case e =>
-      log.error("deserialization error: " + e.getMessage())
+      log.error("deserialization error", e)
       None
   }
   /**

@@ -16,29 +16,34 @@
 
 package org.digimead.digi.ctrl.lib
 
+import java.io.File
+
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
+import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.base.AppService
+import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 
 import android.content.Context
 
 private[lib] trait AnyBase extends Logging {
   @Loggable
-  protected def onCreateBase(ctx: Context, callSuper: => Any): Boolean = {
+  protected def onCreateBase(context: Context, callSuper: => Any) = {
     callSuper
-    AnyBase.init(ctx)
+    AnyBase.init(context)
   }
 }
 
 object AnyBase extends Logging {
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
+  val info = new SyncVar[Option[Info]]
+  info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "128")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
@@ -46,34 +51,61 @@ object AnyBase extends Logging {
     + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
-  private def init(ctx: Context) = {
-    AppActivity.init(ctx)
-    AppService.init(ctx)
-    Logging.init(ctx)
-    uncaughtExceptionHandler.register(ctx)
-    log.debug("start AppActivity singleton actor")
-    AppActivity.Inner match {
-      case Some(inner) =>
-        // start activity singleton actor
-        inner.start
-        true
-      case None =>
-        false
+  def init(context: Context) = synchronized {
+    context match {
+      case activity: Activity =>
+        if (AppActivity.context.get != context)
+          AppActivity.init(context)
+      case service: Service =>
+        if (AppService.context.get != context)
+          AppService.init(context)
+      case _ =>
+    }
+    if (AppActivity.Inner == null)
+      AppActivity.init(context)
+    if (AppService.Inner == null)
+      AppService.init(context)
+    if (AnyBase.info.get == None) {
+      Info.init(context)
+      Logging.init(context)
+      uncaughtExceptionHandler.register(context)
+      log.debug("start AppActivity singleton actor")
+      // start activity singleton actor
+      AppActivity.Inner.start
     }
   }
-  def safeInit(ctx: Context) = {
-    AppActivity.safe(ctx)
-    AppService.safe(ctx)
-    Logging.init(ctx)
-    uncaughtExceptionHandler.register(ctx)
-    log.debug("start AppActivity singleton actor")
-    AppActivity.Inner match {
-      case Some(inner) =>
-        // start activity singleton actor
-        inner.start
-        true
-      case None =>
-        false
+  case class Info(val reportPath: File,
+    val appVersion: String,
+    val appPackage: String,
+    val phoneModel: String,
+    val androidVersion: String,
+    val write: Boolean) {
+    log.debug("reportPath: " + reportPath)
+    log.debug("appVersion: " + appVersion)
+    log.debug("appPackage: " + appPackage)
+    log.debug("phoneModel: " + phoneModel)
+    log.debug("androidVersion: " + androidVersion)
+    log.debug("write to storage: " + write)
+    override def toString = "reportPath: " + reportPath +
+      ", appVersion: " + appVersion + ", appPackage: " + appPackage +
+      ", phoneModel: " + phoneModel + ", androidVersion: " + androidVersion
+  }
+  object Info {
+    def init(context: Context) = synchronized {
+      if (AnyBase.info.get == None) {
+        // Get information about the Package
+        val pm = context.getPackageManager()
+        val pi = pm.getPackageInfo(context.getPackageName(), 0)
+        val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
+        val writeReport = pref.getBoolean(pi.packageName, true)
+        val info = new AnyBase.Info(reportPath = new File(context.getFilesDir(), "report"),
+          appVersion = pi.versionName,
+          appPackage = pi.packageName,
+          phoneModel = android.os.Build.MODEL,
+          androidVersion = android.os.Build.VERSION.RELEASE,
+          write = writeReport)
+        AnyBase.info.set(Some(info))
+      }
     }
   }
 }

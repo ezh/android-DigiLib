@@ -45,7 +45,7 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import annotation.elidable.ASSERTION
 
-protected class AppService private ( final val root: WeakReference[Context]) extends Actor with Logging {
+protected class AppService private () extends Actor with Logging {
   protected lazy val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
   protected lazy val ctrlConnection = new ServiceConnection() {
@@ -109,42 +109,41 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
   }
   @Loggable
   def bind(caller: Activity) = synchronized {
-    for {
-      ctx <- root.get
-      innerApp <- AppActivity.Inner
-    } {
-      if (ctrlBindCounter.incrementAndGet() == 1)
-        if (serviceInstance.get == null)
-          future {
-            val intent = new Intent(DIntent.HostService)
-            intent.putExtra("packageName", ctx.getPackageName())
-            val successful = if (isInstalled(ctx)) {
-              log.info("bind to " + DIntent.HostService)
-              ctx.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)
-            } else {
-              log.warn(DIntent.HostService + " not installed")
-              false
+    AppActivity.Context foreach {
+      context =>
+        if (ctrlBindCounter.incrementAndGet() == 1)
+          if (serviceInstance.get == null)
+            future {
+              val intent = new Intent(DIntent.HostService)
+              intent.putExtra("packageName", context.getPackageName())
+              val successful = if (isInstalled(context)) {
+                log.info("bind to " + DIntent.HostService)
+                context.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)
+              } else {
+                log.warn(DIntent.HostService + " not installed")
+                false
+              }
+              if (!successful)
+                AppActivity.Inner.state.set(AppActivity.State(DState.Broken, Android.getString(context, "error_control_notfound").
+                  getOrElse("Bind failed, DigiControl application not found"),
+                  () => caller.showDialog(InstallControl.getId(context))))
             }
-            if (!successful)
-              innerApp.state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_control_notfound").
-                getOrElse("Bind failed, DigiControl application not found"),
-                () => caller.showDialog(InstallControl.getId(ctx))))
-          }
-        else
-          log.fatal("service " + DIntent.HostService + " already binded")
+          else
+            log.fatal("service " + DIntent.HostService + " already binded")
     }
   }
   @Loggable
   def unbind() = synchronized {
-    root.get.foreach(ctx => {
-      if (ctrlBindCounter.decrementAndGet() == 0)
-        if (serviceInstance.get != null) {
-          log.debug("unbind service")
-          ctx.unbindService(ctrlConnection)
-          serviceInstance.set(null)
-        } else
-          log.warn("service already unbinded")
-    })
+    AppActivity.Context foreach {
+      context =>
+        if (ctrlBindCounter.decrementAndGet() == 0)
+          if (serviceInstance.get != null) {
+            log.debug("unbind service")
+            context.unbindService(ctrlConnection)
+            serviceInstance.set(null)
+          } else
+            log.warn("service already unbinded")
+    }
   }
   @Loggable
   def isInstalled(ctx: Context): Boolean = {
@@ -210,7 +209,8 @@ protected class AppService private ( final val root: WeakReference[Context]) ext
 }
 
 object AppService extends Logging {
-  private var inner: AppService = null
+  @volatile private var inner: AppService = null
+  @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
   log.debug("alive")
   @Loggable
   private[lib] def init(root: Context, _inner: AppService = null) = synchronized {
@@ -220,44 +220,33 @@ object AppService extends Logging {
       log.info("initialize AppService for " + root.getPackageName())
       resetNatives(root)
     }
-    if (_inner != null) {
+    context = new WeakReference(root)
+    if (_inner != null)
       inner = _inner
-    } else {
-      inner = new AppService(new WeakReference(root))
-    }
-  }
-  private[lib] def safe(root: Context) = synchronized {
-    if (inner == null)
-      init(root)
+    else
+      inner = new AppService()
   }
   private[lib] def deinit(): Unit = synchronized {
-    log.info("deinitialize AppService for " + inner.root.get.map(_.getPackageName()).getOrElse("UNKNOWN"))
+    log.info("deinitialize AppService for " + AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN"))
     assert(inner != null)
     val _inner = inner
     inner = null
     if (AppActivity.initialized)
       for {
-        rootSrv <- _inner.root.get;
-        innerApp <- AppActivity.Inner;
-        rootApp <- innerApp.root.get
+        rootSrv <- context.get
+        rootApp <- AppActivity.Context
       } if (rootApp == rootSrv) {
         log.info("AppActivity and AppService share the same context. Clear.")
         AppActivity.deinit()
       }
-    _inner.root.get.foreach(resetNatives)
+    context.get.foreach(resetNatives)
   }
-  def Inner = synchronized {
-    if (inner != null) {
-      Some(inner)
-    } else {
-      val t = new Throwable("Intospecting stack frame")
-      t.fillInStackTrace()
-      log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
-      None
-    }
+  def Inner = inner
+  def ICtrlHost = inner.get()
+  def initialized() = synchronized {
+    while (inner != null)
+      wait()
   }
-  def ICtrlHost = Inner.flatMap(_.get())
-  def initialized() = synchronized { inner != null }
   @Loggable
   private def resetNatives(context: Context) = future {
     /*    val myUID = Process.myUid

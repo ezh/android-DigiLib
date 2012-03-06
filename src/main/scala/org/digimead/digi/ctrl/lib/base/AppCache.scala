@@ -193,7 +193,7 @@ class AppCache extends AppCacheT[String, Any] with Logging {
 }
 
 object AppCache extends Actor with Logging {
-  private var contextPackageName = ""
+  @volatile private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
   private var cacheClass = "org.digimead.digi.ctrl.lib.base.AppCache"
@@ -282,9 +282,10 @@ object AppCache extends Actor with Logging {
   }
   @Loggable
   def init(context: Context, innerCache: AppCache = null): Unit = synchronized {
-    contextPackageName = context.getPackageName()
     if (inner != null) {
-      log.info("reinitialize AppCache core subsystem for " + contextPackageName)
+      if (contextPackageName == context.getPackageName())
+        return // reinitialize AppCache for the same package is too aggressive
+      log.info("reinitialize AppCache core subsystem for " + context.getPackageName())
       /*
        * since actor is a single point of entry
        * process all requests
@@ -293,7 +294,8 @@ object AppCache extends Actor with Logging {
       this ! Message.Reinitialize(context, innerCache)
       return
     } else
-      log.info("initialize AppCache for " + contextPackageName)
+      log.info("initialize AppCache for " + context.getPackageName())
+    contextPackageName = context.getPackageName()
     val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
     period = pref.getLong(DOption.CachePeriod.res, period)
     cachePath = pref.getString(DOption.CacheFolder.res, context.getCacheDir + "/")

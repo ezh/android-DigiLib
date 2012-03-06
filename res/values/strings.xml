@@ -41,4 +41,5 @@
     <string name="state_Unknown">Unknown</string>
     <string name="time_minutes">%1$02dm %2$02ds</string>
     <string name="time_hours">%1$dh %2$02dm %3$02ds</string>
+    <string name="app_name">Unknown</string>
 </resources>

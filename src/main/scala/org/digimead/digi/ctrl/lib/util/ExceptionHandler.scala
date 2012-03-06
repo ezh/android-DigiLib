@@ -26,6 +26,7 @@ import java.lang.Thread.UncaughtExceptionHandler
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DIntent
+import org.digimead.digi.ctrl.lib.AnyBase
 
 import android.content.Context
 import android.content.Intent
@@ -47,7 +48,7 @@ class ExceptionHandler extends Logging {
 object ExceptionHandler extends Logging {
   class Default(val defaultExceptionHandler: UncaughtExceptionHandler) extends UncaughtExceptionHandler with Logging {
     // Default exception handler
-    def uncaughtException(t: Thread, e: Throwable) = Logging.Report.info.get.foreach {
+    def uncaughtException(t: Thread, e: Throwable) = AnyBase.info.get.foreach {
       info =>
         // Here you should have a more robust, permanent record of problems
         val reportName = "stacktrace" + Logging.Report.reportSuffix
@@ -59,7 +60,7 @@ object ExceptionHandler extends Logging {
           log.debug("Writing unhandled exception to: " + file)
           // Write the stacktrace to disk
           val bos = new BufferedWriter(new FileWriter(file))
-          bos.write(Logging.Report.info.get.get.toString)
+          bos.write(AnyBase.info.get.get.toString)
           bos.write(result.toString())
           bos.flush()
           // Close up everything

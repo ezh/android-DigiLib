@@ -18,6 +18,7 @@ package org.digimead.digi.ctrl.lib.storage
 
 import java.io.File
 import java.net.URI
+import java.net.URLEncoder
 import java.security.cert.X509Certificate
 import java.util.concurrent.atomic.AtomicReference
 import java.util.ArrayList
@@ -129,7 +130,7 @@ object GoogleCloud extends Logging {
         getAccessToken(clientID, clientSecret, refreshToken) match {
           case Some(token) =>
             try {
-              val uri = new URI(Seq(uploadURL, bucket, file.getName).mkString("/"))
+              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(file.getName, "utf-8")).mkString("/"))
               log.debug("uploading to " + uri)
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
               val httpput = new HttpPut(uri.getPath())
@@ -141,9 +142,9 @@ object GoogleCloud extends Logging {
               log.debug(uri + " result: " + response.getStatusLine())
               response.getStatusLine().getStatusCode() match {
                 case 200 =>
-                  log.info("upload " + file + " successful")
+                  log.info("upload " + file.getName + " successful")
                 case _ =>
-                  log.warn("upload " + file + " failed")
+                  log.warn("upload " + file.getName + " failed")
               }
             } catch {
               case e =>

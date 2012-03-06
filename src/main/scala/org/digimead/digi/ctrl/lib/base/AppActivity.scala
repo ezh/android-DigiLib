@@ -19,11 +19,13 @@ package org.digimead.digi.ctrl.lib.base
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
 import scala.actors.Actor
-import scala.annotation.elidable
+import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
@@ -32,13 +34,16 @@ import scala.ref.WeakReference
 import scala.xml.Node
 import scala.xml.XML
 
+import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.aop.RichLogger
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DPermission
 import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentInfo
 import org.digimead.digi.ctrl.lib.util.Android
@@ -50,9 +55,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import annotation.elidable.ASSERTION
 
-protected class AppActivity private ( final val root: WeakReference[Context]) extends Actor with Logging {
+protected class AppActivity private () extends Actor with Logging {
   lazy val state = new SyncVar[AppActivity.State]() {
     private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(DState.Unknown))
     override def set(x: AppActivity.State) = synchronized {
@@ -73,15 +77,15 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
         set(busyCounter._2)
     }
   }
-  lazy val appNativePath = root.get.map(ctx => new File(ctx.getFilesDir() + "/" + DConstant.apkNativePath + "/"))
+  lazy val appNativePath = AppActivity.Context.map(ctx => new File(ctx.getFilesDir() + "/" + DConstant.apkNativePath + "/"))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
-    root.get.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
+    AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
   lazy val applicationManifest = try {
-    root.get.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
+    AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
@@ -101,20 +105,6 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
         case message =>
           log.error("skip unknown message " + message)
       }
-    }
-  }
-  def get(): Option[Context] = get(true)
-  def get(throwError: Boolean): Option[Context] = synchronized {
-    if (!throwError)
-      return root.get
-    root.get match {
-      case Some(root) =>
-        Some(root)
-      case None =>
-        val t = new Throwable("Intospecting stack frame")
-        t.fillInStackTrace()
-        log.error("uninitialized Context at AppActivity: " + t.getStackTraceString)
-        None
     }
   }
   @Loggable
@@ -137,8 +127,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       }
     }): Option[ComponentInfo] = {
     for {
-      inner <- AppActivity.Inner
-      appManifest <- inner.applicationManifest
+      appManifest <- applicationManifest
     } yield {
       AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
         case Some(info) =>
@@ -150,28 +139,30 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
       }
     }
   } getOrElse None
-  def filters(): Seq[String] = get() match {
+  def filters(): Seq[String] = AppActivity.Context match {
     case Some(root) =>
       root.getSharedPreferences(DPreference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
     case None =>
       Seq()
   }
   @Loggable
-  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
-    intent.putExtra("__private__", true)
-    flags.foreach(intent.setFlags)
-    context.sendBroadcast(intent, DPermission.Base)
-  })
+  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
+    context =>
+      intent.putExtra("__private__", true)
+      flags.foreach(intent.setFlags)
+      context.sendBroadcast(intent, DPermission.Base)
+  }
   @Loggable
-  def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = root.get.foreach(context => {
-    intent.putExtra("__private__", true)
-    flags.foreach(intent.setFlags)
-    context.sendOrderedBroadcast(intent, DPermission.Base)
-  })
+  def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
+    context =>
+      intent.putExtra("__private__", true)
+      flags.foreach(intent.setFlags)
+      context.sendOrderedBroadcast(intent, DPermission.Base)
+  }
   @Loggable
   protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
     for {
-      ctx <- root.get
+      ctx <- AppActivity.Context
       appNativePath <- appNativePath
     } yield {
       // Copy armeabi from assests to files folder:
@@ -239,7 +230,7 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
   @Loggable
   private def prepareNativePath(caller: Activity): Boolean = {
     for {
-      ctx <- root.get
+      ctx <- AppActivity.Context
       appNativePath <- appNativePath
     } yield {
       try {
@@ -297,14 +288,15 @@ protected class AppActivity private ( final val root: WeakReference[Context]) ex
 }
 
 object AppActivity extends Logging {
-  private var inner: AppActivity = null
+  @volatile private var inner: AppActivity = null
+  @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
   @Loggable
   private[lib] def init(root: Context, _inner: AppActivity = null) = synchronized {
-    future { AppCache.init(root) }
+    LazyInit("initialize AppCache") { AppCache.init(root) }
     if (inner != null) {
       log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
       // unbind services from bindedICtrlPool
-      inner.root.get.map {
+      context.get.foreach {
         context =>
           inner.bindedICtrlPool.keys.foreach(key => {
             inner.bindedICtrlPool.remove(key).map(record => {
@@ -315,36 +307,33 @@ object AppActivity extends Logging {
       }
     } else
       log.info("initialize AppActivity for " + root.getPackageName())
+    context = new WeakReference(root)
     if (_inner != null)
       inner = _inner
     else
-      inner = new AppActivity(new WeakReference(root))
+      inner = new AppActivity()
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def safe(root: Context) = synchronized {
-    if (inner == null)
-      init(root)
-  }
   private[lib] def deinit(): Unit = synchronized {
-    val context = inner.root.get
-    log.info("deinitialize AppActivity for " + context.map(_.getPackageName()).getOrElse("UNKNOWN"))
+    log.info("deinitialize AppActivity for " + Context.map(_.getPackageName()).getOrElse("UNKNOWN"))
     assert(inner != null)
-    val _inner = inner
+    val savedInner = inner
+    val savedContext = context.get
     inner = null
+    context = new WeakReference(null)
     if (AppActivity.initialized)
       for {
-        rootApp <- _inner.root.get;
-        innerSrv <- AppService.Inner;
-        rootSrv <- innerSrv.root.get
+        rootApp <- savedContext
+        rootSrv <- AppService.context.get
       } if (rootApp == rootSrv) {
         log.info("AppActivity and AppService share the same context. Clear.")
         AppService.deinit()
       }
     // unbind services from bindedICtrlPool
-    _inner.root.get.map {
+    savedContext.foreach {
       context =>
-        _inner.bindedICtrlPool.keys.foreach(key => {
-          _inner.bindedICtrlPool.remove(key).map(record => {
+        savedInner.bindedICtrlPool.keys.foreach(key => {
+          savedInner.bindedICtrlPool.remove(key).map(record => {
             log.debug("remove service connection to " + key + " from bindedICtrlPool")
             context.unbindService(record._1)
           })
@@ -352,18 +341,27 @@ object AppActivity extends Logging {
     }
     AppCache.deinit()
   }
-  def Inner = synchronized {
-    if (inner != null) {
-      Some(inner)
-    } else {
-      val t = new Throwable("Intospecting stack frame")
-      t.fillInStackTrace()
-      log.error(getClass().getName() + " singleton uninitialized: " + t.getStackTraceString)
-      None
+  def Inner = inner
+  def Context = context.get
+  def initialized = synchronized { inner != null }
+  object LazyInit {
+    @volatile private var pool: Seq[() => Any] = Seq()
+    private val timeout = DTimeout.long
+    def apply(description: String)(f: => Any)(implicit log: RichLogger) = synchronized {
+      pool = pool :+ (() => {
+        val scheduler = Executors.newSingleThreadScheduledExecutor()
+        scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
+        log.debug("begin LazyInit block \"" + description + "\"")
+        f
+        log.debug("end LazyInit block \"" + description + "\"")
+        scheduler.shutdownNow
+      })
+    }
+    def init() = synchronized {
+      pool.foreach(f => future { f() })
+      pool = Seq()
     }
   }
-  def Context = Inner.flatMap(_.get())
-  def initialized = synchronized { inner != null }
   object Message {
     sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
