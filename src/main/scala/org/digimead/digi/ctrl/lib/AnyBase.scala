@@ -17,6 +17,8 @@
 package org.digimead.digi.ctrl.lib
 
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
@@ -51,7 +53,7 @@ object AnyBase extends Logging {
     + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
-  def init(context: Context) = synchronized {
+  def init(context: Context, stackTraceOnUnknownContext: Boolean = true) = synchronized {
     context match {
       case activity: Activity =>
         if (AppActivity.context.get != context)
@@ -59,7 +61,9 @@ object AnyBase extends Logging {
       case service: Service =>
         if (AppService.context.get != context)
           AppService.init(context)
-      case _ =>
+      case context =>
+        if (stackTraceOnUnknownContext)
+          log.fatal("init from unknown context " + context)
     }
     if (AppActivity.Inner == null)
       AppActivity.init(context)
@@ -76,21 +80,25 @@ object AnyBase extends Logging {
   }
   case class Info(val reportPath: File,
     val appVersion: String,
+    val appBuild: String,
     val appPackage: String,
     val phoneModel: String,
     val androidVersion: String,
     val write: Boolean) {
     log.debug("reportPath: " + reportPath)
     log.debug("appVersion: " + appVersion)
+    log.debug("appBuild: " + appBuild)
     log.debug("appPackage: " + appPackage)
     log.debug("phoneModel: " + phoneModel)
     log.debug("androidVersion: " + androidVersion)
     log.debug("write to storage: " + write)
     override def toString = "reportPath: " + reportPath +
-      ", appVersion: " + appVersion + ", appPackage: " + appPackage +
-      ", phoneModel: " + phoneModel + ", androidVersion: " + androidVersion
+      ", appVersion: " + appVersion + ", appBuild: " + appBuild +
+      ", appPackage: " + appPackage + ", phoneModel: " + phoneModel +
+      ", androidVersion: " + androidVersion
   }
   object Info {
+    private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
     def init(context: Context) = synchronized {
       if (AnyBase.info.get == None) {
         // Get information about the Package
@@ -100,6 +108,7 @@ object AnyBase extends Logging {
         val writeReport = pref.getBoolean(pi.packageName, true)
         val info = new AnyBase.Info(reportPath = new File(context.getFilesDir(), "report"),
           appVersion = pi.versionName,
+          appBuild = dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,
           phoneModel = android.os.Build.MODEL,
           androidVersion = android.os.Build.VERSION.RELEASE,
@@ -107,5 +116,6 @@ object AnyBase extends Logging {
         AnyBase.info.set(Some(info))
       }
     }
+    def dateString(date: Date) = df.format(date)
   }
 }

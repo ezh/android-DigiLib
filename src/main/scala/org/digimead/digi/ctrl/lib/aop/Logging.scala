@@ -57,7 +57,6 @@ package org.digimead.digi.ctrl.lib.aop
 
 import java.io.File
 import java.io.FileWriter
-import java.text.SimpleDateFormat
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
@@ -74,6 +73,7 @@ import org.slf4j.LoggerFactory
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.app.Service
 import android.content.Context
 
 trait Logging {
@@ -125,7 +125,7 @@ object Logging {
   object Report extends Logging {
     private[aop] val queue = new ConcurrentLinkedQueue[Record]
     private val run = new AtomicBoolean(true)
-    val reportSuffix = "-" + Report.dateString(new Date()) + "-U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + ".report"
+    val reportSuffix = "-" + AnyBase.Info.dateString(new Date()) + "-U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + ".report"
     val reportName = "log" + reportSuffix
     private val reportThread = new Thread("GenericLogger " + reportName) {
       this.setDaemon(true)
@@ -159,7 +159,6 @@ object Logging {
         }
       }
     }
-    private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
     private var workerThread: Thread = null
     private var logWriter: FileWriter = null
     private[Logging] def init(context: Context): Unit = synchronized {
@@ -242,8 +241,10 @@ object Logging {
                   log.error(e.getMessage, e)
               }
             }
+          case service: Service =>
+            log.info("unable to send application report from service context")
           case context =>
-            log.info("unable to send application report from unknown context")
+            log.info("unable to send application report from unknown context " + context)
         }
       }
     }
@@ -266,7 +267,6 @@ object Logging {
         logWriter.flush()
       count
     }
-    private def dateString(date: Date) = df.format(date)
     private[aop] class Record(val date: Date,
       val pid: Int,
       val tid: Long,
@@ -274,7 +274,7 @@ object Logging {
       val tag: String,
       val message: String) {
       override def toString =
-        Seq(Report.dateString(date), pid.toString, tid.toString, level.toString, tag.toString).mkString(" ") + ": " + message
+        Seq(AnyBase.Info.dateString(date), pid.toString, tid.toString, level.toString, tag.toString).mkString(" ") + ": " + message
     }
   }
 }
