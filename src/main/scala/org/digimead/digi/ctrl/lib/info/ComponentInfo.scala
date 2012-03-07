@@ -35,9 +35,11 @@ import org.digimead.digi.ctrl.lib.util.Version
 import android.content.Context
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.BitmapFactory
+import android.os.Parcelable
+import android.os.Parcel
 import android.util.DisplayMetrics
 
-case class ComponentInfo(val id: String,
+case class ComponentInfo(val id: String, // unique string / primary key
   val name: String,
   val version: String, // Version Not Serializable
   val description: String,
@@ -51,7 +53,116 @@ case class ComponentInfo(val id: String,
   val iconMDPI: Option[Array[Byte]], // Bitmap Not Serializable
   val iconXHDPI: Option[Array[Byte]], // Bitmap Not Serializable
   val market: String,
-  val componentPackage: String) extends java.io.Serializable {
+  val componentPackage: String) extends Parcelable {
+  def this(in: Parcel) = this(id = in.readString,
+    name = in.readString,
+    version = in.readString,
+    description = in.readString,
+    project = in.readString,
+    thumb = {
+      val dataLength = in.readInt
+      if (dataLength == -1) {
+        None
+      } else {
+        val data = new Array[Byte](dataLength)
+        in.readByteArray(data)
+        Some(data)
+      }
+    },
+    origin = in.readString,
+    license = in.readString,
+    email = in.readString,
+    iconHDPI = {
+      val dataLength = in.readInt
+      if (dataLength == -1) {
+        None
+      } else {
+        val data = new Array[Byte](dataLength)
+        in.readByteArray(data)
+        Some(data)
+      }
+    },
+    iconLDPI = {
+      val dataLength = in.readInt
+      if (dataLength == -1) {
+        None
+      } else {
+        val data = new Array[Byte](dataLength)
+        in.readByteArray(data)
+        Some(data)
+      }
+    },
+    iconMDPI = {
+      val dataLength = in.readInt
+      if (dataLength == -1) {
+        None
+      } else {
+        val data = new Array[Byte](dataLength)
+        in.readByteArray(data)
+        Some(data)
+      }
+    },
+    iconXHDPI = {
+      val dataLength = in.readInt
+      if (dataLength == -1) {
+        None
+      } else {
+        val data = new Array[Byte](dataLength)
+        in.readByteArray(data)
+        Some(data)
+      }
+    },
+    market = in.readString,
+    componentPackage = in.readString)
+  def writeToParcel(out: Parcel, flags: Int) {
+    ComponentInfo.log.debug("writeToParcel with flags " + flags)
+    out.writeString(id)
+    out.writeString(name)
+    out.writeString(version)
+    out.writeString(description)
+    out.writeString(project)
+    thumb match {
+      case Some(thumb) =>
+        out.writeInt(thumb.length)
+        out.writeByteArray(thumb)
+      case None =>
+        out.writeInt(-1)
+    }
+    out.writeString(origin)
+    out.writeString(license)
+    out.writeString(email)
+    iconHDPI match {
+      case Some(thumb) =>
+        out.writeInt(thumb.length)
+        out.writeByteArray(thumb)
+      case None =>
+        out.writeInt(-1)
+    }
+    iconLDPI match {
+      case Some(thumb) =>
+        out.writeInt(thumb.length)
+        out.writeByteArray(thumb)
+      case None =>
+        out.writeInt(-1)
+    }
+    iconMDPI match {
+      case Some(thumb) =>
+        out.writeInt(thumb.length)
+        out.writeByteArray(thumb)
+      case None =>
+        out.writeInt(-1)
+    }
+    iconXHDPI match {
+      case Some(thumb) =>
+        out.writeInt(thumb.length)
+        out.writeByteArray(thumb)
+      case None =>
+        out.writeInt(-1)
+    }
+    out.writeString(market)
+    out.writeString(componentPackage)
+  }
+  def describeContents() = 0
   def getDescription(): String = {
     Seq("Name: " + name,
       "Version: " + version,
@@ -74,14 +185,21 @@ case class ComponentInfo(val id: String,
   def getIconDrawable(context: Context) =
     getIconBitmap(context).map(new BitmapDrawable(_))
 }
+
 object ComponentInfo extends Logging {
+  override protected val log = Logging.getLogger(this)
+  final val CREATOR: Parcelable.Creator[ComponentInfo] = new Parcelable.Creator[ComponentInfo]() {
+    @Loggable
+    def createFromParcel(in: Parcel): ComponentInfo = new ComponentInfo(in)
+    def newArray(size: Int): Array[ComponentInfo] = new Array[ComponentInfo](size)
+  }
   final protected val stringLimit = 1024
   val emailPattern = Pattern.compile("""^[a-z0-9._%-]+@(?:[a-z0-9-]+\.)+[a-z]{2,4}$""", Pattern.CASE_INSENSITIVE)
   val packagePattern = Pattern.compile("""^([a-z_]{1}[a-z0-9_]*(\.[a-z_]{1}[a-z0-9_]*)*)$""", Pattern.CASE_INSENSITIVE)
   @Loggable
   def apply(xml: Elem, locale: String, localeLanguage: String, iconExtractor: (Seq[(IconType, String)]) => Seq[Option[Array[Byte]]]): Option[ComponentInfo] = try {
     log.debug("check XML content")
-    val id = check(Check.Text("is"), xml \\ "id" headOption)
+    val id = check(Check.Text("id"), xml \\ "id" headOption)
     val name = check(Check.Text("name"), suitable(xml \\ "name", locale, localeLanguage))
     val version = check(Check.Version("version"), xml \\ "version" headOption)
     val description = check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage))

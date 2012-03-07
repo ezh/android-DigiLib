@@ -98,6 +98,7 @@ case class ExecutableInfo(val id: Int,
   }
   def describeContents() = 0
 }
+
 object ExecutableInfo extends Logging {
   override protected val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {

@@ -14,17 +14,6 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl;
+package org.digimead.digi.ctrl.lib.info;
 
-import org.digimead.digi.ctrl.lib.info.ExecutableInfo;
-import org.digimead.digi.ctrl.lib.info.ComponentInfo;
-
-interface ICtrlComponent {
-  // serialized to Array[Byte] Common.ComponentInfo
-  ComponentInfo info();
-  int uid();
-  int size();
-  boolean pre(in int id, in String workdir);
-  ExecutableInfo executable(in int id, in String workdir);
-  boolean post(in int id, in String workdir);
-}
+parcelable ComponentInfo;
