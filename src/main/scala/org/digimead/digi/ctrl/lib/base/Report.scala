@@ -16,16 +16,18 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.io.File
 import java.io.FileWriter
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
+import java.util.UUID
 
 import scala.Option.option2Iterable
 import scala.collection.JavaConversions._
 
-import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
@@ -38,6 +40,8 @@ import android.app.ActivityManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.util.Base64.DEFAULT
+import android.util.Base64.encode
 
 object Report extends Logging {
   private[lib] val queue = new ConcurrentLinkedQueue[Record]
@@ -132,6 +136,7 @@ object Report extends Logging {
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {
             if (force || reports.exists(_.endsWith(".stacktrace"))) {
+              val sessionId = UUID.randomUUID.toString + "-"
               val futures = reports.map(name => {
                 val report = new File(info.reportPath, name)
                 val active = try {
@@ -144,17 +149,21 @@ object Report extends Logging {
                 }
                 if (active) {
                   log.debug("there is active report " + report.getName)
-                  uploadCallback.foreach(_(report, reports.size))
-                  if (force)
-                    GoogleCloud.upload(report)
-                  else
+                  if (force) {
+                    uploadCallback.foreach(_(report, reports.size))
+                    GoogleCloud.upload(report, sessionId)
+                  } else {
+                    uploadCallback.foreach(_(report, reports.size))
                     None
+                  }
                 } else {
                   log.debug("there is passive report " + report.getName)
                   uploadCallback.foreach(_(report, reports.size))
-                  GoogleCloud.upload(report)
+                  GoogleCloud.upload(report, sessionId)
                 }
               })
+              // IMHO there is cloud rate limit. futures are useless
+              // awaitAll(DTimeout.long, futures.flatten.toSeq: _*)
             }
           } catch {
             case e =>
@@ -166,6 +175,7 @@ object Report extends Logging {
           log.info("unable to send application report from unknown context " + context)
       }
     }
+    clean()
   }
   private def clean(): Unit = synchronized {
     for {
@@ -189,7 +199,7 @@ object Report extends Logging {
             case _ =>
               false
           }
-          if (!active) {
+          if (!active || !report.getName.endsWith(".log")) {
             log.info("delete " + report.getName)
             report.delete
           }

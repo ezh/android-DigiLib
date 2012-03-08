@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.ArrayList
 import java.util.Date
 
+import scala.io.Codec.charset2codec
+
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpPut
@@ -32,7 +34,7 @@ import org.apache.http.conn.scheme.PlainSocketFactory
 import org.apache.http.conn.scheme.Scheme
 import org.apache.http.conn.scheme.SchemeRegistry
 import org.apache.http.conn.ssl.SSLSocketFactory
-import org.apache.http.entity.FileEntity
+import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.impl.client.DefaultHttpClient
 import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager
 import org.apache.http.message.BasicNameValuePair
@@ -115,7 +117,7 @@ object GoogleCloud extends Logging {
       }
       client
   }
-  def upload(file: File, uploadViaTempFile: Boolean = true) = AppActivity.Context.foreach {
+  def upload(file: File, prefix: String = "") = AppActivity.Context.foreach {
     context =>
       log.debug("upload " + file.getName + " with default credentials")
       val result = for {
@@ -132,23 +134,17 @@ object GoogleCloud extends Logging {
         getAccessToken(clientID, clientSecret, refreshToken) match {
           case Some(token) =>
             try {
-              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(file.getName, "utf-8")).mkString("/"))
-              val uploadFile = if (uploadViaTempFile) {
-                val temp = File.createTempFile("GoogleCloud-", ".upload", file.getParentFile)
-                temp.deleteOnExit
-                log.debug("prepare " + file.getName + " for uploading to " + uri)
-                Common.copyFile(file, temp)
-                log.debug(file.getName + " prepared")
-                temp
-              } else {
-                log.debug(file.getName + " uploading to " + uri)
-                file
-              }
+              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
+              log.debug("prepare " + file.getName + " for uploading to " + uri)
+              val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
+              val byteArray = source.map(_.toByte).toArray
+              source.close()
+              log.debug(file.getName + " prepared")
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
               val httpput = new HttpPut(uri.getPath())
               httpput.setHeader("x-goog-api-version", "2")
               httpput.setHeader("Authorization", "OAuth " + token.access_token)
-              httpput.setEntity(new FileEntity(uploadFile, "binary/octet-stream"))
+              httpput.setEntity(new ByteArrayEntity(byteArray))
               val response = httpclient.execute(host, httpput)
               val entity = response.getEntity()
               log.debug(uri + " result: " + response.getStatusLine())
@@ -158,8 +154,6 @@ object GoogleCloud extends Logging {
                 case _ =>
                   log.warn("upload " + file.getName + " failed")
               }
-              if (uploadViaTempFile && !uploadFile.delete)
-                log.error("unable to delete temporary file " + uploadFile)
             } catch {
               case e =>
                 log.error("unable to get access token", e)

@@ -77,7 +77,7 @@ trait Activity extends AActivity with AnyBase with Logging {
             summary.getRootView.post(new Runnable { def run = summary.setText("") })
         }
         val spinner = dialog.findViewById(android.R.id.text2).asInstanceOf[Spinner]
-        val emails = "none" +: AccountManager.get(this).getAccounts().map(_.name).filter(_.contains('@')).toList
+        val emails = AccountManager.get(this).getAccounts().map(_.name).filter(_.contains('@')).toList :+ "none"
         val adapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, emails)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.setAdapter(adapter)

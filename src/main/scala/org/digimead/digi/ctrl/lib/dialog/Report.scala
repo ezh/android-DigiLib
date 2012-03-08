@@ -76,6 +76,7 @@ object Report extends Logging {
                   val date = Common.dateString(new Date(time))
                   val summary = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
                   val spinner = view.findViewById(android.R.id.text2).asInstanceOf[Spinner]
+                  AnyBase.info.get.foreach(writer.println)
                   writer.println("email: " + spinner.getSelectedItem().toString())
                   writer.println("description: " + summary.getText.toString)
                   writer.println("generation time: " + date)
