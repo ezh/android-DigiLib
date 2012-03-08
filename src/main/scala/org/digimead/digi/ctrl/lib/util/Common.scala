@@ -20,15 +20,20 @@ import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
 import java.net.NetworkInterface
+import java.nio.channels.FileChannel
+import java.text.SimpleDateFormat
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.Date
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
@@ -58,7 +63,9 @@ import android.text.ClipboardManager
 import android.widget.Toast
 
 object Common extends Logging {
+  private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
   log.debug("alive")
+  def dateString(date: Date) = df.format(date)
   @Loggable
   def onCreateDialog(id: Int, activity: Activity) = id match {
     case id if id == InstallControl.getId(activity) =>
@@ -202,6 +209,26 @@ object Common extends Logging {
       } else {
         log.fatal("service bind failed")
       }
+  }
+  @Loggable
+  def copyFile(sourceFile: File, destFile: File) {
+    if (!destFile.exists()) {
+      destFile.createNewFile();
+    }
+    var source: FileChannel = null
+    var destination: FileChannel = null
+    try {
+      source = new FileInputStream(sourceFile).getChannel()
+      destination = new FileOutputStream(destFile).getChannel()
+      destination.transferFrom(source, 0, source.size())
+    } finally {
+      if (source != null) {
+        source.close()
+      }
+      if (destination != null) {
+        destination.close()
+      }
+    }
   }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList

@@ -17,7 +17,6 @@
 package org.digimead.digi.ctrl.lib
 
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Date
 
 import scala.actors.scheduler.DaemonScheduler
@@ -29,7 +28,9 @@ import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.base.AppService
+import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DPreference
+import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 
 import android.content.Context
@@ -71,7 +72,7 @@ object AnyBase extends Logging {
       AppService.init(context)
     if (AnyBase.info.get == None) {
       Info.init(context)
-      Logging.init(context)
+      Report.init(context)
       uncaughtExceptionHandler.register(context)
       log.debug("start AppActivity singleton actor")
       // start activity singleton actor
@@ -98,7 +99,6 @@ object AnyBase extends Logging {
       ", androidVersion: " + androidVersion
   }
   object Info {
-    private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
     def init(context: Context) = synchronized {
       if (AnyBase.info.get == None) {
         // Get information about the Package
@@ -108,7 +108,7 @@ object AnyBase extends Logging {
         val writeReport = pref.getBoolean(pi.packageName, true)
         val info = new AnyBase.Info(reportPath = new File(context.getFilesDir(), "report"),
           appVersion = pi.versionName,
-          appBuild = dateString(new Date(pi.versionCode.toLong * 1000)),
+          appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,
           phoneModel = android.os.Build.MODEL,
           androidVersion = android.os.Build.VERSION.RELEASE,
@@ -116,6 +116,5 @@ object AnyBase extends Logging {
         AnyBase.info.set(Some(info))
       }
     }
-    def dateString(date: Date) = df.format(date)
   }
 }

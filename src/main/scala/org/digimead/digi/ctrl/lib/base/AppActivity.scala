@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
 import scala.actors.Actor
+import scala.annotation.elidable
 import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
@@ -55,6 +56,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
   lazy val state = new SyncVar[AppActivity.State]() {
@@ -358,7 +360,14 @@ object AppActivity extends Logging {
       })
     }
     def init() = synchronized {
-      pool.foreach(f => future { f() })
+      pool.foreach(f => future {
+        try {
+          f()
+        } catch {
+          case e =>
+            log.error(e.getMessage, e)
+        }
+      })
       pool = Seq()
     }
   }

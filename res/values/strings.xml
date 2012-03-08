@@ -33,13 +33,19 @@
     <string name="status_busy">Busy</string>
     <string name="ask_control_newconnection_title">ask_control_newconnection_title</string>
     <string name="ask_control_newconnection_content">ask_control_newconnection_content</string>
-    <string name="state_Initializing">&lt;font color=&quot;white&quot;&gt;&lt;i&gt;Initializing&lt;/i&gt;&lt;/font&gt;</string>
-    <string name="state_Broken">&lt;font color=&quot;red&quot;&gt;Broken&lt;/font&gt;</string>
+    <string name="state_Initializing">&lt;font color="white">&lt;i>Initializing&lt;/i>&lt;/font></string>
+    <string name="state_Broken">&lt;font color="red">Broken&lt;/font></string>
     <string name="state_Passive">Passive</string>
-    <string name="state_Busy">&lt;font color=&quot;yellow&quot;&gt;&lt;i&gt;Busy&lt;/i&gt;&lt;/font&gt;</string>
-    <string name="state_Active">&lt;font color=&quot;white&quot;&gt;Active&lt;/font&gt;</string>
+    <string name="state_Busy">&lt;font color="yellow">&lt;i>Busy&lt;/i>&lt;/font></string>
+    <string name="state_Active">&lt;font color="white">Active&lt;/font></string>
     <string name="state_Unknown">Unknown</string>
     <string name="time_minutes">%1$02dm %2$02ds</string>
     <string name="time_hours">%1$dh %2$02dm %3$02ds</string>
     <string name="app_name">Unknown</string>
+    <string name="report">report</string>
+    <string name="quit">quit</string>
+    <string name="report_hint">description</string>
+    <string name="report_summary">Please give us a short summary</string>
+    <string name="report_email">Contact email</string>
+
 </resources>

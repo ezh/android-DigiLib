@@ -16,7 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
@@ -34,10 +33,9 @@ import android.content.Intent
 import android.net.Uri
 
 object InstallControl extends Logging {
-  def getId(context: Context) = context.getResources().getIdentifier("dialog_InstallControl", "id", context.getPackageName())
+  def getId(context: Context) = Android.getId(context, "install_digicontrol")
   @Loggable
   def createDialog(activity: Activity): Dialog = {
-    log.debug("createDialog(...)")
     // check whether the intent can be resolved. If not, we will see
     // whether we can download it from the Market.
     val intent = new Intent(activity, classOf[ICtrlHost])

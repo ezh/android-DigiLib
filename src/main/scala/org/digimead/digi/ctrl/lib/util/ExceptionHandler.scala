@@ -25,6 +25,7 @@ import java.lang.Thread.UncaughtExceptionHandler
 
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.AnyBase
 
@@ -46,33 +47,37 @@ class ExceptionHandler extends Logging {
 }
 
 object ExceptionHandler extends Logging {
+  @volatile var allowGenerateStackTrace = true
+  def generateStackTrace(t: Thread, e: Throwable) = AnyBase.info.get.foreach {
+    info =>
+      // Here you should have a more robust, permanent record of problems
+      val reportName = Report.reportPrefix + ".stacktrace"
+      val result = new StringWriter()
+      val printWriter = new PrintWriter(result)
+      e.printStackTrace(printWriter)
+      try {
+        val file = new File(info.reportPath, reportName)
+        log.debug("Writing unhandled exception to: " + file)
+        // Write the stacktrace to disk
+        val bos = new BufferedWriter(new FileWriter(file))
+        bos.write(AnyBase.info.get.get.toString + "\n")
+        bos.write(result.toString())
+        bos.flush()
+        // Close up everything
+        bos.close()
+        AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Error))) // try to notify user, if it is possible
+      } catch {
+        // Nothing much we can do about this - the game is over
+        case e =>
+      }
+  }
   class Default(val defaultExceptionHandler: UncaughtExceptionHandler) extends UncaughtExceptionHandler with Logging {
     // Default exception handler
-    def uncaughtException(t: Thread, e: Throwable) = AnyBase.info.get.foreach {
-      info =>
-        // Here you should have a more robust, permanent record of problems
-        val reportName = "stacktrace" + Logging.Report.reportSuffix
-        val result = new StringWriter()
-        val printWriter = new PrintWriter(result)
-        e.printStackTrace(printWriter)
-        try {
-          val file = new File(info.reportPath, reportName)
-          log.debug("Writing unhandled exception to: " + file)
-          // Write the stacktrace to disk
-          val bos = new BufferedWriter(new FileWriter(file))
-          bos.write(AnyBase.info.get.get.toString)
-          bos.write(result.toString())
-          bos.flush()
-          // Close up everything
-          bos.close()
-          AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Error))) // try to notify user, if it is possible
-        } catch {
-          // Nothing much we can do about this - the game is over
-          case e =>
-            log.error(e.getMessage, e)
-        }
-        //call original handler
-        defaultExceptionHandler.uncaughtException(t, e)
+    def uncaughtException(t: Thread, e: Throwable) {
+      if (allowGenerateStackTrace)
+        generateStackTrace(t, e)
+      //call original handler
+      defaultExceptionHandler.uncaughtException(t, e)
     }
   }
 }

@@ -22,6 +22,7 @@ import java.net.URLEncoder
 import java.security.cert.X509Certificate
 import java.util.concurrent.atomic.AtomicReference
 import java.util.ArrayList
+import java.util.Date
 
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.HttpPost
@@ -45,6 +46,7 @@ import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.Common
 import org.json.JSONObject
 
 import android.provider.Settings
@@ -55,7 +57,7 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /*
- * act as web server ;-) strictly within Google OAuth2 draft10 manual, Ezh
+ * mobile application act as web server ;-) strictly within Google OAuth2 draft10 manual, Ezh
  */
 object GoogleCloud extends Logging {
   private lazy val accessToken = new AtomicReference[Option[AccessToken]](None)
@@ -113,7 +115,7 @@ object GoogleCloud extends Logging {
       }
       client
   }
-  def upload(file: File) = AppActivity.Context.foreach {
+  def upload(file: File, uploadViaTempFile: Boolean = true) = AppActivity.Context.foreach {
     context =>
       log.debug("upload " + file.getName + " with default credentials")
       val result = for {
@@ -131,12 +133,22 @@ object GoogleCloud extends Logging {
           case Some(token) =>
             try {
               val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(file.getName, "utf-8")).mkString("/"))
-              log.debug("uploading to " + uri)
+              val uploadFile = if (uploadViaTempFile) {
+                val temp = File.createTempFile("GoogleCloud-", ".upload", file.getParentFile)
+                temp.deleteOnExit
+                log.debug("prepare " + file.getName + " for uploading to " + uri)
+                Common.copyFile(file, temp)
+                log.debug(file.getName + " prepared")
+                temp
+              } else {
+                log.debug(file.getName + " uploading to " + uri)
+                file
+              }
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
               val httpput = new HttpPut(uri.getPath())
               httpput.setHeader("x-goog-api-version", "2")
               httpput.setHeader("Authorization", "OAuth " + token.access_token)
-              httpput.setEntity(new FileEntity(file, "binary/octet-stream"))
+              httpput.setEntity(new FileEntity(uploadFile, "binary/octet-stream"))
               val response = httpclient.execute(host, httpput)
               val entity = response.getEntity()
               log.debug(uri + " result: " + response.getStatusLine())
@@ -146,6 +158,8 @@ object GoogleCloud extends Logging {
                 case _ =>
                   log.warn("upload " + file.getName + " failed")
               }
+              if (uploadViaTempFile && !uploadFile.delete)
+                log.error("unable to delete temporary file " + uploadFile)
             } catch {
               case e =>
                 log.error("unable to get access token", e)
@@ -161,10 +175,12 @@ object GoogleCloud extends Logging {
       if (result == None)
         log.warn("unable to upload " + file)
   }
-  def getAccessToken(clientID: String, clientSecret: String, refreshToken: String): Option[AccessToken] = {
+  def getAccessToken(clientID: String, clientSecret: String, refreshToken: String): Option[AccessToken] = synchronized {
     accessToken.get.foreach(t => if (t.expired > System.currentTimeMillis) {
       log.debug("get cached access token " + t.access_token)
       return Some(t)
+    } else {
+      log.debug("cached access token expired: " + Common.dateString(new Date(t.expired)))
     })
     log.debug("aquire new access token")
     val result = httpclient.flatMap {
@@ -186,7 +202,7 @@ object GoogleCloud extends Logging {
             case 200 =>
               val o = new JSONObject(EntityUtils.toString(entity))
               Some(AccessToken(o.getString("access_token"),
-                System.currentTimeMillis - 1000 + o.getInt("expires_in"),
+                System.currentTimeMillis - 1000 + (o.getInt("expires_in") * 1000),
                 o.getString("token_type")))
             case _ =>
               None

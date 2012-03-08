@@ -15,11 +15,13 @@
 -->
 <resources>
 
-    <item name="dialog_InstallControl" type="id"/>
-    <item name="dialog_FailedMarket" type="id"/>
+    <item name="install_digicontrol" type="id"/>
+    <item name="failed_market" type="id"/>
     <item name="block_support_voice_call" type="id"/>
     <item name="block_support_skype_call" type="id"/>
     <item name="block_legal_open" type="id"/>
     <item name="block_legal_send" type="id"/>
+    <item name="report" type="id"/>
+    <item name="quit" type="id"/>
 
 </resources>

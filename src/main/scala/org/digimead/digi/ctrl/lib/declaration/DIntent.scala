@@ -25,4 +25,5 @@ object DIntent {
   val ComponentActivity = DConstant.prefix + "component.activity"
   val ComponentService = DConstant.prefix + "component.service"
   val Error = DConstant.prefix + "error"
+  val FlushReport = DConstant.prefix + "flush.report"
 }

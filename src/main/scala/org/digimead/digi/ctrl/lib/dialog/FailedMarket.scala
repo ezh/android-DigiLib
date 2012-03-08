@@ -16,7 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Android
@@ -28,10 +27,9 @@ import android.content.Context
 import android.content.DialogInterface
 
 object FailedMarket extends Logging {
-  def getId(context: Context) = context.getResources().getIdentifier("dialog_FailedMarket", "id", context.getPackageName())
+  def getId(context: Context) = Android.getId(context, "failed_market")
   @Loggable
   def createDialog(activity: Activity): Dialog = {
-    log.debug("createDialog(...)")
     new AlertDialog.Builder(activity).
       setTitle(Android.getString(activity, "error_market_failed_title").
         getOrElse("Market failed")).
