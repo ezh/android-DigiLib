@@ -23,6 +23,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
+import scala.actors.Futures.awaitAll
 import scala.actors.Futures.future
 import scala.actors.Actor
 import scala.annotation.elidable
@@ -360,7 +361,7 @@ object AppActivity extends Logging {
       })
     }
     def init() = synchronized {
-      pool.foreach(f => future {
+      val futures = pool.map(f => future {
         try {
           f()
         } catch {
@@ -368,8 +369,11 @@ object AppActivity extends Logging {
             log.error(e.getMessage, e)
         }
       })
+      awaitAll(DTimeout.long, futures: _*)
       pool = Seq()
     }
+    def isEmpty = synchronized { pool.isEmpty }
+    def nonEmpty = synchronized { pool.nonEmpty }
   }
   object Message {
     sealed trait Abstract
