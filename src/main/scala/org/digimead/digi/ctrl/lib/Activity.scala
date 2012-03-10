@@ -69,14 +69,14 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def onResume() = {
     log.trace("Activity::onResume")
-    Activity.registeredReveivers.foreach(t => registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
+    Activity.registeredReveivers.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     activityDialog.set(null) // unlock
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
     activityDialog.set(null) // unlock
-    Activity.registeredReveivers.keys.foreach(unregisterReceiver(_))
+    Activity.registeredReveivers.keys.foreach(super.unregisterReceiver(_))
     super.onPause()
   }
   /*
@@ -200,6 +200,11 @@ object Activity {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
+            if (isSet)
+              get match {
+                case d: Dialog => d.dismiss
+                case _ =>
+              }
           }
         }, DTimeout.longest, TimeUnit.MILLISECONDS)
         d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
