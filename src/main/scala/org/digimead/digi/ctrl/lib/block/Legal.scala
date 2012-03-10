@@ -17,8 +17,8 @@
 package org.digimead.digi.ctrl.lib.block
 
 import scala.annotation.implicitNotFound
+import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
@@ -113,22 +113,28 @@ class Legal(val context: Activity, items: List[Legal.Item],
 }
 
 object Legal {
-  case class Item(val text: String)(val uri: String) {
+  case class Item(val text: String)(val uri: String) extends Block.Item {
     override def toString() = text
   }
   class Adapter(context: Context, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
     extends ArrayAdapter(context, android.R.layout.simple_list_item_1, android.R.id.text1, data.toArray) {
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
+      val item = data(position)
       convertView match {
         case null =>
           val view = super.getView(position, convertView, parent)
-          val item = data(position)
           val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
           text1.setTextAppearance(context, android.R.style.TextAppearance_Small)
           text1.setText(Html.fromHtml(item.text, imageGetter, tagHandler), BufferType.SPANNABLE)
+          item.view = new WeakReference(view)
           view
         case view: View =>
-          view
+          item.view.get match {
+            case Some(view) =>
+              view
+            case None =>
+              view
+          }
       }
     }
   }

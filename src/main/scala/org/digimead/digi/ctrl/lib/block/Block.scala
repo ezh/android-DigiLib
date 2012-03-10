@@ -16,6 +16,8 @@
 
 package org.digimead.digi.ctrl.lib.block
 
+import scala.ref.WeakReference
+
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 
@@ -39,6 +41,9 @@ trait Block[Item] {
 }
 
 object Block {
+  trait Item {
+    var view: WeakReference[View] = new WeakReference(null) // android build in cache may sporadically give us junk :-/
+  }
   class ImageGetter(context: Context) extends Html.ImageGetter with Logging {
     def getDrawable(source: String): Drawable = {
       Android.getId(context, source, "drawable") match {

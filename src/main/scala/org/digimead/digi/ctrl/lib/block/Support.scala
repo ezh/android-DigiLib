@@ -19,8 +19,8 @@ package org.digimead.digi.ctrl.lib.block
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.annotation.implicitNotFound
+import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
@@ -160,7 +160,7 @@ class Support(val context: Activity,
 object Support {
   private val name = "name"
   private val description = "description"
-  sealed case class Item(id: Int)(val name: String, val description: String, val icon: String = "")
+  sealed case class Item(id: Int)(val name: String, val description: String, val icon: String = "") extends Block.Item
   object Item {
     private val counter = new AtomicInteger(0)
     def apply(name: String, description: String) = new Item(counter.getAndIncrement)(name, description)
@@ -169,10 +169,10 @@ object Support {
   class Adapter(context: Context, data: Seq[Item])
     extends ArrayAdapter(context, Android.getId(context, "advanced_list_item", "layout"), android.R.id.text1, data.toArray) {
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
+      val item = data(position)
       convertView match {
         case null =>
           val view = super.getView(position, convertView, parent)
-          val item = data(position)
           val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
           val text2 = view.findViewById(android.R.id.text2).asInstanceOf[TextView]
           val icon = view.findViewById(android.R.id.icon1).asInstanceOf[ImageView]
@@ -186,9 +186,15 @@ object Support {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
+          item.view = new WeakReference(view)
           view
         case view: View =>
-          view
+          item.view.get match {
+            case Some(view) =>
+              view
+            case None =>
+              view
+          }
       }
     }
   }

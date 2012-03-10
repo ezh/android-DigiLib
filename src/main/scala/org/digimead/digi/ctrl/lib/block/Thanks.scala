@@ -54,7 +54,7 @@ class Thanks(val context: Activity) extends Block[Thanks.Item] with Logging {
 object Thanks {
   private val name = "name"
   private val description = "description"
-  case class Item(name: String, description: String) extends java.util.HashMap[String, Spanned] {
+  case class Item(name: String, description: String) extends java.util.HashMap[String, Spanned] with Block.Item {
     put(Thanks.name, Html.fromHtml(name))
     put(Thanks.description, Html.fromHtml(description))
   }

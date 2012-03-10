@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
-import scala.annotation.elidable
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
@@ -34,8 +33,8 @@ import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.dialog.Report
 
 import android.accounts.AccountManager
-import android.app.{Activity => AActivity}
-import android.app.{Dialog => ADialog}
+import android.app.{ Activity => AActivity }
+import android.app.{ Dialog => ADialog }
 import android.content.BroadcastReceiver
 import android.content.DialogInterface
 import android.content.Intent
@@ -45,7 +44,6 @@ import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
-import annotation.elidable.ASSERTION
 import declaration.DTimeout
 
 /*
@@ -65,13 +63,16 @@ trait Activity extends AActivity with AnyBase with Logging {
     log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
     Activity.registeredReveivers.foreach(t => registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
+    activityDialog.set(new ADialog(this)) // lock
   }
   override def onResume() = {
     log.trace("Activity::onResume")
+    activityDialog.set(null) // unlock
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
+    activityDialog.set(null) // unlock
     super.onPause()
   }
   override def onDestroy() = {
@@ -81,12 +82,18 @@ trait Activity extends AActivity with AnyBase with Logging {
     super.onDestroy()
   }
   def showDialogSafe(id: Int) = future {
-    log.trace("Activity::showDialogSafe")
-    activityDialog.synchronized {
-      while (activityDialog.get != null)
-        activityDialog.wait
-      log.debug("show dialog " + id)
-      runOnUiThread(new Runnable { def run = showDialog(id) })
+    try {
+      log.trace("Activity::showDialogSafe")
+      activityDialog.synchronized {
+        while (activityDialog.get != null)
+          activityDialog.wait
+        log.debug("show dialog " + id)
+        runOnUiThread(new Runnable { def run = showDialog(id) })
+      }
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+        None
     }
   }
   def showDialogSafe[T <% ADialog](dialog: () => T): Option[T] = activityDialog.synchronized {
@@ -172,25 +179,42 @@ object Activity {
     super.set(null)
     @Loggable
     override def set(d: ADialog) = synchronized {
-      log.info("show safe dialog " + d.getClass.getName)
-      activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
-      activityDialogGuard.schedule(new Runnable {
-        def run() = {
-          log.fatal("dismiss stalled dialog " + d.getClass.getName)
-          activityDialogGuard.shutdownNow
-          activityDialogGuard = null
-        }
-      }, DTimeout.longest, TimeUnit.MILLISECONDS)
-      d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
-        @Loggable
-        override def onDismiss(dialog: DialogInterface) = Dialog.this.synchronized {
-          log.info("dismiss safe dialog " + d.getClass.getName)
-          activityDialogGuard.shutdownNow
-          activityDialogGuard = null
-          Dialog.super.set(null)
-          Dialog.this.notifyAll
-        }
-      })
+      if (activityDialogGuard != null) {
+        activityDialogGuard.shutdownNow
+        activityDialogGuard = null
+      }
+      if (d != null) {
+        log.info("show safe dialog " + d.getClass.getName)
+        activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
+        activityDialogGuard.schedule(new Runnable {
+          def run() = {
+            log.fatal("dismiss stalled dialog " + d.getClass.getName)
+            if (activityDialogGuard != null) {
+              activityDialogGuard.shutdownNow
+              activityDialogGuard = null
+            }
+          }
+        }, DTimeout.longest, TimeUnit.MILLISECONDS)
+        d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
+          @Loggable
+          override def onDismiss(dialog: DialogInterface) = Dialog.this.synchronized {
+            log.info("dismiss safe dialog " + d.getClass.getName)
+            if (activityDialogGuard != null) {
+              activityDialogGuard.shutdownNow
+              activityDialogGuard = null
+            }
+            Dialog.super.set(null)
+            Dialog.this.notifyAll
+          }
+        })
+      } else {
+        if (isSet)
+          get match {
+            case d: Dialog => d.dismiss
+            case _ =>
+          }
+        log.info("reset safe dialog")
+      }
       super.set(d)
       notifyAll()
     }

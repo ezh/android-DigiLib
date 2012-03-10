@@ -23,8 +23,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
-import scala.actors.Futures.awaitAll
-import scala.actors.Futures.future
+import scala.actors.Futures._
 import scala.actors.Actor
 import scala.annotation.elidable
 import scala.annotation.implicitNotFound
@@ -61,24 +60,41 @@ import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
   lazy val state = new SyncVar[AppActivity.State]() with Logging {
-    private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(DState.Unknown))
-    override def set(x: AppActivity.State) = synchronized {
-      if (x.code == DState.Busy) {
-        busyCounter = (busyCounter._1 + 1, busyCounter._2)
-        super.set(x)
-      } else if (busyCounter._1 != 0) {
-        busyCounter = (busyCounter._1, x)
+    private var lastNonBusyState: AppActivity.State = null
+    private var busyCounter = 0
+    set(AppActivity.State(DState.Unknown))
+    override def set(newState: AppActivity.State) = synchronized {
+      if (newState.code == DState.Busy) {
+        busyCounter += 1
+        log.debug("increase status busy counter to " + busyCounter)
+        if (isSet && get.code != DState.Busy)
+          lastNonBusyState = get
+        super.set(newState)
+      } else if (busyCounter != 0) {
+        lastNonBusyState = newState
       } else
-        super.set(x)
-      log.debug("set status to \"" + x + "\"")
+        super.set(newState)
+      log.debug("set status to " + newState)
       AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     @Loggable
-    def freeBusy() {
-      if (busyCounter._1 > 0)
-        busyCounter = (busyCounter._1 - 1, busyCounter._2)
-      if (busyCounter._1 == 0)
-        set(busyCounter._2)
+    def freeBusy() = synchronized {
+      if (busyCounter > 1) {
+        busyCounter -= 1
+        log.debug("decrease status busy counter to " + busyCounter)
+      } else if (busyCounter == 1) {
+        busyCounter -= 1
+        log.debug("reset status busy counter")
+        lastNonBusyState match {
+          case state: AppActivity.State =>
+            lastNonBusyState = null
+            set(state)
+          case state =>
+            log.warn("unknown lastNonBusyState condition " + state)
+        }
+      } else {
+        log.fatal("illegal busyCounter")
+      }
     }
   }
   lazy val appNativePath = AppActivity.Context.map(ctx => new File(ctx.getFilesDir() + "/" + DConstant.apkNativePath + "/"))
@@ -110,6 +126,35 @@ protected class AppActivity private () extends Actor with Logging {
           log.error("skip unknown message " + message)
       }
     }
+  }
+  @Loggable
+  def getCachedComponentInfo(locale: String, localeLanguage: String,
+    iconExtractor: (Seq[(ComponentInfo.IconType, String)]) => Seq[Option[Array[Byte]]] = (icons: Seq[(ComponentInfo.IconType, String)]) => {
+      icons.map {
+        case (iconType, url) =>
+          iconType match {
+            case icon: ComponentInfo.Thumbnail.type =>
+              None
+            case icon: ComponentInfo.LDPI.type =>
+              None
+            case icon: ComponentInfo.MDPI.type =>
+              None
+            case icon: ComponentInfo.HDPI.type =>
+              None
+            case icon: ComponentInfo.XHDPI.type =>
+              None
+          }
+      }
+    }): Option[ComponentInfo] = applicationManifest.flatMap {
+    appManifest =>
+      AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
+        case Some(info) =>
+          Some(info.asInstanceOf[ComponentInfo])
+        case None =>
+          val result = getComponentInfo(locale, localeLanguage, iconExtractor)
+          result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
+          result
+      }
   }
   @Loggable
   def getComponentInfo(locale: String, localeLanguage: String,
@@ -294,56 +339,73 @@ protected class AppActivity private () extends Actor with Logging {
 object AppActivity extends Logging {
   @volatile private var inner: AppActivity = null
   @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
+  private val deinitializationLock = new SyncVar[Boolean]()
+
+  log.debug("alive")
   @Loggable
-  private[lib] def init(root: Context, _inner: AppActivity = null) = synchronized {
-    LazyInit("initialize AppCache") { AppCache.init(root) }
-    if (inner != null) {
-      log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
-      // unbind services from bindedICtrlPool
-      context.get.foreach {
-        context =>
-          inner.bindedICtrlPool.keys.foreach(key => {
-            inner.bindedICtrlPool.remove(key).map(record => {
-              log.debug("remove service connection to " + key + " from bindedICtrlPool")
-              context.unbindService(record._1)
+  private[lib] def init(root: Context, _inner: AppActivity = null) = {
+    deinitializationLock.set(false)
+    synchronized {
+      // cancel deinitialization sequence if any
+      LazyInit("initialize AppCache") { AppCache.init(root) }
+      if (inner != null) {
+        log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
+        // unbind services from bindedICtrlPool
+        context.get.foreach {
+          context =>
+            inner.bindedICtrlPool.keys.foreach(key => {
+              inner.bindedICtrlPool.remove(key).map(record => {
+                log.debug("remove service connection to " + key + " from bindedICtrlPool")
+                context.unbindService(record._1)
+              })
             })
-          })
-      }
-    } else
-      log.info("initialize AppActivity for " + root.getPackageName())
-    context = new WeakReference(root)
-    if (_inner != null)
-      inner = _inner
-    else
-      inner = new AppActivity()
-    inner.state.set(State(DState.Initializing))
-  }
-  private[lib] def deinit(): Unit = synchronized {
-    log.info("deinitialize AppActivity for " + Context.map(_.getPackageName()).getOrElse("UNKNOWN"))
-    assert(inner != null)
-    val savedInner = inner
-    val savedContext = context.get
-    inner = null
-    context = new WeakReference(null)
-    if (AppActivity.initialized)
-      for {
-        rootApp <- savedContext
-        rootSrv <- AppService.context.get
-      } if (rootApp == rootSrv) {
-        log.info("AppActivity and AppService share the same context. Clear.")
-        AppService.deinit()
-      }
-    // unbind services from bindedICtrlPool
-    savedContext.foreach {
-      context =>
-        savedInner.bindedICtrlPool.keys.foreach(key => {
-          savedInner.bindedICtrlPool.remove(key).map(record => {
-            log.debug("remove service connection to " + key + " from bindedICtrlPool")
-            context.unbindService(record._1)
-          })
-        })
+        }
+      } else
+        log.info("initialize AppActivity for " + root.getPackageName())
+      context = new WeakReference(root)
+      if (_inner != null)
+        inner = _inner
+      else
+        inner = new AppActivity()
+      inner.state.set(State(DState.Initializing))
     }
-    AppCache.deinit()
+  }
+  private[lib] def deinit(): Unit = future {
+    val name = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
+    log.info("deinitializing AppActivity for " + name)
+    deinitializationLock.unset
+    deinitializationLock.get(DTimeout.longest) match {
+      case Some(false) =>
+        log.info("deinitialization AppActivity for " + name + " canceled")
+      case _ =>
+        synchronized {
+          log.info("deinitialize AppActivity for " + name)
+          assert(inner != null)
+          val savedInner = inner
+          val savedContext = context.get
+          inner = null
+          context = new WeakReference(null)
+          if (AppActivity.initialized)
+            for {
+              rootApp <- savedContext
+              rootSrv <- AppService.context.get
+            } if (rootApp == rootSrv) {
+              log.info("AppActivity and AppService share the same context. Clear.")
+              AppService.deinit()
+            }
+          // unbind services from bindedICtrlPool
+          savedContext.foreach {
+            context =>
+              savedInner.bindedICtrlPool.keys.foreach(key => {
+                savedInner.bindedICtrlPool.remove(key).map(record => {
+                  log.debug("remove service connection to " + key + " from bindedICtrlPool")
+                  context.unbindService(record._1)
+                })
+              })
+          }
+          AppCache.deinit()
+        }
+    }
   }
   def Inner = inner
   def Context = context.get

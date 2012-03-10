@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import scala.actors.Futures.future
 import scala.actors.Actor
-import scala.annotation.elidable
+import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
@@ -31,6 +31,7 @@ import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.util.Android
@@ -43,7 +44,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import annotation.elidable.ASSERTION
 
 protected class AppService private () extends Actor with Logging {
   protected lazy val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
@@ -64,6 +64,7 @@ protected class AppService private () extends Actor with Logging {
       serviceInstance.set(null)
     }
   }
+
   log.debug("alive")
   def act = {
     loop {
@@ -211,35 +212,50 @@ protected class AppService private () extends Actor with Logging {
 object AppService extends Logging {
   @volatile private var inner: AppService = null
   @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
+  private val deinitializationLock = new SyncVar[Boolean]()
+
   log.debug("alive")
   @Loggable
-  private[lib] def init(root: Context, _inner: AppService = null) = synchronized {
-    if (inner != null) {
-      log.info("reinitialize AppService core subsystem for " + root.getPackageName())
-    } else {
-      log.info("initialize AppService for " + root.getPackageName())
-      resetNatives(root)
-    }
-    context = new WeakReference(root)
-    if (_inner != null)
-      inner = _inner
-    else
-      inner = new AppService()
-  }
-  private[lib] def deinit(): Unit = synchronized {
-    log.info("deinitialize AppService for " + AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN"))
-    assert(inner != null)
-    val _inner = inner
-    inner = null
-    if (AppActivity.initialized)
-      for {
-        rootSrv <- context.get
-        rootApp <- AppActivity.Context
-      } if (rootApp == rootSrv) {
-        log.info("AppActivity and AppService share the same context. Clear.")
-        AppActivity.deinit()
+  private[lib] def init(root: Context, _inner: AppService = null) = {
+    deinitializationLock.set(false) // cancel deinitialization sequence if any
+    synchronized {
+      if (inner != null) {
+        log.info("reinitialize AppService core subsystem for " + root.getPackageName())
+      } else {
+        log.info("initialize AppService for " + root.getPackageName())
+        resetNatives(root)
       }
-    context.get.foreach(resetNatives)
+      context = new WeakReference(root)
+      if (_inner != null)
+        inner = _inner
+      else
+        inner = new AppService()
+    }
+  }
+  private[lib] def deinit(): Unit = future {
+    val name = AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN")
+    log.info("deinitializing AppService for " + name)
+    deinitializationLock.unset
+    deinitializationLock.get(DTimeout.longest) match {
+      case Some(false) =>
+        log.info("deinitialization AppService for " + name + " canceled")
+      case _ =>
+        synchronized {
+          log.info("deinitialize AppService for " + name)
+          assert(inner != null)
+          val _inner = inner
+          inner = null
+          if (AppActivity.initialized)
+            for {
+              rootSrv <- context.get
+              rootApp <- AppActivity.Context
+            } if (rootApp == rootSrv) {
+              log.info("AppActivity and AppService share the same context. Clear.")
+              AppActivity.deinit()
+            }
+          context.get.foreach(resetNatives)
+        }
+    }
   }
   def Inner = inner
   def ICtrlHost = inner.get()
