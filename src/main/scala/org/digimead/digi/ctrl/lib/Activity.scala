@@ -59,25 +59,32 @@ trait Activity extends AActivity with AnyBase with Logging {
     id.get
   }
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
+  /*
+   * sometimes in life cycle onCreate stage invoked without onDestroy stage
+   */
   override def onCreate(savedInstanceState: Bundle): Unit = {
     log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
-    Activity.registeredReveivers.foreach(t => registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     activityDialog.set(new ADialog(this)) // lock
   }
   override def onResume() = {
     log.trace("Activity::onResume")
+    Activity.registeredReveivers.foreach(t => registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     activityDialog.set(null) // unlock
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
     activityDialog.set(null) // unlock
+    Activity.registeredReveivers.keys.foreach(unregisterReceiver(_))
     super.onPause()
   }
+  /*
+   * sometimes in life cycle onCreate stage invoked without onDestroy stage
+   * in fact AppActivity.deinit is sporadic event
+   */
   override def onDestroy() = {
     log.trace("Activity::onDestroy")
-    Activity.registeredReveivers.keys.foreach(unregisterReceiver(_))
     AppActivity.deinit()
     super.onDestroy()
   }

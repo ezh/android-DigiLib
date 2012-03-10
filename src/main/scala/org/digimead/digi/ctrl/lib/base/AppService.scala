@@ -218,44 +218,46 @@ object AppService extends Logging {
   @Loggable
   private[lib] def init(root: Context, _inner: AppService = null) = {
     deinitializationLock.set(false) // cancel deinitialization sequence if any
-    synchronized {
-      if (inner != null) {
-        log.info("reinitialize AppService core subsystem for " + root.getPackageName())
-      } else {
-        log.info("initialize AppService for " + root.getPackageName())
-        resetNatives(root)
-      }
-      context = new WeakReference(root)
-      if (_inner != null)
-        inner = _inner
-      else
-        inner = new AppService()
+    initRoutine(root, _inner)
+  }
+  private[lib] def initRoutine(root: Context, _inner: AppService) = synchronized {
+    if (inner != null) {
+      log.info("reinitialize AppService core subsystem for " + root.getPackageName())
+    } else {
+      log.info("initialize AppService for " + root.getPackageName())
+      resetNatives(root)
     }
+    context = new WeakReference(root)
+    if (_inner != null)
+      inner = _inner
+    else
+      inner = new AppService()
   }
   private[lib] def deinit(): Unit = future {
-    val name = AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppService for " + name)
+    val packageName = AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN")
+    log.info("deinitializing AppService for " + packageName)
     deinitializationLock.unset
     deinitializationLock.get(DTimeout.longest) match {
       case Some(false) =>
-        log.info("deinitialization AppService for " + name + " canceled")
+        log.info("deinitialization AppService for " + packageName + " canceled")
       case _ =>
-        synchronized {
-          log.info("deinitialize AppService for " + name)
-          assert(inner != null)
-          val _inner = inner
-          inner = null
-          if (AppActivity.initialized)
-            for {
-              rootSrv <- context.get
-              rootApp <- AppActivity.Context
-            } if (rootApp == rootSrv) {
-              log.info("AppActivity and AppService share the same context. Clear.")
-              AppActivity.deinit()
-            }
-          context.get.foreach(resetNatives)
-        }
+        deinitRoutine(packageName)
     }
+  }
+  private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
+    log.info("deinitialize AppService for " + packageName)
+    assert(inner != null)
+    val _inner = inner
+    inner = null
+    if (AppActivity.initialized)
+      for {
+        rootSrv <- context.get
+        rootApp <- AppActivity.Context
+      } if (rootApp == rootSrv) {
+        log.info("AppActivity and AppService share the same context. Clear.")
+        AppActivity.deinitRoutine(packageName)
+      }
+    context.get.foreach(resetNatives)
   }
   def Inner = inner
   def ICtrlHost = inner.get()

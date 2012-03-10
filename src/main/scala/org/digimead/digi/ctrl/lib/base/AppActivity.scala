@@ -345,67 +345,69 @@ object AppActivity extends Logging {
   @Loggable
   private[lib] def init(root: Context, _inner: AppActivity = null) = {
     deinitializationLock.set(false)
-    synchronized {
-      // cancel deinitialization sequence if any
-      LazyInit("initialize AppCache") { AppCache.init(root) }
-      if (inner != null) {
-        log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
-        // unbind services from bindedICtrlPool
-        context.get.foreach {
-          context =>
-            inner.bindedICtrlPool.keys.foreach(key => {
-              inner.bindedICtrlPool.remove(key).map(record => {
-                log.debug("remove service connection to " + key + " from bindedICtrlPool")
-                context.unbindService(record._1)
-              })
+    initRoutine(root, _inner)
+  }
+  private[lib] def initRoutine(root: Context, _inner: AppActivity) = synchronized {
+    // cancel deinitialization sequence if any
+    LazyInit("initialize AppCache") { AppCache.init(root) }
+    if (inner != null) {
+      log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
+      // unbind services from bindedICtrlPool
+      context.get.foreach {
+        context =>
+          inner.bindedICtrlPool.keys.foreach(key => {
+            inner.bindedICtrlPool.remove(key).map(record => {
+              log.debug("remove service connection to " + key + " from bindedICtrlPool")
+              context.unbindService(record._1)
             })
-        }
-      } else
-        log.info("initialize AppActivity for " + root.getPackageName())
-      context = new WeakReference(root)
-      if (_inner != null)
-        inner = _inner
-      else
-        inner = new AppActivity()
-      inner.state.set(State(DState.Initializing))
-    }
+          })
+      }
+    } else
+      log.info("initialize AppActivity for " + root.getPackageName())
+    context = new WeakReference(root)
+    if (_inner != null)
+      inner = _inner
+    else
+      inner = new AppActivity()
+    inner.state.set(State(DState.Initializing))
   }
   private[lib] def deinit(): Unit = future {
-    val name = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppActivity for " + name)
+    val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
+    log.info("deinitializing AppActivity for " + packageName)
     deinitializationLock.unset
     deinitializationLock.get(DTimeout.longest) match {
       case Some(false) =>
-        log.info("deinitialization AppActivity for " + name + " canceled")
+        log.info("deinitialization AppActivity for " + packageName + " canceled")
       case _ =>
-        synchronized {
-          log.info("deinitialize AppActivity for " + name)
-          assert(inner != null)
-          val savedInner = inner
-          val savedContext = context.get
-          inner = null
-          context = new WeakReference(null)
-          if (AppActivity.initialized)
-            for {
-              rootApp <- savedContext
-              rootSrv <- AppService.context.get
-            } if (rootApp == rootSrv) {
-              log.info("AppActivity and AppService share the same context. Clear.")
-              AppService.deinit()
-            }
-          // unbind services from bindedICtrlPool
-          savedContext.foreach {
-            context =>
-              savedInner.bindedICtrlPool.keys.foreach(key => {
-                savedInner.bindedICtrlPool.remove(key).map(record => {
-                  log.debug("remove service connection to " + key + " from bindedICtrlPool")
-                  context.unbindService(record._1)
-                })
-              })
-          }
-          AppCache.deinit()
-        }
+        deinitRoutine(packageName)
     }
+  }
+  private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
+    log.info("deinitialize AppActivity for " + packageName)
+    assert(inner != null)
+    val savedInner = inner
+    val savedContext = context.get
+    inner = null
+    context = new WeakReference(null)
+    if (AppActivity.initialized)
+      for {
+        rootApp <- savedContext
+        rootSrv <- AppService.context.get
+      } if (rootApp == rootSrv) {
+        log.info("AppActivity and AppService share the same context. Clear.")
+        AppService.deinitRoutine(packageName)
+      }
+    // unbind services from bindedICtrlPool
+    savedContext.foreach {
+      context =>
+        savedInner.bindedICtrlPool.keys.foreach(key => {
+          savedInner.bindedICtrlPool.remove(key).map(record => {
+            log.debug("remove service connection to " + key + " from bindedICtrlPool")
+            context.unbindService(record._1)
+          })
+        })
+    }
+    AppCache.deinit()
   }
   def Inner = inner
   def Context = context.get

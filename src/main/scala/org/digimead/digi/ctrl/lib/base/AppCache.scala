@@ -103,6 +103,7 @@ class AppCache extends AppCacheT[String, Any] with Logging {
             } else {
               // period > 0 and file outdated
               file.delete()
+              log.trace("MISS, expired")
               None
             }
           } else
@@ -113,10 +114,13 @@ class AppCache extends AppCacheT[String, Any] with Logging {
                 Some(obj)
               case None =>
                 file.delete()
+                log.trace("MISS, period " + period)
                 None
             }
-        } else
+        } else {
+          log.trace("MISS")
           None
+        }
       case Some((time, obj)) =>
         if (period > 0)
           if (System.currentTimeMillis() - time <= period)

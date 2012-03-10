@@ -20,13 +20,20 @@ import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
 import org.digimead.digi.ctrl.lib.base.AppService
 
-import android.app.{Service => AService}
+import android.app.{ Service => AService }
 
 trait Service extends AService with AnyBase with Logging {
+  /*
+   * sometimes in life cycle onCreate stage invoked without onDestroy stage
+   */
   override def onCreate(): Unit = {
     log.trace("Service::onCreate")
     onCreateBase(this, { Service.super.onCreate() })
   }
+  /*
+   * sometimes in life cycle onCreate stage invoked without onDestroy stage
+   * in fact AppService.deinit is sporadic event
+   */
   override def onDestroy() = {
     log.trace("Service::onDestroy")
     AppService.deinit()
