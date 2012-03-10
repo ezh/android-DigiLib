@@ -16,13 +16,17 @@
 
 package org.digimead.digi.ctrl.lib
 
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
+import scala.annotation.elidable
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
+import scala.concurrent.SyncVar
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.aop.Logging
@@ -31,44 +35,93 @@ import org.digimead.digi.ctrl.lib.dialog.Report
 
 import android.accounts.AccountManager
 import android.app.{Activity => AActivity}
-import android.app.Dialog
+import android.app.{Dialog => ADialog}
+import android.content.BroadcastReceiver
+import android.content.DialogInterface
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
+import annotation.elidable.ASSERTION
+import declaration.DTimeout
 
+/*
+ * trait hasn't ability to use @Loggable
+ */
 trait Activity extends AActivity with AnyBase with Logging {
-  protected[lib] val activityDialog = new AtomicReference[Dialog](null)
+  protected[lib] val activityDialog = new Activity.Dialog
+  lazy val uiThreadID: Long = {
+    val id = new SyncVar[Long]()
+    runOnUiThread(new Runnable {
+      def run = id.set(Thread.currentThread.getId)
+    })
+    id.get
+  }
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
-  @Loggable
-  override def onCreate(savedInstanceState: Bundle): Unit =
+  override def onCreate(savedInstanceState: Bundle): Unit = {
+    log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
-  @Loggable
+    Activity.registeredReveivers.foreach(t => registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
+  }
+  override def onResume() = {
+    log.trace("Activity::onResume")
+    super.onResume()
+  }
+  override def onPause() {
+    log.trace("Activity::onPause")
+    super.onPause()
+  }
   override def onDestroy() = {
+    log.trace("Activity::onDestroy")
+    Activity.registeredReveivers.keys.foreach(unregisterReceiver(_))
     AppActivity.deinit()
     super.onDestroy()
   }
-  @Loggable
   def showDialogSafe(id: Int) = future {
+    log.trace("Activity::showDialogSafe")
     activityDialog.synchronized {
       while (activityDialog.get != null)
         activityDialog.wait
+      log.debug("show dialog " + id)
       runOnUiThread(new Runnable { def run = showDialog(id) })
     }
   }
-  @Loggable
-  override def onCreateDialog(id: Int, data: Bundle): Dialog = id match {
-    case id if id == Report.getId(this) =>
-      Report.createDialog(this)
-    case id =>
-      log.error("unknown dialog id " + id)
-      null
+  def showDialogSafe[T <% ADialog](dialog: () => T): Option[T] = activityDialog.synchronized {
+    try {
+      log.trace("Activity::showDialogSafe")
+      assert(uiThreadID != Thread.currentThread.getId)
+      while (activityDialog.get != null)
+        activityDialog.wait
+      this.runOnUiThread(new Runnable { def run = activityDialog.set(dialog()) })
+      while (activityDialog.get == null)
+        activityDialog.wait
+      Some(activityDialog.get.asInstanceOf[T])
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+        None
+    }
   }
-  @Loggable
-  override def onPrepareDialog(id: Int, dialog: Dialog): Unit = activityDialog.synchronized {
+  override def onCreateDialog(id: Int, data: Bundle): ADialog = {
+    log.trace("Activity::onCreateDialog")
+    id match {
+      case id if id == Report.getId(this) =>
+        Report.createDialog(this)
+      case id =>
+        log.error("unknown dialog id " + id)
+        super.onCreateDialog(id, data)
+    }
+  }
+  override def onPrepareDialog(id: Int, dialog: ADialog): Unit = activityDialog.synchronized {
+    log.trace("Activity::onPrepareDialog")
+    super.onPrepareDialog(id, dialog)
     activityDialog.set(dialog)
     id match {
       case id if id == Report.getId(this) =>
+        log.debug("prepare Report dialog")
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
           case Some(stash) =>
@@ -81,8 +134,68 @@ trait Activity extends AActivity with AnyBase with Logging {
         val adapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, emails)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.setAdapter(adapter)
-      case id =>
-        log.error("unknown dialog id " + id)
+      case _ =>
     }
+  }
+  override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
+    log.trace("Activity::registerReceiver")
+    assert(!Activity.registeredReveivers.isDefinedAt(receiver))
+    Activity.registeredReveivers(receiver) = (filter, null, null)
+    super.registerReceiver(receiver, filter)
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      null
+  }
+  override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
+    log.trace("Activity::registerReceiver")
+    assert(!Activity.registeredReveivers.isDefinedAt(receiver))
+    Activity.registeredReveivers(receiver) = (filter, broadcastPermission, scheduler)
+    super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      null
+  }
+  override def unregisterReceiver(receiver: BroadcastReceiver) {
+    log.trace("Activity::unregisterReceiver")
+    Activity.registeredReveivers.remove(receiver)
+    super.unregisterReceiver(receiver)
+  }
+}
+
+object Activity {
+  /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
+  private val registeredReveivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
+  class Dialog extends SyncVar[ADialog]() with Logging {
+    private var activityDialogGuard: ScheduledExecutorService = null
+    super.set(null)
+    @Loggable
+    override def set(d: ADialog) = synchronized {
+      log.info("show safe dialog " + d.getClass.getName)
+      activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
+      activityDialogGuard.schedule(new Runnable {
+        def run() = {
+          log.fatal("dismiss stalled dialog " + d.getClass.getName)
+          activityDialogGuard.shutdownNow
+          activityDialogGuard = null
+        }
+      }, DTimeout.longest, TimeUnit.MILLISECONDS)
+      d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
+        @Loggable
+        override def onDismiss(dialog: DialogInterface) = Dialog.this.synchronized {
+          log.info("dismiss safe dialog " + d.getClass.getName)
+          activityDialogGuard.shutdownNow
+          activityDialogGuard = null
+          Dialog.super.set(null)
+          Dialog.this.notifyAll
+        }
+      })
+      super.set(d)
+      notifyAll()
+    }
+  }
+  object Dialog {
+    implicit def d2ad(d: Dialog): ADialog = d.get
   }
 }

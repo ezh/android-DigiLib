@@ -16,6 +16,11 @@ DOCUMENTATION
 ### [WIKI](http://github.com/ezh/android-DigiLib/wiki)
 ### [API](http://ezh.github.com/android-DigiLib/api/)
 
+![dynamic log analysis with awk](https://github.com/ezh/android-DigiLib/blob/master/contrib/adb.log.dyn-2012-03-09%2013:33:22.png?raw=true)
+
+![static log analysis with gedit](https://github.com/ezh/android-DigiLib/blob/master/contrib/adb.log-2012-03-09%2013:27:53.png?raw=true)
+
+
 AUTHORS
 -------
 

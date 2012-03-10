@@ -102,7 +102,6 @@ case class ExecutableInfo(val id: Int,
 object ExecutableInfo extends Logging {
   override protected val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {
-    @Loggable
     def createFromParcel(in: Parcel): ExecutableInfo = new ExecutableInfo(in)
     def newArray(size: Int): Array[ExecutableInfo] = new Array[ExecutableInfo](size)
   }

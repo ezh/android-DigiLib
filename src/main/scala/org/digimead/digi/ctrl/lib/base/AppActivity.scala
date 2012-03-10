@@ -60,7 +60,7 @@ import android.content.ServiceConnection
 import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
-  lazy val state = new SyncVar[AppActivity.State]() {
+  lazy val state = new SyncVar[AppActivity.State]() with Logging {
     private var busyCounter: Tuple2[Int, AppActivity.State] = (0, AppActivity.State(DState.Unknown))
     override def set(x: AppActivity.State) = synchronized {
       if (x.code == DState.Busy) {
@@ -73,6 +73,7 @@ protected class AppActivity private () extends Actor with Logging {
       log.debug("set status to \"" + x + "\"")
       AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
+    @Loggable
     def freeBusy() {
       if (busyCounter._1 > 0)
         busyCounter = (busyCounter._1 - 1, busyCounter._2)
@@ -369,7 +370,7 @@ object AppActivity extends Logging {
             log.error(e.getMessage, e)
         }
       })
-      awaitAll(DTimeout.long, futures: _*)
+      awaitAll(timeout, futures: _*)
       pool = Seq()
     }
     def isEmpty = synchronized { pool.isEmpty }

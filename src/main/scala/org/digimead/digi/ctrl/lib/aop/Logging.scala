@@ -55,6 +55,8 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
+import scala.annotation.implicitNotFound
+
 import org.aspectj.lang.Signature
 import org.slf4j.LoggerFactory
 
@@ -64,27 +66,48 @@ trait Logging {
 
 object Logging {
   var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
+  val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
   @volatile var enabled = true
-  def enteringMethod(file: String, line: Int, signature: Signature, obj: Logging) {
+  def enteringMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    obj.log.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName)
+    obj match {
+      case logging: Logging =>
+        logging.log.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName)
+      case other =>
+        commonLogger.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
+    }
   }
-  def leavingMethod(file: String, line: Int, signature: Signature, obj: Logging) {
+  def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    obj.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName)
+    obj match {
+      case logging: Logging =>
+        logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName)
+      case other =>
+        commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
+    }
   }
-  def leavingMethod(file: String, line: Int, signature: Signature, obj: Logging, returnValue: Object) {
+  def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef, returnValue: Object) {
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
-    obj.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
+    obj match {
+      case logging: Logging =>
+        logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
+      case other =>
+        commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + " result [" + returnValue + "]")
+    }
   }
-  def leavingMethodException(file: String, line: Int, signature: Signature, obj: Logging, throwable: Exception) {
+  def leavingMethodException(file: String, line: Int, signature: Signature, obj: AnyRef, throwable: Exception) {
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
     val exceptionMessage = throwable.getMessage();
-    obj.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
+    obj match {
+      case log: Logging =>
+        log.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
+      case other =>
+        commonLogger.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + ". Reason: " + exceptionMessage)
+    }
   }
   def getLogger(obj: Logging): RichLogger = {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
@@ -95,7 +118,7 @@ object Logging {
       fileRaw.dropRight(1).mkString(".")
     else
       fileRaw.head
-    if (obj.getClass().toString.last == '$') // add object mart to file name
+    if (obj.getClass().toString.last == '$') // add object mark to file name
       new RichLogger(LoggerFactory.getLogger(logPrefix +
         obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"))
     else

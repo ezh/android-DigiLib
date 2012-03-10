@@ -48,7 +48,7 @@ import annotation.elidable.ASSERTION
 protected class AppService private () extends Actor with Logging {
   protected lazy val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
-  protected lazy val ctrlConnection = new ServiceConnection() {
+  protected lazy val ctrlConnection = new ServiceConnection() with Logging {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
       log.debug("connected to Control service")

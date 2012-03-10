@@ -23,11 +23,12 @@ import org.digimead.digi.ctrl.lib.base.AppService
 import android.app.{Service => AService}
 
 trait Service extends AService with AnyBase with Logging {
-  @Loggable
-  override def onCreate(): Unit =
+  override def onCreate(): Unit = {
+    log.trace("Service::onCreate")
     onCreateBase(this, { Service.super.onCreate() })
-  @Loggable
+  }
   override def onDestroy() = {
+    log.trace("Service::onDestroy")
     AppService.deinit()
     super.onDestroy()
   }

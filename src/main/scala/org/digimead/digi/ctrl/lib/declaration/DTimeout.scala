@@ -17,8 +17,9 @@
 package org.digimead.digi.ctrl.lib.declaration
 
 object DTimeout {
-  val fastest = 1000
-  val fast = 5000
+  val shortest = 1000
+  val short = 5000
   val normal = 10000
   val long = 60000
+  val longest = 5 * 60000
 }

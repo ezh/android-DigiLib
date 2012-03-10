@@ -36,8 +36,8 @@ import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 import android.content.Context
 
 private[lib] trait AnyBase extends Logging {
-  @Loggable
   protected def onCreateBase(context: Context, callSuper: => Any) = {
+    log.trace("AnyBase::onCreateBase")
     callSuper
     AnyBase.init(context)
   }

@@ -19,7 +19,6 @@ package org.digimead.digi.ctrl.lib.storage
 import java.io.File
 import java.net.URI
 import java.net.URLEncoder
-import java.security.cert.X509Certificate
 import java.util.concurrent.atomic.AtomicReference
 import java.util.ArrayList
 import java.util.Date
@@ -30,19 +29,10 @@ import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpPut
 import org.apache.http.conn.params.ConnRoutePNames
-import org.apache.http.conn.scheme.PlainSocketFactory
-import org.apache.http.conn.scheme.Scheme
-import org.apache.http.conn.scheme.SchemeRegistry
-import org.apache.http.conn.ssl.SSLSocketFactory
 import org.apache.http.entity.ByteArrayEntity
-import org.apache.http.impl.client.DefaultHttpClient
-import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager
 import org.apache.http.message.BasicNameValuePair
-import org.apache.http.params.BasicHttpParams
-import org.apache.http.params.HttpProtocolParams
 import org.apache.http.util.EntityUtils
 import org.apache.http.HttpHost
-import org.apache.http.HttpVersion
 import org.apache.http.NameValuePair
 import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Logging
@@ -51,12 +41,9 @@ import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.json.JSONObject
 
+import android.net.http.AndroidHttpClient
 import android.provider.Settings
 import android.util.Base64
-import javax.net.ssl.HttpsURLConnection
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 /*
  * mobile application act as web server ;-) strictly within Google OAuth2 draft10 manual, Ezh
@@ -64,21 +51,10 @@ import javax.net.ssl.X509TrustManager
 object GoogleCloud extends Logging {
   private lazy val accessToken = new AtomicReference[Option[AccessToken]](None)
   val tokenURL = "https://accounts.google.com/o/oauth2/token"
-  val uploadURL = "https://commondatastorage.googleapis.com"
+  val uploadURL = "http://commondatastorage.googleapis.com"
   protected lazy val httpclient = AppActivity.Context.map {
     context =>
-      // register the "http" and "https" protocol schemes, they are
-      // required by the default operator to look up socket factories.
-      val supportedSchemes = new SchemeRegistry()
-      supportedSchemes.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80))
-      supportedSchemes.register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443))
-      // prepare parameters
-      val params = new BasicHttpParams()
-      HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1)
-      HttpProtocolParams.setContentCharset(params, "UTF-8")
-      HttpProtocolParams.setUseExpectContinue(params, true)
-      val ccm = new ThreadSafeClientConnManager(params, supportedSchemes)
-      val client = new DefaultHttpClient(ccm, params)
+      val client = AndroidHttpClient.newInstance("Android")
       /*
        * attach proxy
        */
@@ -96,25 +72,6 @@ object GoogleCloud extends Logging {
         }
       } else
         log.info("proxy not detected")
-      /*
-       * trust all TLS certs
-       */
-      val ctx = SSLContext.getInstance("TLS")
-      val tm = new X509TrustManager() {
-        def checkClientTrusted(xcs: Array[X509Certificate], string: String) {}
-        def checkServerTrusted(xcs: Array[X509Certificate], string: String) {}
-        def getAcceptedIssuers() = Array[X509Certificate]()
-      }
-      ctx.init(null, Array[TrustManager](tm), null)
-      try {
-        val ssf = new SSLSocketFactory(null)
-        ssf.setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
-        client.getConnectionManager.getSchemeRegistry().register(new Scheme("https", ssf, 443))
-      } catch {
-        case e =>
-          log.warn(e.getMessage(), e)
-          HttpsURLConnection.setDefaultSSLSocketFactory(ctx.getSocketFactory())
-      }
       client
   }
   def upload(file: File, prefix: String = "") = AppActivity.Context.foreach {

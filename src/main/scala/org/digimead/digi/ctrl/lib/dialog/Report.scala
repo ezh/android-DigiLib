@@ -59,14 +59,14 @@ object Report extends Logging {
       setTitle(Android.getString(activity, "send_report").
         getOrElse("Submit report")).
       setView(view).
-      setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+      setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = activity.activityDialog.synchronized {
           AnyBase.info.get.foreach {
             info =>
-              activity.activityDialog.getAndSet(ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true)).dismiss()
-              activity.activityDialog.notifyAll
+              activity.activityDialog.dismiss
               future {
+                activity.showDialogSafe[ProgressDialog](() => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
                 try {
                   val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
@@ -98,19 +98,17 @@ object Report extends Logging {
                     case null =>
                   }
                 }))
-                activity.activityDialog.synchronized {
-                  activity.activityDialog.getAndSet(null).dismiss()
-                  activity.activityDialog.notifyAll
-                }
+                activity.activityDialog.dismiss
+                org.digimead.digi.ctrl.lib.base.Report.clean()
               }
           }
         }
       }).
-      setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+      setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() with Logging {
         @Loggable
-        def onClick(dialog: DialogInterface, which: Int) = activity.activityDialog.synchronized {
-          activity.activityDialog.getAndSet(null).dismiss()
-          activity.activityDialog.notifyAll
+        def onClick(dialog: DialogInterface, which: Int) = {
+          activity.activityDialog.dismiss
+          org.digimead.digi.ctrl.lib.base.Report.clean()
         }
       }).
       create()

@@ -125,38 +125,38 @@ case class ComponentInfo(val id: String, // unique string / primary key
       case Some(thumb) =>
         out.writeInt(thumb.length)
         out.writeByteArray(thumb)
-      case None =>
+      case _ =>
         out.writeInt(-1)
     }
     out.writeString(origin)
     out.writeString(license)
     out.writeString(email)
     iconHDPI match {
-      case Some(thumb) =>
-        out.writeInt(thumb.length)
-        out.writeByteArray(thumb)
-      case None =>
+      case Some(icon) =>
+        out.writeInt(icon.length)
+        out.writeByteArray(icon)
+      case _ =>
         out.writeInt(-1)
     }
     iconLDPI match {
-      case Some(thumb) =>
-        out.writeInt(thumb.length)
-        out.writeByteArray(thumb)
-      case None =>
+      case Some(icon) =>
+        out.writeInt(icon.length)
+        out.writeByteArray(icon)
+      case _ =>
         out.writeInt(-1)
     }
     iconMDPI match {
-      case Some(thumb) =>
-        out.writeInt(thumb.length)
-        out.writeByteArray(thumb)
-      case None =>
+      case Some(icon) =>
+        out.writeInt(icon.length)
+        out.writeByteArray(icon)
+      case _ =>
         out.writeInt(-1)
     }
     iconXHDPI match {
-      case Some(thumb) =>
-        out.writeInt(thumb.length)
-        out.writeByteArray(thumb)
-      case None =>
+      case Some(icon) =>
+        out.writeInt(icon.length)
+        out.writeByteArray(icon)
+      case _ =>
         out.writeInt(-1)
     }
     out.writeString(market)
@@ -189,7 +189,6 @@ case class ComponentInfo(val id: String, // unique string / primary key
 object ComponentInfo extends Logging {
   override protected val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentInfo] = new Parcelable.Creator[ComponentInfo]() {
-    @Loggable
     def createFromParcel(in: Parcel): ComponentInfo = new ComponentInfo(in)
     def newArray(size: Int): Array[ComponentInfo] = new Array[ComponentInfo](size)
   }
