@@ -34,15 +34,18 @@ import android.widget.ListView
 
 trait Block[Item] {
   val context: Activity
+  protected val items: Seq[Block.Item]
   def appendTo(adapter: MergeAdapter)
   def onListItemClick(l: ListView, v: View, item: Item)
   def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: Item) {}
   def onContextItemSelected(menuItem: MenuItem, item: Item): Boolean = false
+  def reset() =
+    items.foreach(_.view = new WeakReference(null))
 }
 
 object Block {
   trait Item {
-    var view: WeakReference[View] = new WeakReference(null) // android build in cache may sporadically give us junk :-/
+    @volatile var view: WeakReference[View] = new WeakReference(null) // android build in cache may sporadically give us junk :-/
   }
   class ImageGetter(context: Context) extends Html.ImageGetter with Logging {
     def getDrawable(source: String): Drawable = {

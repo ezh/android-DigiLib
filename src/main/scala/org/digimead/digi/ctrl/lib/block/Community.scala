@@ -16,7 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -28,10 +27,10 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -45,9 +44,9 @@ class Community(val context: Activity,
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
   val itemTranslate = Community.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
-  private val items = Seq(itemWiki)
+  protected val items = Seq(itemWiki)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Community.Adapter(context, items)
+  private lazy val adapter = new Community.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -76,13 +75,14 @@ object Community {
   private val name = "name"
   private val description = "description"
   case class Item(name: String, description: String, icon: String = "") extends Block.Item
-  class Adapter(context: Context, data: Seq[Item])
-    extends ArrayAdapter(context, Android.getId(context, "advanced_list_item", "layout"), android.R.id.text1, data.toArray) {
+  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item])
+    extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
+    private var inflater: LayoutInflater = context.getLayoutInflater
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
-      convertView match {
-        case null =>
-          val view = super.getView(position, convertView, parent)
+      item.view.get match {
+        case None =>
+          val view = inflater.inflate(textViewResourceId, null)
           val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
           val text2 = view.findViewById(android.R.id.text2).asInstanceOf[TextView]
           val icon = view.findViewById(android.R.id.icon1).asInstanceOf[ImageView]
@@ -98,13 +98,8 @@ object Community {
             }
           item.view = new WeakReference(view)
           view
-        case view: View =>
-          item.view.get match {
-            case Some(view) =>
-              view
-            case None =>
-              view
-          }
+        case Some(view) =>
+          view
       }
     }
   }

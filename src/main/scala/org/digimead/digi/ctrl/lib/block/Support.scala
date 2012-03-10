@@ -18,7 +18,6 @@ package org.digimead.digi.ctrl.lib.block
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -30,11 +29,11 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
 import android.view.ContextMenu
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -59,9 +58,9 @@ class Support(val context: Activity,
     Android.getString(context, "block_support_email_description").getOrElse("email us directly"), "ic_block_support_message")
   val itemChat = Support.Item(Android.getString(context, "block_chat_title").getOrElse("live chat"),
     Android.getString(context, "block_support_chat_description").getOrElse("let's talk via Skype, VoIP, ..."), "ic_block_support_chat")
-  private val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
+  protected val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Support.Adapter(context, items)
+  private lazy val adapter = new Support.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -166,13 +165,14 @@ object Support {
     def apply(name: String, description: String) = new Item(counter.getAndIncrement)(name, description)
     def apply(name: String, description: String, icon: String) = new Item(counter.getAndIncrement)(name, description, icon)
   }
-  class Adapter(context: Context, data: Seq[Item])
-    extends ArrayAdapter(context, Android.getId(context, "advanced_list_item", "layout"), android.R.id.text1, data.toArray) {
+  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item])
+    extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
+    private var inflater: LayoutInflater = context.getLayoutInflater
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
-      convertView match {
-        case null =>
-          val view = super.getView(position, convertView, parent)
+      item.view.get match {
+        case None =>
+          val view = inflater.inflate(textViewResourceId, null)
           val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
           val text2 = view.findViewById(android.R.id.text2).asInstanceOf[TextView]
           val icon = view.findViewById(android.R.id.icon1).asInstanceOf[ImageView]
@@ -188,13 +188,8 @@ object Support {
             }
           item.view = new WeakReference(view)
           view
-        case view: View =>
-          item.view.get match {
-            case Some(view) =>
-              view
-            case None =>
-              view
-          }
+        case Some(view) =>
+          view
       }
     }
   }

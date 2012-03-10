@@ -16,7 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -28,11 +27,11 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
 import android.view.ContextMenu
+import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -42,7 +41,8 @@ import android.widget.TextView.BufferType
 import android.widget.ListView
 import android.widget.TextView
 
-class Legal(val context: Activity, items: List[Legal.Item],
+class Legal(val context: Activity,
+  protected val items: List[Legal.Item],
   _imageGetter: Html.ImageGetter = null,
   tagHandler: Html.TagHandler = null)(implicit @transient val dispatcher: Dispatcher) extends Block[Legal.Item] with Logging {
   private lazy val imageGetter = _imageGetter match {
@@ -50,7 +50,7 @@ class Legal(val context: Activity, items: List[Legal.Item],
     case getter => getter
   }
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Legal.Adapter(context, items, imageGetter, tagHandler)
+  private lazy val adapter = new Legal.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -116,25 +116,21 @@ object Legal {
   case class Item(val text: String)(val uri: String) extends Block.Item {
     override def toString() = text
   }
-  class Adapter(context: Context, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
-    extends ArrayAdapter(context, android.R.layout.simple_list_item_1, android.R.id.text1, data.toArray) {
+  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
+    extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
+    private var inflater: LayoutInflater = context.getLayoutInflater
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
-      convertView match {
-        case null =>
-          val view = super.getView(position, convertView, parent)
+      item.view.get match {
+        case None =>
+          val view = inflater.inflate(textViewResourceId, null)
           val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
           text1.setTextAppearance(context, android.R.style.TextAppearance_Small)
           text1.setText(Html.fromHtml(item.text, imageGetter, tagHandler), BufferType.SPANNABLE)
           item.view = new WeakReference(view)
           view
-        case view: View =>
-          item.view.get match {
-            case Some(view) =>
-              view
-            case None =>
-              view
-          }
+        case Some(view) =>
+          view
       }
     }
   }

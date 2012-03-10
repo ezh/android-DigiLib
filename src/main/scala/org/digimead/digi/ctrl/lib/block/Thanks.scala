@@ -34,7 +34,7 @@ import android.widget.SimpleAdapter
 import android.widget.TextView
 
 class Thanks(val context: Activity) extends Block[Thanks.Item] with Logging {
-  private val items = Seq(
+  protected val items = Seq(
     Thanks.Item("Someone", "For everything"))
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SimpleAdapter(context, Thanks.getListValues(items), android.R.layout.simple_list_item_2,
