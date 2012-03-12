@@ -48,10 +48,10 @@ abstract class Caching extends Logging {
     log.trace(shortSignature + " with namespace id " + annotation.namespace)
     AppCache !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
       case r @ Some(retVal) =>
-        log.trace("HIT key " + key + " found, returning cached value")
+        log.trace("HIT, key " + key + " found, returning cached value")
         return r
       case None =>
-        log.trace("MISS key " + key + " not found, invoking original method")
+        log.trace("MISS, key " + key + " not found, invoking original method")
         invokeOriginal(invoker, key, annotation.namespace())
     }
   }

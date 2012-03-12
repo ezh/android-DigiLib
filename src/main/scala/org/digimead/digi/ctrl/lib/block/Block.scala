@@ -45,7 +45,7 @@ trait Block[Item] {
 
 object Block {
   trait Item {
-    @volatile var view: WeakReference[View] = new WeakReference(null) // android build in cache may sporadically give us junk :-/
+    @volatile var view: WeakReference[View] = new WeakReference(null) // android built in cache may sporadically give us junk :-/
   }
   class ImageGetter(context: Context) extends Html.ImageGetter with Logging {
     def getDrawable(source: String): Drawable = {

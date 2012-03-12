@@ -28,6 +28,7 @@ import scala.actors.Actor
 import scala.annotation.elidable
 import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
+import scala.collection.immutable.LongMap
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
 import scala.concurrent.SyncVar
@@ -413,29 +414,34 @@ object AppActivity extends Logging {
   def Context = context.get
   def initialized = synchronized { inner != null }
   object LazyInit {
-    @volatile private var pool: Seq[() => Any] = Seq()
+    // priority -> Seq(functions)
+    @volatile private var pool: LongMap[Seq[() => Any]] = LongMap()
     private val timeout = DTimeout.long
-    def apply(description: String)(f: => Any)(implicit log: RichLogger) = synchronized {
-      pool = pool :+ (() => {
+    def apply(description: String, priority: Long = 0)(f: => Any)(implicit log: RichLogger) = synchronized {
+      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[() => Any]()
+      pool = pool + (priority -> (storedFunc :+ (() => {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
         log.debug("begin LazyInit block \"" + description + "\"")
         f
         log.debug("end LazyInit block \"" + description + "\"")
         scheduler.shutdownNow
-      })
+      })))
     }
     def init() = synchronized {
-      val futures = pool.map(f => future {
-        try {
-          f()
-        } catch {
-          case e =>
-            log.error(e.getMessage, e)
-        }
-      })
-      awaitAll(timeout, futures: _*)
-      pool = Seq()
+      for (prio <- pool.keys.toSeq.sorted) {
+        log.debug("running " + pool(prio).size + " LazyInit routine(s) at priority level " + prio)
+        val futures = pool(prio).map(f => future {
+          try {
+            f()
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+        })
+        awaitAll(timeout, futures: _*)
+      }
+      pool = LongMap()
     }
     def isEmpty = synchronized { pool.isEmpty }
     def nonEmpty = synchronized { pool.nonEmpty }
