@@ -109,10 +109,14 @@ trait Activity extends AActivity with AnyBase with Logging {
       assert(uiThreadID != Thread.currentThread.getId)
       while (activityDialog.get != null)
         activityDialog.wait
+      activityDialog.unset
       this.runOnUiThread(new Runnable { def run = activityDialog.set(dialog()) })
-      while (activityDialog.get == null)
-        activityDialog.wait
-      Some(activityDialog.get.asInstanceOf[T])
+      activityDialog.get.asInstanceOf[T] match {
+        case null =>
+          None
+        case d =>
+          Some(d)
+      }
     } catch {
       case e =>
         log.error(e.getMessage, e)
@@ -200,11 +204,8 @@ object Activity {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
-            if (isSet)
-              get match {
-                case d: Dialog => d.dismiss
-                case _ =>
-              }
+            if (d.isShowing)
+              d.dismiss
           }
         }, DTimeout.longest, TimeUnit.MILLISECONDS)
         d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {

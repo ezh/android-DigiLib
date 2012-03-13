@@ -32,7 +32,12 @@ object DMessage {
   case class IAmBusy(val origin: Origin,
     val message: String)(implicit @transient val logger: RichLogger,
       @transient val dispatcher: Dispatcher) extends DMessage {
-    logger.info("BUSY: " + message)
+    if (logger.isTraceEnabled) {
+      val t = new Throwable("Intospecting stack frame")
+      t.fillInStackTrace()
+      logger.info("BUSY: " + message + "\n" + t.getStackTraceString)
+    } else
+      logger.info("BUSY: " + message)
     dispatcher.process(this)
   }
   case class IAmReady(val origin: Origin,
