@@ -94,6 +94,7 @@ trait Activity extends AActivity with AnyBase with Logging {
       activityDialog.synchronized {
         while (activityDialog.get != null)
           activityDialog.wait
+        activityDialog.unset
         log.debug("show dialog " + id)
         runOnUiThread(new Runnable { def run = showDialog(id) })
       }
@@ -217,7 +218,7 @@ object Activity {
               activityDialogGuard = null
             }
             Dialog.super.set(null)
-            Dialog.this.notifyAll
+            Dialog.this.notify
           }
         })
       } else {
@@ -229,7 +230,7 @@ object Activity {
         log.info("reset safe dialog")
       }
       super.set(d)
-      notifyAll()
+      notify
     }
   }
   object Dialog {
