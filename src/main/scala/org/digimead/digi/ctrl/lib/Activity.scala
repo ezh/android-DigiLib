@@ -234,6 +234,6 @@ object Activity {
     }
   }
   object Dialog {
-    implicit def d2ad(d: Dialog): ADialog = d.get
+    implicit def d2ad(d: Dialog): Option[ADialog] = Option(d.get)
   }
 }

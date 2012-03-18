@@ -85,6 +85,14 @@ class RichLogger(val logger: Logger) {
     Report.queue.offer(new Report.Record(new Date(), pid, Thread.currentThread.getId, 'D', logger.getName, msg + "\n" + t.getStackTraceString))
     logger.debug(msg, t)
   }
+  def debugWhere(msg: String)(stackLine: Int = -1) {
+    val t = new Throwable(msg)
+    t.fillInStackTrace()
+    if (stackLine == -1)
+      debug(msg, t)
+    else
+      debug(msg + " at " + t.getStackTrace.take(stackLine + 1).last)
+  }
   // info
   def info(msg: String) {
     Report.queue.offer(new Report.Record(new Date(), pid, Thread.currentThread.getId, 'I', logger.getName, msg))

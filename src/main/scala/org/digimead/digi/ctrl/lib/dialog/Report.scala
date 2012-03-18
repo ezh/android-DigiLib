@@ -64,7 +64,7 @@ object Report extends Logging {
         def onClick(dialog: DialogInterface, which: Int) = activity.activityDialog.synchronized {
           AnyBase.info.get.foreach {
             info =>
-              activity.activityDialog.dismiss
+              activity.activityDialog.foreach(_.dismiss)
               future {
                 activity.showDialogSafe[ProgressDialog](() => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
@@ -98,7 +98,7 @@ object Report extends Logging {
                     case null =>
                   }
                 }))
-                activity.activityDialog.dismiss
+                activity.activityDialog.foreach(_.dismiss)
                 org.digimead.digi.ctrl.lib.base.Report.clean()
               }
           }
@@ -107,7 +107,7 @@ object Report extends Logging {
       setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          activity.activityDialog.dismiss
+          activity.activityDialog.foreach(_.dismiss)
           org.digimead.digi.ctrl.lib.base.Report.clean()
         }
       }).

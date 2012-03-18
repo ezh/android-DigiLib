@@ -452,5 +452,7 @@ object AppActivity extends Logging {
   }
   case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
-  })
+  }) extends Logging {
+    log.debugWhere("create new state " + code)(2)
+  }
 }
