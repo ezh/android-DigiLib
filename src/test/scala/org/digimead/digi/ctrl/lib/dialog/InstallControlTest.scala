@@ -27,7 +27,7 @@ import com.xtremelabs.robolectric.Robolectric
 
 import android.app.Activity
 
-class FailedMarketTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
+class InstallControlTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
   lazy val roboClassLoader = RobotEsTrick.classLoader
   lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
@@ -38,16 +38,16 @@ class FailedMarketTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
     roboSetup
   }
 
-  test("test FailedMarket dialog") {
+  test("test InstallControl dialog") {
     val activity = new Activity()
-    FailedMarket.getId(activity) should (not equal (null) and not be (0) and not be (-1))
-    val dialog = FailedMarket.createDialog(activity)
+    InstallControl.getId(activity) should (not equal (null) and not be (0) and not be (-1))
+    val dialog = InstallControl.createDialog(activity)
     dialog.show()
     val lastDialog = ShadowAlertDialog.getLatestAlertDialog()
     lastDialog should be === dialog
     val shadow = Robolectric.shadowOf(lastDialog)
-    shadow.getTitle() should be === "Market failed"
-    shadow.getMessage() should be === "Market application not found on the device"
+    shadow.getTitle() should be === "DigiControl not found"
+    shadow.getMessage() should startWith("Install from market")
   }
 
 }

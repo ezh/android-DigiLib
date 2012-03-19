@@ -21,13 +21,11 @@ import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
-
 import com.xtremelabs.robolectric.shadows.ShadowAlertDialog
 import com.xtremelabs.robolectric.Robolectric
+import org.digimead.digi.ctrl.lib.Activity
 
-import android.app.Activity
-
-class FailedMarketTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
+class ReportTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
   lazy val roboClassLoader = RobotEsTrick.classLoader
   lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
@@ -38,16 +36,16 @@ class FailedMarketTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
     roboSetup
   }
 
-  test("test FailedMarket dialog") {
-    val activity = new Activity()
-    FailedMarket.getId(activity) should (not equal (null) and not be (0) and not be (-1))
-    val dialog = FailedMarket.createDialog(activity)
+  test("test Report dialog") {
+    val activity = new android.app.Activity() with Activity
+    Report.getId(activity) should (not equal (null) and not be (0) and not be (-1))
+    val dialog = Report.createDialog(activity)
     dialog.show()
     val lastDialog = ShadowAlertDialog.getLatestAlertDialog()
     lastDialog should be === dialog
     val shadow = Robolectric.shadowOf(lastDialog)
-    shadow.getTitle() should be === "Market failed"
-    shadow.getMessage() should be === "Market application not found on the device"
+    shadow.getTitle() should be === "Submit report"
+    shadow.getMessage() should equal (null)
   }
 
 }
