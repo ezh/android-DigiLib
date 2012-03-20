@@ -25,7 +25,7 @@ import java.util.Date
 import scala.actors.Futures.future
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common

@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
 import org.digimead.digi.ctrl.lib.declaration.DMessage
 import org.digimead.digi.ctrl.lib.util.Android

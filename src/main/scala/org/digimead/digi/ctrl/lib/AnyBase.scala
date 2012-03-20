@@ -25,7 +25,7 @@ import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.base.AppService
 import org.digimead.digi.ctrl.lib.base.Report
@@ -72,6 +72,7 @@ object AnyBase extends Logging {
       AppService.init(context)
     if (AnyBase.info.get == None) {
       Info.init(context)
+      Logging.init(context)
       Report.init(context)
       uncaughtExceptionHandler.register(context)
       log.debug("start AppActivity singleton actor")

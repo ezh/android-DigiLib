@@ -27,7 +27,7 @@ import scala.Option.option2Iterable
 import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.storage.GoogleCloud
@@ -41,81 +41,8 @@ import android.content.Context
 import android.content.Intent
 
 object Report extends Logging {
-  private[lib] val queue = new ConcurrentLinkedQueue[Record]
-  private val run = new AtomicBoolean(true)
   val reportName = reportPrefix + ".log"
-  private val reportThread = new Thread("GenericLogger " + reportName) {
-    this.setDaemon(true)
-    override def run() = AnyBase.info.get.foreach {
-      info =>
-        log.info("start report writing to " + reportName)
-        val f = new File(info.reportPath, reportName)
-        if (!f.getParentFile.exists)
-          f.getParentFile().mkdirs()
-        logWriter = new FileWriter(f, true)
-        logWriter.write(info.toString + "\n")
-        while (Report.this.run.get) {
-          if (queue.isEmpty())
-            Thread.sleep(500)
-          else
-            flush(1000)
-        }
-        logWriter.flush()
-        logWriter.close()
-        logWriter = null
-    }
-  }
-  private val nullThread = new Thread("NullLogger " + reportName) {
-    this.setDaemon(true)
-    override def run() {
-      while (Report.this.run.get) {
-        if (queue.isEmpty())
-          Thread.sleep(500)
-        else
-          queue.clear
-      }
-    }
-  }
-  private var workerThread: Thread = null
-  private var logWriter: FileWriter = null
   def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateString(new Date())
-  private[lib] def init(context: Context): Unit = synchronized {
-    try {
-      AnyBase.info.get foreach {
-        info =>
-          // Try to create the files folder if it doesn't exist
-          if (!info.reportPath.exists)
-            info.reportPath.mkdir()
-          if (info.write) {
-            Runtime.getRuntime().addShutdownHook(new Thread() { override def run() = logWriter.flush })
-            write()
-          } else {
-            drop()
-          }
-          workerThread.start()
-          AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
-            // try to submit reports if there any stack traces
-            context match {
-              case context: Activity =>
-                AnyBase.info.get.foreach {
-                  info =>
-                    Thread.sleep(DTimeout.normal) // take it gently ;-)
-                    log.debug("looking for stack trace reports in: " + info.reportPath)
-                    val dir = new File(info.reportPath + "/")
-                    val reports = Option(dir.list()).flatten
-                    if (reports.exists(_.endsWith(".stacktrace")))
-                      org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
-                    else
-                      clean()
-                }
-              case _ =>
-            }
-          }
-      }
-    } catch {
-      case e => log.error(e.getMessage, e)
-    }
-  }
   def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Unit = synchronized {
     for {
       info <- AnyBase.info.get
@@ -128,7 +55,6 @@ object Report extends Logging {
         return
       context match {
         case activity: Activity =>
-          flush()
           activity.sendBroadcast(new Intent(DIntent.FlushReport))
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
           val processList = activityManager.getRunningAppProcesses().toSeq
@@ -174,6 +100,33 @@ object Report extends Logging {
       }
     }
   }
+  private[lib] def init(context: Context): Unit = synchronized {
+    try {
+      AnyBase.info.get foreach {
+        info =>
+          AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+            // try to submit reports if there any stack traces
+            context match {
+              case context: Activity =>
+                AnyBase.info.get.foreach {
+                  info =>
+                    Thread.sleep(DTimeout.normal) // take it gently ;-)
+                    log.debug("looking for stack trace reports in: " + info.reportPath)
+                    val dir = new File(info.reportPath + "/")
+                    val reports = Option(dir.list()).flatten
+                    if (reports.exists(_.endsWith(".stacktrace")))
+                      org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
+                    else
+                      clean()
+                }
+              case _ =>
+            }
+          }
+      }
+    } catch {
+      case e => log.error(e.getMessage, e)
+    }
+  }
   @Loggable
   def clean(): Unit = synchronized {
     for {
@@ -207,35 +160,5 @@ object Report extends Logging {
           log.error(e.getMessage, e)
       }
     }
-  }
-  private def write() {
-    workerThread = reportThread
-  }
-  private def drop() {
-    workerThread = nullThread
-  }
-  private def close() = logWriter.close()
-  private def flush(): Int = flush(java.lang.Integer.MAX_VALUE)
-  private def flush(n: Int): Int = synchronized {
-    if (logWriter == null)
-      return 0
-    var count = 0
-    while (count < n && !queue.isEmpty()) {
-      val record = queue.poll()
-      logWriter.write(record + "\n")
-      count += 1;
-    }
-    if (count > 0)
-      logWriter.flush()
-    count
-  }
-  class Record(val date: Date,
-    val pid: Int,
-    val tid: Long,
-    val level: Char,
-    val tag: String,
-    val message: String) {
-    override def toString =
-      Seq(Common.dateString(date), pid.toString, tid.toString, level.toString, tag.toString).mkString(" ") + ": " + message
   }
 }

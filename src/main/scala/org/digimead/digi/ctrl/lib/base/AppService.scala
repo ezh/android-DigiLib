@@ -26,9 +26,8 @@ import scala.actors.Actor
 import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout

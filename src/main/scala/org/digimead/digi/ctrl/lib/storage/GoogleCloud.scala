@@ -34,8 +34,7 @@ import org.apache.http.message.BasicNameValuePair
 import org.apache.http.util.EntityUtils
 import org.apache.http.HttpHost
 import org.apache.http.NameValuePair
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common

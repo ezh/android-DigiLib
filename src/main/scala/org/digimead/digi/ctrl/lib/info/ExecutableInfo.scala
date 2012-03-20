@@ -21,7 +21,7 @@ import java.util.ArrayList
 import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DState
 
 import android.os.Parcelable
@@ -100,7 +100,7 @@ case class ExecutableInfo(val id: Int,
 }
 
 object ExecutableInfo extends Logging {
-  override protected val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {
     def createFromParcel(in: Parcel): ExecutableInfo = new ExecutableInfo(in)
     def newArray(size: Int): Array[ExecutableInfo] = new Array[ExecutableInfo](size)

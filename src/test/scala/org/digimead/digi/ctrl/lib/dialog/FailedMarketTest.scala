@@ -27,12 +27,12 @@ import com.xtremelabs.robolectric.Robolectric
 
 import android.app.Activity
 
-class FailedMarketTest extends FunSuite with BeforeAndAfter with RobotEsTrick {
+class FailedMarketTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
   lazy val roboClassLoader = RobotEsTrick.classLoader
   lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
   lazy val roboConfig = RobotEsTrick.config
-  override val debug = true
+  //override val debug = true
 
   before {
     roboSetup

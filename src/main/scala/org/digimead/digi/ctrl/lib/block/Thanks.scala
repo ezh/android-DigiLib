@@ -18,9 +18,8 @@ package org.digimead.digi.ctrl.lib.block
 
 import java.util.ArrayList
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter

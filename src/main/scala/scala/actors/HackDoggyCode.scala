@@ -28,7 +28,7 @@ package scala.actors
 import scala.actors.scheduler.ThreadPoolConfig
 import scala.actors.scheduler.ResizableThreadPoolScheduler
 
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 
 object HackDoggyCode extends Logging {
   log.debug("alive")

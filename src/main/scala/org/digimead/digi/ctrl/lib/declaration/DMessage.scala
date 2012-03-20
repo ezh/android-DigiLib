@@ -17,9 +17,7 @@
 package org.digimead.digi.ctrl.lib.declaration
 
 import scala.annotation.implicitNotFound
-
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
-import org.digimead.digi.ctrl.lib.aop.RichLogger
+import org.digimead.digi.ctrl.lib.log.RichLogger
 
 sealed trait DMessage extends java.io.Serializable {
   val logger: RichLogger

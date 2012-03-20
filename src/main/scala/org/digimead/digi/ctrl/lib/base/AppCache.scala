@@ -39,9 +39,8 @@ import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
 import scala.ref.SoftReference
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DOption
 import org.digimead.digi.ctrl.lib.declaration.DPreference
 

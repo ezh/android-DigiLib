@@ -17,7 +17,7 @@
 package org.digimead.digi.ctrl.lib.dialog
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.util.Android

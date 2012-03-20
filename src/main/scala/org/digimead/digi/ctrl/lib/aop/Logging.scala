@@ -56,74 +56,61 @@
 package org.digimead.digi.ctrl.lib.aop
 
 import scala.annotation.implicitNotFound
-
 import org.aspectj.lang.Signature
+import org.digimead.digi.ctrl.lib.log.FileLogger
+import org.digimead.digi.ctrl.lib.log.RichLogger
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-
-trait Logging {
-  implicit protected val log: RichLogger = Logging.getLogger(this)
-}
+import scala.concurrent.SyncVar
+import java.util.concurrent.atomic.AtomicReference
+import scala.ref.WeakReference
+import org.digimead.digi.ctrl.lib.log.{Logging => LLogging}
 
 object Logging {
-  var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
-  @volatile var enabled = true
   def enteringMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
+    if (LLogging.logger.nonEmpty) return
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
     obj match {
-      case logging: Logging =>
+      case logging: LLogging =>
         logging.log.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName)
       case other =>
-        commonLogger.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
+        LLogging.commonLogger.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
     }
   }
   def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
+    if (LLogging.logger.nonEmpty) return
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
     obj match {
-      case logging: Logging =>
+      case logging: LLogging =>
         logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName)
       case other =>
-        commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
+        LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
     }
   }
   def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef, returnValue: Object) {
+    if (LLogging.logger.nonEmpty) return
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
     obj match {
-      case logging: Logging =>
+      case logging: LLogging =>
         logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
       case other =>
-        commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + " result [" + returnValue + "]")
+        LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + " result [" + returnValue + "]")
     }
   }
   def leavingMethodException(file: String, line: Int, signature: Signature, obj: AnyRef, throwable: Exception) {
+    if (LLogging.logger.nonEmpty) return
     val className = signature.getDeclaringType().getSimpleName()
     val methodName = signature.getName()
     val exceptionMessage = throwable.getMessage();
     obj match {
-      case log: Logging =>
+      case log: LLogging =>
         log.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
       case other =>
-        commonLogger.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + ". Reason: " + exceptionMessage)
+        LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + ". Reason: " + exceptionMessage)
     }
-  }
-  def getLogger(obj: Logging): RichLogger = {
-    val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
-    val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)
-      stackArray(1) else stackArray(2)
-    val fileRaw = stack.getFileName.split("""\.""")
-    val fileParsed = if (fileRaw.length > 1)
-      fileRaw.dropRight(1).mkString(".")
-    else
-      fileRaw.head
-    if (obj.getClass().toString.last == '$') // add object mark to file name
-      new RichLogger(LoggerFactory.getLogger(logPrefix +
-        obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"))
-    else
-      new RichLogger(LoggerFactory.getLogger(logPrefix +
-        obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed))
   }
 }
 
@@ -142,33 +129,33 @@ privileged public final aspect AspectLogging {
 
 	before(final Logging obj, final Loggable loggable) : logging(obj, loggable) {
 		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
-		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
-			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enteringMethod(
+		if (org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.enteringMethod(
 					location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
 	after(final Logging obj, final Loggable loggable) returning(final Object result) : loggingNonVoid(obj, loggable) {
 		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
-		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
+		if (org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.enabled())
 			if (loggable.result())
-				org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.leavingMethod(
+				org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.leavingMethod(
 						location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj, result);
 			else
-				org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+				org.digimead.digi.ctrl.lib.log.Logging$.MODULE$
 						.leavingMethod(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
 	after(final Logging obj, final Loggable loggable) returning() : loggingVoid(obj, loggable) {
 		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
-		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
-			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+		if (org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.log.Logging$.MODULE$
 					.leavingMethod(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj);
 	}
 
 	after(final Logging obj, final Loggable loggable) throwing(final Exception ex) : logging(obj, loggable) {
 		SourceLocation location = thisJoinPointStaticPart.getSourceLocation();
-		if (org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$.enabled())
-			org.digimead.digi.ctrl.lib.aop.Logging$.MODULE$
+		if (org.digimead.digi.ctrl.lib.log.Logging$.MODULE$.enabled())
+			org.digimead.digi.ctrl.lib.log.Logging$.MODULE$
 					.leavingMethodException(location.getFileName(), location.getLine(),	thisJoinPointStaticPart.getSignature(), obj, ex);
 	}
 }

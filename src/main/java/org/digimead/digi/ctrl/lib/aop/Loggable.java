@@ -21,8 +21,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import org.digimead.digi.ctrl.lib.aop.Logging;
-
 /**
  * Use this annotation on methods which you want to be weaved by the
  * {@link Logging}.

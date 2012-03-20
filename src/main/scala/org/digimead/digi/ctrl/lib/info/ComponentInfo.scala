@@ -27,9 +27,8 @@ import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
 
-import org.digimead.digi.ctrl.lib.aop.RichLogger.rich2plain
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Version
 
 import android.content.Context
@@ -187,7 +186,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
 }
 
 object ComponentInfo extends Logging {
-  override protected val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentInfo] = new Parcelable.Creator[ComponentInfo]() {
     def createFromParcel(in: Parcel): ComponentInfo = new ComponentInfo(in)
     def newArray(size: Int): Array[ComponentInfo] = new Array[ComponentInfo](size)

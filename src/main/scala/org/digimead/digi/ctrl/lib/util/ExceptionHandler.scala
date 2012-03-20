@@ -23,7 +23,7 @@ import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Thread.UncaughtExceptionHandler
 
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DIntent

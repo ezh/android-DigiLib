@@ -18,7 +18,7 @@ package org.digimead.digi.ctrl.lib.block
 
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.aop.Logging
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
