@@ -47,5 +47,7 @@
     <string name="report_hint">description</string>
     <string name="report_summary">Please give us a short summary</string>
     <string name="report_email">Contact email</string>
-
+    <string name="loading">loading…</string>
+    <string name="empty"></string>
+    
 </resources>

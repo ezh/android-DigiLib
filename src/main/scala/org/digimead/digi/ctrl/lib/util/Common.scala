@@ -53,6 +53,7 @@ import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.ICtrlComponent
 
+import android.content.pm.PackageManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -266,6 +267,24 @@ object Common extends Logging {
         destination.close()
       }
     }
+  }
+  @Loggable
+  def isSignedWithDebugKey(context: Context, clazz: Class[_], debugKey: String): Boolean = try {
+    val c = new ComponentName(context, clazz)
+    val pinfo = context.getPackageManager.getPackageInfo(c.getPackageName(), PackageManager.GET_SIGNATURES)
+    val sigs = pinfo.signatures
+    sigs.foreach(s => log.debug(s.toCharsString))
+    if (debugKey == sigs.head.toCharsString) {
+      log.debug("package " + c.getPackageName() + " has been signed with the debug key")
+      true
+    } else {
+      log.debug("package " + c.getPackageName() + "signed with a key other than the debug key")
+      false
+    }
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      false
   }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList

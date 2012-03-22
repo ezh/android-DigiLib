@@ -22,4 +22,5 @@ interface ICtrlHost {
   boolean start(in String componentPackage);
   List status(in String componentPackage); // serialized to Array[Byte] Common.ComponentStatus
   boolean stop(in String componentPackage);
+  boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
 }

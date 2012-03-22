@@ -27,7 +27,9 @@ import org.slf4j.helpers.MarkerIgnoringBase
 class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
   // fast look while development, highlight it in your IDE
   def g_a_s_e(msg: String) {
-    fatal("GASE: " + msg)
+    val t = new Throwable(msg)
+    t.fillInStackTrace()
+    error("GASE: " + msg + "\n" + t.getStackTraceString)
   }
   // error with stack trace
   def fatal(msg: String) {

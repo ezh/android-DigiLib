@@ -78,6 +78,11 @@ protected class AppService private () extends Actor with Logging {
           onCompleteCallback(componentStatus(componentPackage))
         case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
           if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
+        case AppService.Message.Disconnect(componentPackage, processID, connectionID, onCompleteCallback) =>
+          if (onCompleteCallback != null)
+            onCompleteCallback(componentDisconnect(componentPackage, processID, connectionID))
+          else
+            componentDisconnect(componentPackage, processID, connectionID)
         case message: AnyRef =>
           log.error("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -206,7 +211,11 @@ protected class AppService private () extends Actor with Logging {
     case Some(service) => service.stop(componentPackage)
     case None => false
   }
-}
+  @Loggable
+  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get match {
+    case Some(service) => service.disconnect(componentPackage, processID, connectionID)
+    case None => false
+  }}
 
 object AppService extends Logging {
   @volatile private var inner: AppService = null
@@ -295,6 +304,6 @@ object AppService extends Logging {
     case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit) extends Abstract
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
     //    object ListInterfaces extends Abstract
-    object Disconnect extends Abstract
+    case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
   }
 }
