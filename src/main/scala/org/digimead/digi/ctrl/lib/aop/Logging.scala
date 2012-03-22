@@ -55,60 +55,65 @@
 
 package org.digimead.digi.ctrl.lib.aop
 
-import scala.annotation.implicitNotFound
 import org.aspectj.lang.Signature
-import org.digimead.digi.ctrl.lib.log.FileLogger
-import org.digimead.digi.ctrl.lib.log.RichLogger
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-import scala.concurrent.SyncVar
-import java.util.concurrent.atomic.AtomicReference
-import scala.ref.WeakReference
-import org.digimead.digi.ctrl.lib.log.{Logging => LLogging}
+import org.digimead.digi.ctrl.lib.log.{ Logging => LLogging }
 
 object Logging {
   def enteringMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
-    if (LLogging.logger.nonEmpty) return
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
     obj match {
       case logging: LLogging =>
+        if (!logging.log.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         logging.log.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName)
       case other =>
+        if (!LLogging.commonLogger.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         LLogging.commonLogger.trace("[L%04d".format(line) + "] enteringMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
     }
   }
   def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef) {
-    if (LLogging.logger.nonEmpty) return
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
     obj match {
       case logging: LLogging =>
+        if (!logging.log.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName)
       case other =>
+        if (!LLogging.commonLogger.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.'))
     }
   }
   def leavingMethod(file: String, line: Int, signature: Signature, obj: AnyRef, returnValue: Object) {
-    if (LLogging.logger.nonEmpty) return
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
     obj match {
       case logging: LLogging =>
+        if (!logging.log.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         logging.log.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " result [" + returnValue + "]")
       case other =>
+        if (!LLogging.commonLogger.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
         LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethod " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + " result [" + returnValue + "]")
     }
   }
   def leavingMethodException(file: String, line: Int, signature: Signature, obj: AnyRef, throwable: Exception) {
-    if (LLogging.logger.nonEmpty) return
-    val className = signature.getDeclaringType().getSimpleName()
-    val methodName = signature.getName()
-    val exceptionMessage = throwable.getMessage();
     obj match {
-      case log: LLogging =>
-        log.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
+      case logging: LLogging =>
+        if (!logging.log.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
+        val exceptionMessage = throwable.getMessage();
+        logging.log.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + ". Reason: " + exceptionMessage)
       case other =>
+        if (!LLogging.commonLogger.isTraceEnabled) return
+        val className = signature.getDeclaringType().getSimpleName()
+        val methodName = signature.getName()
+        val exceptionMessage = throwable.getMessage();
         LLogging.commonLogger.trace("[L%04d".format(line) + "] leavingMethodException " + className + "::" + methodName + " at " + file.takeWhile(_ != '.') + ". Reason: " + exceptionMessage)
     }
   }

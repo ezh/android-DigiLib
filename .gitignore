@@ -64,7 +64,6 @@ syntax: glob
 # building
 target
 build
-build.xml
 null
 tmp*
 temp*

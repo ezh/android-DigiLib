@@ -17,9 +17,9 @@
 package org.digimead.digi.ctrl.lib.dialog
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.ICtrlHost
@@ -51,9 +51,9 @@ object InstallControl extends Logging {
     }
     new AlertDialog.Builder(activity).
       setTitle(Android.getString(activity, "error_control_notfound_title").
-          getOrElse("DigiControl failed")).
+        getOrElse("DigiControl failed")).
       setMessage(Android.getString(activity, "error_control_notfound_content").
-          getOrElse("DigiControl application not found on the device")).
+        getOrElse("DigiControl application not found on the device")).
       setPositiveButton(yesString, new DialogInterface.OnClickListener() {
         @Loggable
         def onClick(dialog: DialogInterface, whichButton: Int) {

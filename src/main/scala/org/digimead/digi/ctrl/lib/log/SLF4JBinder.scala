@@ -76,7 +76,6 @@ class StaticLoggerBinder extends LoggerFactoryBinder {
 object StaticLoggerBinder {
   val loggerFactory: ILoggerFactory = new SLF4JLoggerFactory()
   val loggerFactoryClassStr = classOf[SLF4JLoggerFactory].getName
-  val REQUESTED_API_VERSION = "1.6"
   val SINGLETON = new StaticLoggerBinder()
   def getSingleton() = SINGLETON
 }

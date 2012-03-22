@@ -41,8 +41,35 @@ import android.content.Context
 import android.content.Intent
 
 object Report extends Logging {
-  val reportName = reportPrefix + ".log"
   def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateString(new Date())
+  private[lib] def init(context: Context): Unit = synchronized {
+    try {
+      AnyBase.info.get foreach {
+        info =>
+          AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+            // try to submit reports if there any stack traces
+            context match {
+              case context: Activity =>
+                AnyBase.info.get.foreach {
+                  info =>
+                    Thread.sleep(DTimeout.normal) // take it gently ;-)
+                    log.debug("looking for stack trace reports in: " + info.reportPath)
+                    val dir = new File(info.reportPath + "/")
+                    val reports = Option(dir.list()).flatten
+                    if (reports.exists(_.endsWith(".stacktrace")))
+                      org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
+                    else
+                      clean()
+                }
+              case _ =>
+            }
+          }
+      }
+    } catch {
+      case e => log.error(e.getMessage, e)
+    }
+  }
+  @Loggable
   def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Unit = synchronized {
     for {
       info <- AnyBase.info.get
@@ -71,6 +98,7 @@ object Report extends Logging {
                   case _ =>
                     false
                 }
+                Logging.flush
                 if (active) {
                   log.debug("there is active report " + report.getName)
                   if (force) {
@@ -98,33 +126,6 @@ object Report extends Logging {
         case context =>
           log.info("unable to send application report from unknown context " + context)
       }
-    }
-  }
-  private[lib] def init(context: Context): Unit = synchronized {
-    try {
-      AnyBase.info.get foreach {
-        info =>
-          AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
-            // try to submit reports if there any stack traces
-            context match {
-              case context: Activity =>
-                AnyBase.info.get.foreach {
-                  info =>
-                    Thread.sleep(DTimeout.normal) // take it gently ;-)
-                    log.debug("looking for stack trace reports in: " + info.reportPath)
-                    val dir = new File(info.reportPath + "/")
-                    val reports = Option(dir.list()).flatten
-                    if (reports.exists(_.endsWith(".stacktrace")))
-                      org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
-                    else
-                      clean()
-                }
-              case _ =>
-            }
-          }
-      }
-    } catch {
-      case e => log.error(e.getMessage, e)
     }
   }
   @Loggable

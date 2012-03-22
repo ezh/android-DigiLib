@@ -16,7 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter

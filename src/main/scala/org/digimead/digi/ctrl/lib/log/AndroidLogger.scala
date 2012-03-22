@@ -1,45 +1,55 @@
-/*
-* Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
-* 
-* this file based on AndroidLogger.java
-* 
-* Copyright (c) 2009 SLF4J.ORG
-*
-* All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining
-* a copy of this software and associated documentation files (the
-* "Software"), to deal in the Software without restriction, including
-* without limitation the rights to use, copy, modify, merge, publish,
-* distribute, sublicense, and/or sell copies of the Software, and to
-* permit persons to whom the Software is furnished to do so, subject to
-* the following conditions:
-*
-* The above copyright notice and this permission notice shall be
-* included in all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-* NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-* LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-* OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-* WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+/**
+ * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 package org.digimead.digi.ctrl.lib.log
 
-import android.util.Log
 import java.util.StringTokenizer
-import org.slf4j.helpers.MarkerIgnoringBase
 
-class AndroidLogger(val rawLoggerName: String) extends MarkerIgnoringBase {
-  val actualName = forceValidName(rawLoggerName)
-  if (!actualName.equals(rawLoggerName))
-    Log.i(getClass.getSimpleName(),
-      "Logger name '" + rawLoggerName + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
-        " characters, using '" + actualName + "' instead.")
+import scala.collection.immutable.HashMap
 
+import android.util.Log
+
+object AndroidLogger extends Logger {
+  private[lib] var validName = new HashMap[String, String]()
+  final val TAG_MAX_LENGTH = 23; // tag names cannot be longer on Android platform
+  // see also android/system/core/include/cutils/property.h
+  // and android/frameworks/base/core/jni/android_util_Log.cpp
+  protected var f = (record: Logging.Record) => {
+    val tag = validName.get(record.tag).getOrElse(this.synchronized {
+      val valid = forceValidName(record.tag)
+      validName = validName + (record.tag -> valid)
+      Log.i(getClass.getSimpleName(),
+        "Logger name '" + record.tag + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
+          " characters, using '" + valid + "' instead.")
+      valid
+    })
+    record.level match {
+      case Logging.Level.Trace =>
+        if (record.throwable.isEmpty) Log.v(tag, record.message) else Log.v(tag, record.message, record.throwable.get)
+      case Logging.Level.Debug =>
+        if (record.throwable.isEmpty) Log.d(tag, record.message) else Log.d(tag, record.message, record.throwable.get)
+      case Logging.Level.Info =>
+        if (record.throwable.isEmpty) Log.i(tag, record.message) else Log.i(tag, record.message, record.throwable.get)
+      case Logging.Level.Warn =>
+        if (record.throwable.isEmpty) Log.w(tag, record.message) else Log.w(tag, record.message, record.throwable.get)
+      case Logging.Level.Error =>
+        if (record.throwable.isEmpty) Log.e(tag, record.message) else Log.e(tag, record.message, record.throwable.get)
+    }
+    ()
+  }
   /**
    * Trim name in case it exceeds maximum length of {@value #TAG_MAX_LENGTH} characters.
    */
@@ -70,104 +80,5 @@ class AndroidLogger(val rawLoggerName: String) extends MarkerIgnoringBase {
         name = name.substring(0, AndroidLogger.TAG_MAX_LENGTH - 1) + '*'
     }
     name
-  }
-
-  /* @see org.slf4j.Logger#isTraceEnabled() */
-  def isTraceEnabled(): Boolean = Log.isLoggable(rawLoggerName, Log.VERBOSE)
-
-  /* @see org.slf4j.Logger#trace(java.lang.String) */
-  def trace(msg: String) = Log.v(actualName, msg)
-
-  /* @see org.slf4j.Logger#trace(java.lang.String, java.lang.Object) */
-  def trace(format: String, param1: AnyRef) = Log.v(actualName, format.format(param1))
-
-  /* @see org.slf4j.Logger#trace(java.lang.String, java.lang.Object, java.lang.Object) */
-  def trace(format: String, param1: AnyRef, param2: AnyRef) = Log.v(actualName, format.format(param1, param2))
-
-  /* @see org.slf4j.Logger#trace(java.lang.String, java.lang.Object[]) */
-  def trace(format: String, argArray: Array[AnyRef]) = Log.v(actualName, format.format(argArray: _*))
-
-  /* @see org.slf4j.Logger#trace(java.lang.String, java.lang.Throwable) */
-  def trace(msg: String, t: Throwable) = Log.v(actualName, msg, t)
-
-  /* @see org.slf4j.Logger#isDebugEnabled() */
-  def isDebugEnabled(): Boolean = Log.isLoggable(rawLoggerName, Log.DEBUG)
-
-  /* @see org.slf4j.Logger#debug(java.lang.String) */
-  def debug(msg: String) = Log.d(actualName, msg)
-
-  /* @see org.slf4j.Logger#debug(java.lang.String, java.lang.Object) */
-  def debug(format: String, param1: AnyRef) = Log.d(actualName, format.format(param1))
-
-  /* @see org.slf4j.Logger#debug(java.lang.String, java.lang.Object, java.lang.Object) */
-  def debug(format: String, param1: AnyRef, param2: AnyRef) = Log.d(actualName, format.format(param1, param2))
-
-  /* @see org.slf4j.Logger#debug(java.lang.String, java.lang.Object[]) */
-  def debug(format: String, argArray: Array[AnyRef]) = Log.d(actualName, format.format(argArray: _*))
-
-  /* @see org.slf4j.Logger#debug(java.lang.String, java.lang.Throwable) */
-  def debug(msg: String, t: Throwable) = Log.d(actualName, msg, t)
-
-  /* @see org.slf4j.Logger#isInfoEnabled() */
-  def isInfoEnabled(): Boolean = Log.isLoggable(rawLoggerName, Log.INFO)
-
-  /* @see org.slf4j.Logger#info(java.lang.String) */
-  def info(msg: String) = Log.i(actualName, msg)
-
-  /* @see org.slf4j.Logger#info(java.lang.String, java.lang.Object) */
-  def info(format: String, param1: AnyRef) = Log.i(actualName, format.format(param1))
-
-  /* @see org.slf4j.Logger#info(java.lang.String, java.lang.Object, java.lang.Object) */
-  def info(format: String, param1: AnyRef, param2: AnyRef) = Log.i(actualName, format.format(param1, param2))
-
-  /* @see org.slf4j.Logger#info(java.lang.String, java.lang.Object[]) */
-  def info(format: String, argArray: Array[AnyRef]) = Log.i(actualName, format.format(argArray: _*))
-
-  /* @see org.slf4j.Logger#info(java.lang.String, java.lang.Throwable) */
-  def info(msg: String, t: Throwable) = Log.i(actualName, msg, t)
-
-  /* @see org.slf4j.Logger#isWarnEnabled() */
-  def isWarnEnabled(): Boolean = Log.isLoggable(rawLoggerName, Log.WARN)
-
-  /* @see org.slf4j.Logger#warn(java.lang.String) */
-  def warn(msg: String) = Log.w(actualName, msg)
-
-  /* @see org.slf4j.Logger#warn(java.lang.String, java.lang.Object) */
-  def warn(format: String, param1: AnyRef) = Log.w(actualName, format.format(param1))
-
-  /* @see org.slf4j.Logger#warn(java.lang.String, java.lang.Object, java.lang.Object) */
-  def warn(format: String, param1: AnyRef, param2: AnyRef) = Log.w(actualName, format.format(param1, param2))
-
-  /* @see org.slf4j.Logger#warn(java.lang.String, java.lang.Object[]) */
-  def warn(format: String, argArray: Array[AnyRef]) = Log.w(actualName, format.format(argArray: _*))
-
-  /* @see org.slf4j.Logger#warn(java.lang.String, java.lang.Throwable) */
-  def warn(msg: String, t: Throwable) = Log.w(actualName, msg, t)
-
-  /* @see org.slf4j.Logger#isErrorEnabled() */
-  def isErrorEnabled(): Boolean = Log.isLoggable(rawLoggerName, Log.ERROR)
-
-  /* @see org.slf4j.Logger#error(java.lang.String) */
-  def error(msg: String) = Log.e(actualName, msg)
-
-  /* @see org.slf4j.Logger#error(java.lang.String, java.lang.Object) */
-  def error(format: String, param1: AnyRef) = Log.e(actualName, format.format(param1))
-
-  /* @see org.slf4j.Logger#error(java.lang.String, java.lang.Object, java.lang.Object) */
-  def error(format: String, param1: AnyRef, param2: AnyRef) = Log.e(actualName, format.format(param1, param2))
-
-  /* @see org.slf4j.Logger#error(java.lang.String, java.lang.Object[]) */
-  def error(format: String, argArray: Array[AnyRef]) = Log.e(actualName, format.format(argArray: _*))
-
-  /* @see org.slf4j.Logger#error(java.lang.String, java.lang.Throwable) */
-  def error(msg: String, t: Throwable) = Log.e(actualName, msg, t)
-}
-
-object AndroidLogger extends Logger {
-  final val TAG_MAX_LENGTH = 23; // tag names cannot be longer on Android platform
-  // see also android/system/core/include/cutils/property.h
-  // and android/frameworks/base/core/jni/android_util_Log.cpp
-  def apply(record: Logging.Record) {
-    
   }
 }

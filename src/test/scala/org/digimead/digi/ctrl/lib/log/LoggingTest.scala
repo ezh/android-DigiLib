@@ -16,11 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.log
 
-import org.scalatest.FunSuite
-import org.scalatest.BeforeAndAfter
+import java.util.Date
+
+import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
-import org.digimead.digi.ctrl.lib.Activity
+import org.scalatest.BeforeAndAfter
+import org.scalatest.FunSuite
 
 class LoggingTestBeforeInit_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -72,7 +76,7 @@ class LoggingTestAfterInit_j1 extends FunSuite with BeforeAndAfter with RobotEsT
   }
 }
 
-class LoggingTestLoggers_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
+class LoggingTestConsoleLogger_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
   lazy val roboClassLoader = RobotEsTrick.classLoader
   lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
@@ -84,7 +88,93 @@ class LoggingTestLoggers_j1 extends FunSuite with BeforeAndAfter with RobotEsTri
 
   test("logging console") {
     val activity = new android.app.Activity with Activity
+    activity.onCreate(null)
+    AnyBase.info.get should not be (None)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(false)
+    Logging.logger.isEmpty should be(true)
     Logging.init(activity)
+    var writeToLog = false
+    ConsoleLogger.setF((r) => { writeToLog = true })
     Logging.addLogger(ConsoleLogger)
+    Logging.logger.isEmpty should be(false)
+    Logging.logger.head should equal(ConsoleLogger)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(true)
+    writeToLog should be(true)
+  }
+}
+
+class LoggingTestAndroidLogger_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
+  lazy val roboClassHandler = RobotEsTrick.classHandler
+  lazy val roboClassLoader = RobotEsTrick.classLoader
+  lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
+  lazy val roboConfig = RobotEsTrick.config
+
+  before {
+    roboSetup
+  }
+
+  test("logging android") {
+    val activity = new android.app.Activity with Activity
+    activity.onCreate(null)
+    AnyBase.info.get should not be (None)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(false)
+    Logging.logger.isEmpty should be(true)
+    Logging.init(activity)
+    var writeToLog = false
+    val f = AndroidLogger.getF
+    AndroidLogger.setF((r) => { writeToLog = true })
+    Logging.addLogger(AndroidLogger)
+    Logging.logger.isEmpty should be(false)
+    Logging.logger.head should equal(AndroidLogger)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(true)
+    writeToLog should be(true)
+    AndroidLogger.validName.isEmpty should be(true)
+    f(Logging.Record(new Date, 0, Logging.Level.Debug, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "+"))
+    AndroidLogger.validName.nonEmpty should be(true)
+    AndroidLogger.validName.head should be(("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA*"))
+  }
+}
+
+class LoggingTestFileLogger_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
+  lazy val roboClassHandler = RobotEsTrick.classHandler
+  lazy val roboClassLoader = RobotEsTrick.classLoader
+  lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
+  lazy val roboConfig = RobotEsTrick.config
+
+  before {
+    roboSetup
+  }
+
+  test("logging file") {
+    val activity = new android.app.Activity with Activity
+    activity.onCreate(null)
+    AnyBase.info.get should not be (None)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(false)
+    Logging.logger.isEmpty should be(true)
+    Logging.init(activity)
+    var writeToLog = false
+    val f = FileLogger.getF
+    FileLogger.setF((r) => { writeToLog = true })
+    Logging.addLogger(FileLogger)
+    Logging.logger.isEmpty should be(false)
+    Logging.logger.head should equal(FileLogger)
+    Thread.sleep(100)
+    Logging.loggingThread.isAlive should be(true)
+    writeToLog should be(true)
+  }
+
+  test("file location") {
+    AnyBase.info.get should not be (None)
+    AppActivity.Context should not be (None)
+    AppActivity.Inner.internalStorage should not be (None)
+    AppActivity.Inner.externalStorage should be(None)
+    Logging.logger.head should equal(FileLogger)
+    FileLogger.file should not be (None)
+    FileLogger.output should not be (None)
   }
 }

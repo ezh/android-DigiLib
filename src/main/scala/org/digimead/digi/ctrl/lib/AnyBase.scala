@@ -45,6 +45,7 @@ private[lib] trait AnyBase extends Logging {
 
 object AnyBase extends Logging {
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
+  @volatile var reportDirectory = "report"
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -107,7 +108,7 @@ object AnyBase extends Logging {
         val pi = pm.getPackageInfo(context.getPackageName(), 0)
         val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
         val writeReport = pref.getBoolean(pi.packageName, true)
-        val info = new AnyBase.Info(reportPath = new File(context.getFilesDir(), "report"),
+        val info = new AnyBase.Info(reportPath = Common.getDirectory(context, reportDirectory).get,
           appVersion = pi.versionName,
           appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,

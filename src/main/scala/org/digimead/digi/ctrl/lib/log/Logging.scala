@@ -16,16 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.log
 
-import scala.annotation.implicitNotFound
-import scala.collection.immutable.HashMap
-import scala.concurrent.SyncVar
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
+import scala.collection.immutable.HashSet
+import scala.collection.immutable.HashMap
 import org.digimead.digi.ctrl.lib.util.Common
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.slf4j.LoggerFactory
 import android.content.Context
-import org.digimead.digi.ctrl.lib.AnyBase
-import scala.collection.immutable.HashSet
+import scala.ref.WeakReference
 
 trait Logging {
   implicit protected[lib] val log: RichLogger = Logging.getLogger(this)
@@ -33,18 +32,24 @@ trait Logging {
 
 object Logging {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  private val pid = try { android.os.Process.myPid } catch { case e => 0 }
-  private[lib] val queue = new ConcurrentLinkedQueue[Record]
-  @volatile private[lib] var logger = new HashSet[Logger]()
-  private var richLogger = new HashMap[String, RichLogger]()
+  private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
+  private[log] val queue = new ConcurrentLinkedQueue[Record]
+  private[log] var logger = new HashSet[Logger]()
+  private[log] var richLogger = new HashMap[String, RichLogger]()
+  private[log] var loggingThread = getWorker
+  private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
-  private var loggingThread = getWorker
+  def offer(record: Record) = queue.offer(record)
   private[lib] def init(context: Context): Unit = synchronized {
     try {
       AnyBase.info.get foreach {
         info =>
           Runtime.getRuntime().addShutdownHook(new Thread() { override def run() = deinit })
       }
+      logger.foreach(_.init(context))
+      if (!loggingThread.isAlive)
+        loggingThread = getWorker
+      initializationContext = new WeakReference(context)
     } catch {
       case e => try {
         System.err.println(e.getMessage + "\n" + e.getStackTraceString)
@@ -55,8 +60,7 @@ object Logging {
       }
     }
   }
-  private[lib] def deinit(): Unit = synchronized {
-  }
+  private[lib] def deinit(): Unit = synchronized { delLogger(logger.toSeq) }
   private def getWorker() = {
     val thread = new Thread("GenericLogger for " + Logging.getClass.getName) {
       this.setDaemon(true)
@@ -73,6 +77,7 @@ object Logging {
     thread.start
     thread
   }
+  def flush() = synchronized { logger.foreach(_.flush) }
   private def flushQueue(): Int = flushQueue(java.lang.Integer.MAX_VALUE)
   private def flushQueue(n: Int): Int = synchronized {
     var count = 0
@@ -83,8 +88,27 @@ object Logging {
     }
     count
   }
-  def addLogger(l: Logger) = logger = logger + l
-  def delLogger(l: Logger) = logger = logger - l
+  def addLogger(s: Seq[Logger]): Unit =
+    synchronized { s.foreach(l => addLogger(l, false)) }
+  def addLogger(s: Seq[Logger], force: Boolean): Unit =
+    synchronized { s.foreach(l => addLogger(l, force)) }
+  def addLogger(l: Logger): Unit =
+    synchronized { addLogger(l, false) }
+  def addLogger(l: Logger, force: Boolean): Unit = synchronized {
+    if (!logger.contains(l) || force) {
+      initializationContext.get.foreach(l.init)
+      logger = logger + l
+    }
+    if (!loggingThread.isAlive)
+      loggingThread = getWorker
+  }
+  def delLogger(s: Seq[Logger]): Unit =
+    synchronized { s.foreach(l => delLogger(l)) }
+  def delLogger(l: Logger) = synchronized {
+    logger = logger - l
+    l.flush
+    l.deinit
+  }
   def getLogger(obj: Logging): RichLogger = synchronized {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
     val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)
@@ -114,8 +138,7 @@ object Logging {
     val message: String,
     val throwable: Option[Throwable] = None,
     val pid: Int = Logging.pid) {
-    override def toString =
-      Seq(Common.dateString(date), pid.toString, tid.toString, level.toString, tag.toString).mkString(" ") + ": " + message
+    override def toString = "%s P%05d T%05d %s %-24s %s".format(Common.dateString(date), pid, tid, level.toString.charAt(0), tag + ":", message)
   }
   sealed trait Level
   object Level {

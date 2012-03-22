@@ -17,8 +17,9 @@
 package org.digimead.digi.ctrl.lib.aop
 
 import scala.Array.canBuildFrom
+
 import org.digimead.digi.ctrl.lib.base.AppCache
-import org.digimead.digi.ctrl.lib.log.{Logging => LLogging}
+import org.digimead.digi.ctrl.lib.log.{ Logging => LLogging }
 
 abstract class Caching extends LLogging {
   protected def execute(invoker: Invoker, annotation: Cacheable, longSignature: String, shortSignature: String, args: Array[AnyRef]): Any = {

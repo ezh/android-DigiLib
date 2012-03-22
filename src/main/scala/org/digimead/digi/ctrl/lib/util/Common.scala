@@ -43,13 +43,13 @@ import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.ICtrlComponent
 
@@ -57,6 +57,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Environment
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
@@ -74,6 +75,43 @@ object Common extends Logging {
     case _ =>
       log.fatal("unknown dialog id " + id)
       null
+  }
+  @Loggable
+  def getDirectory(context: Context, name: String, forceInternal: Boolean = true): Option[File] = {
+    var result: Option[File] = None
+    if (!forceInternal) {
+      // try to use external storage
+      try {
+        result = Option(context.getExternalFilesDir(null)).flatMap(base =>
+          if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
+            Some(new File(base, name))
+          } else
+            None)
+        result.foreach(dir => {
+          if (!dir.exists)
+            dir.mkdirs
+        })
+      } catch {
+        case e =>
+          log.debug(e.getMessage, e)
+          result = None
+      }
+    }
+    if (result == None) {
+      // try to use internal storage
+      try {
+        result = Option(context.getFilesDir()).flatMap(base => Some(new File(base, name)))
+        result.foreach(dir => {
+          if (!dir.exists)
+            dir.mkdirs
+        })
+      } catch {
+        case e =>
+          log.debug(e.getMessage, e)
+          result = None
+      }
+    }
+    result
   }
   @Loggable
   def listInterfaces(): Seq[String] = {

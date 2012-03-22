@@ -97,7 +97,9 @@ protected class AppActivity private () extends Actor with Logging {
       }
     }
   }
-  lazy val appNativePath = AppActivity.Context.map(ctx => new File(ctx.getFilesDir() + "/" + DConstant.apkNativePath + "/"))
+  lazy val internalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getFilesDir()))
+  lazy val externalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getExternalFilesDir(null)))
+  lazy val appNativePath = internalStorage.map(is => new File(is, DConstant.apkNativePath))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
     AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
@@ -110,8 +112,6 @@ protected class AppActivity private () extends Actor with Logging {
     case e => log.error(e.getMessage, e); None
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (ServiceConnection, ICtrlComponent)]
-  //appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
-  //lazy val nativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   def act = {
     loop {
       react {
