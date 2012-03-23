@@ -22,6 +22,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.FileWriter
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.ObjectInputStream
@@ -37,6 +38,7 @@ import java.util.Date
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
+import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
@@ -333,6 +335,12 @@ object Common extends Logging {
     case e =>
       log.error("deserialization error", e)
       None
+  }
+  @Loggable
+  def writeToFile(file: File, text: String) {
+    val fw = new FileWriter(file)
+    try { fw.write(text) }
+    finally { fw.close }
   }
   /**
    * Write to a stream

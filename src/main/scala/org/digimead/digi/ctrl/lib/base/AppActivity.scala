@@ -36,6 +36,7 @@ import scala.ref.WeakReference
 import scala.xml.Node
 import scala.xml.XML
 
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -213,6 +214,7 @@ protected class AppActivity private () extends Actor with Logging {
     for {
       ctx <- AppActivity.Context
       appNativePath <- appNativePath
+      info <- AnyBase.info.get
     } yield {
       // Copy armeabi from assests to files folder:
       // /data/data/PKG_NAME/files
@@ -242,7 +244,14 @@ protected class AppActivity private () extends Actor with Logging {
           getOrElse("Error prepare environment, manifest for native files not found")))
         return false
       }
-      if (keep && to.forall(_.exists) && nativeManifestInstalled != None &&
+      // compare versionCode
+      val appBuildFile = new File(appNativePath, ".build")
+      val appBuild = try {
+        if (appBuildFile.exists) scala.io.Source.fromFile(appBuildFile).getLines.mkString.trim else ""
+      } catch {
+        case e => ""
+      }
+      if ((info.appBuild == appBuild) && keep && to.forall(_.exists) && nativeManifestInstalled != None &&
         checkEnvironmentVersion(nativeManifest, nativeManifestInstalled)) {
         log.debug("skip, armeabi files already installed")
         true
@@ -266,6 +275,8 @@ protected class AppActivity private () extends Actor with Logging {
               state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
                 getOrElse("Error prepare environment, chmod failed"),
                 () => caller.showDialog(InstallControl.getId(ctx))))
+            // save appBuild
+            Common.writeToFile(appBuildFile, info.appBuild)
             result
           } catch {
             case e =>
@@ -310,13 +321,13 @@ protected class AppActivity private () extends Actor with Logging {
    *  false - we need some work
    */
   @Loggable
-  private def checkEnvironmentVersion(xmlOriginal: Option[Node], xmlInstalled: Option[Node]): Boolean = {
+  private[base] def checkEnvironmentVersion(xmlOriginal: Option[Node], xmlInstalled: Option[Node]): Boolean = {
     if (xmlOriginal == None)
       return true
     else if (xmlInstalled == None)
       return false
-    val versionOriginalText = (xmlOriginal.get \ "manifest" \ "build" \ "version").text
-    val versionInstalledText = (xmlInstalled.get \ "manifest" \ "build" \ "version").text
+    val versionOriginalText = (xmlOriginal.get \\ "manifest" \ "build" \ "version").text
+    val versionInstalledText = (xmlInstalled.get \\ "manifest" \ "build" \ "version").text
     if (versionOriginalText.trim.isEmpty) {
       log.warn("build version in original mainfest not found")
       return false

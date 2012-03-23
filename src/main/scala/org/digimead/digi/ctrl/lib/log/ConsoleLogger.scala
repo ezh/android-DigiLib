@@ -18,9 +18,11 @@ package org.digimead.digi.ctrl.lib.log
 
 object ConsoleLogger extends Logger {
   val LINE_SEPARATOR = System.getProperty("line.separator")
-  protected var f = (record: Logging.Record) => {
-    System.err.println(record.toString())
-    record.throwable.foreach(_.printStackTrace(System.err))
+  protected var f = (records: Seq[Logging.Record]) => synchronized {
+    records.foreach(r => {
+      System.err.println(r.toString())
+      r.throwable.foreach(_.printStackTrace(System.err))
+    })
     System.err.flush()
   }
   override def flush() = System.err.flush()

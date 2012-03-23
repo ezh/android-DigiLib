@@ -69,25 +69,34 @@ object Logging {
           while (logger.nonEmpty) {
             if (queue.isEmpty())
               Thread.sleep(500)
-            else
+            else {
               flushQueue(1000)
+              Thread.sleep(50)
+            }
           }
       }
     }
     thread.start
     thread
   }
-  def flush() = synchronized { logger.foreach(_.flush) }
+  def flush() = synchronized {
+    while (!queue.isEmpty())
+      Thread.sleep(100)
+    logger.foreach(_.flush)
+  }
   private def flushQueue(): Int = flushQueue(java.lang.Integer.MAX_VALUE)
-  private def flushQueue(n: Int): Int = synchronized {
+  private def flushQueue(n: Int): Int = {
     var count = 0
+    var records: Seq[Record] = Seq()
     while (count < n && !queue.isEmpty()) {
-      val record = queue.poll()
-      logger.foreach(_(record))
+      records = records :+ queue.poll()
       count += 1;
     }
+    logger.foreach(_(records))
     count
   }
+  def dump() =
+    ("queue size: " + queue.size + ", loggers: " + logger.mkString(",") + " thread: " + loggingThread.isAlive) +: queue.toArray.map(_.toString)
   def addLogger(s: Seq[Logger]): Unit =
     synchronized { s.foreach(l => addLogger(l, false)) }
   def addLogger(s: Seq[Logger], force: Boolean): Unit =

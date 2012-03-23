@@ -27,28 +27,28 @@ object AndroidLogger extends Logger {
   final val TAG_MAX_LENGTH = 23; // tag names cannot be longer on Android platform
   // see also android/system/core/include/cutils/property.h
   // and android/frameworks/base/core/jni/android_util_Log.cpp
-  protected var f = (record: Logging.Record) => {
-    val tag = validName.get(record.tag).getOrElse(this.synchronized {
-      val valid = forceValidName(record.tag)
-      validName = validName + (record.tag -> valid)
-      Log.i(getClass.getSimpleName(),
-        "Logger name '" + record.tag + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
-          " characters, using '" + valid + "' instead.")
-      valid
-    })
-    record.level match {
-      case Logging.Level.Trace =>
-        if (record.throwable.isEmpty) Log.v(tag, record.message) else Log.v(tag, record.message, record.throwable.get)
-      case Logging.Level.Debug =>
-        if (record.throwable.isEmpty) Log.d(tag, record.message) else Log.d(tag, record.message, record.throwable.get)
-      case Logging.Level.Info =>
-        if (record.throwable.isEmpty) Log.i(tag, record.message) else Log.i(tag, record.message, record.throwable.get)
-      case Logging.Level.Warn =>
-        if (record.throwable.isEmpty) Log.w(tag, record.message) else Log.w(tag, record.message, record.throwable.get)
-      case Logging.Level.Error =>
-        if (record.throwable.isEmpty) Log.e(tag, record.message) else Log.e(tag, record.message, record.throwable.get)
-    }
-    ()
+  protected var f = (records: Seq[Logging.Record]) => records.foreach {
+    record =>
+      val tag = validName.get(record.tag).getOrElse(this.synchronized {
+        val valid = forceValidName(record.tag)
+        validName = validName + (record.tag -> valid)
+        Log.i(getClass.getSimpleName(),
+          "Logger name '" + record.tag + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
+            " characters, using '" + valid + "' instead.")
+        valid
+      })
+      record.level match {
+        case Logging.Level.Trace =>
+          if (record.throwable.isEmpty) Log.v(tag, record.message) else Log.v(tag, record.message, record.throwable.get)
+        case Logging.Level.Debug =>
+          if (record.throwable.isEmpty) Log.d(tag, record.message) else Log.d(tag, record.message, record.throwable.get)
+        case Logging.Level.Info =>
+          if (record.throwable.isEmpty) Log.i(tag, record.message) else Log.i(tag, record.message, record.throwable.get)
+        case Logging.Level.Warn =>
+          if (record.throwable.isEmpty) Log.w(tag, record.message) else Log.w(tag, record.message, record.throwable.get)
+        case Logging.Level.Error =>
+          if (record.throwable.isEmpty) Log.e(tag, record.message) else Log.e(tag, record.message, record.throwable.get)
+      }
   }
   /**
    * Trim name in case it exceeds maximum length of {@value #TAG_MAX_LENGTH} characters.

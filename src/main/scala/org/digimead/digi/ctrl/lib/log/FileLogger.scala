@@ -28,13 +28,16 @@ import org.digimead.digi.ctrl.lib.AnyBase
 
 object FileLogger extends Logger with Logging {
   private[lib] var file: Option[File] = None
-  private[lib] var output: Option[PrintWriter] = None
-  private var bufferedOutput: Option[BufferedWriter] = None
-  protected var f = (record: Logging.Record) => {
+  private[lib] var output: Option[BufferedWriter] = None
+  protected var f = (records: Seq[Logging.Record]) => synchronized {
     output.foreach {
       output =>
-        output.println(record.toString())
-        record.throwable.foreach(_.printStackTrace(output))
+        output.write(records.map(r => {
+          r.toString() +
+            r.throwable.map(t => "\n" + t.getStackTraceString).getOrElse("")
+        }).mkString("\n"))
+        output.newLine
+        output.flush
     }
   }
   override def init(context: Context) = synchronized {
@@ -43,11 +46,10 @@ object FileLogger extends Logger with Logging {
       deinit
       // open new
       file = AnyBase.info.get.map(info => new File(info.reportPath, logname))
-      bufferedOutput = file.map(f => new BufferedWriter(new FileWriter(f)))
-      output = bufferedOutput.map(b => new PrintWriter(b))
+      output = file.map(f => new BufferedWriter(new FileWriter(f)))
       // write header
-      output.foreach(_.println(AnyBase.info.get.toString + "\n"))
-      bufferedOutput.foreach(_.flush)
+      output.foreach(_.write(AnyBase.info.get.toString + "\n"))
+      output.foreach(_.flush)
     } catch {
       case e =>
         log.error(e.getMessage, e)
@@ -57,7 +59,6 @@ object FileLogger extends Logger with Logging {
     try {
       // close output if any
       output.foreach(_.close)
-      bufferedOutput.foreach(_.close)
       output = None
       file = None
     } catch {
@@ -66,6 +67,6 @@ object FileLogger extends Logger with Logging {
     }
   }
   override def flush() = synchronized {
-    try { bufferedOutput.foreach(_.flush) } catch { case e => log.error(e.getMessage, e) }
+    try { output.foreach(_.flush) } catch { case e => log.error(e.getMessage, e) }
   }
 }
