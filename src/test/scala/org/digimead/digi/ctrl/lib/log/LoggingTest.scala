@@ -133,7 +133,7 @@ class LoggingTestAndroidLogger_j1 extends FunSuite with BeforeAndAfter with Robo
     Logging.loggingThread.isAlive should be(true)
     writeToLog should be(true)
     AndroidLogger.validName.isEmpty should be(true)
-    f(Logging.Record(new Date, 0, Logging.Level.Debug, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "+"))
+    f(Seq(Logging.Record(new Date, 0, Logging.Level.Debug, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "+")))
     AndroidLogger.validName.nonEmpty should be(true)
     AndroidLogger.validName.head should be(("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA*"))
   }

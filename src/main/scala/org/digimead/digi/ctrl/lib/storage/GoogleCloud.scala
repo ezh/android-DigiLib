@@ -31,14 +31,27 @@ import org.apache.http.client.methods.HttpPut
 import org.apache.http.conn.params.ConnRoutePNames
 import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.message.BasicNameValuePair
+import org.apache.http.params.CoreProtocolPNames
 import org.apache.http.util.EntityUtils
 import org.apache.http.HttpHost
+import org.apache.http.HttpVersion
 import org.apache.http.NameValuePair
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.json.JSONObject
+
+import com.ning.http.client.AsyncHandler.STATE
+import com.ning.http.client.providers.jdk.JDKAsyncHttpProvider
+import com.ning.http.client.AsyncHandler
+import com.ning.http.client.AsyncHttpClient
+import com.ning.http.client.AsyncHttpClientConfig
+import com.ning.http.client.HttpResponseBodyPart
+import com.ning.http.client.HttpResponseHeaders
+import com.ning.http.client.HttpResponseStatus
+import com.ning.http.client.RequestBuilder
+import com.ning.http.client.Response
 
 import android.net.http.AndroidHttpClient
 import android.provider.Settings
@@ -54,6 +67,7 @@ object GoogleCloud extends Logging {
   protected lazy val httpclient = AppActivity.Context.map {
     context =>
       val client = AndroidHttpClient.newInstance("Android")
+      client.getParams().setParameter(CoreProtocolPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_1)
       /*
        * attach proxy
        */
@@ -73,9 +87,10 @@ object GoogleCloud extends Logging {
         log.info("proxy not detected")
       client
   }
-  def upload(file: File, prefix: String = "") = AppActivity.Context.foreach {
+  val upload: (File, String) => Unit = uploadViaApache
+  def uploadViaApache(file: File, prefix: String = "") = AppActivity.Context.foreach {
     context =>
-      log.debug("upload " + file.getName + " with default credentials")
+      log.debug("upload via Apache client " + file.getName + " with default credentials")
       val result = for {
         clientID_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_ID")
         clientSecret_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_SECRET")
@@ -96,6 +111,7 @@ object GoogleCloud extends Logging {
               val byteArray = source.map(_.toByte).toArray
               source.close()
               log.debug(file.getName + " prepared")
+              // upload byteArray
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
               val httpput = new HttpPut(uri.getPath())
               httpput.setHeader("x-goog-api-version", "2")
@@ -105,6 +121,73 @@ object GoogleCloud extends Logging {
               val entity = response.getEntity()
               log.debug(uri + " result: " + response.getStatusLine())
               response.getStatusLine().getStatusCode() match {
+                case 200 =>
+                  log.info("upload " + file.getName + " successful")
+                case _ =>
+                  log.warn("upload " + file.getName + " failed")
+              }
+            } catch {
+              case e =>
+                log.error("unable to get access token", e)
+                None
+            }
+          case None =>
+            log.error("access token not exists")
+        }
+      } catch {
+        case e =>
+          log.error("unable to upload", e)
+      }
+      if (result == None)
+        log.warn("unable to upload " + file)
+  }
+  def uploadViaNetty(file: File, prefix: String = "") = AppActivity.Context.foreach {
+    context =>
+      log.debug("upload via Netty client " + file.getName + " with default credentials")
+      val result = for {
+        clientID_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_ID")
+        clientSecret_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_SECRET")
+        refreshToken_64 <- Android.getString(context, "APPLICATION_GS_TOKEN")
+        backet_64 <- Android.getString(context, "APPLICATION_GS_BUCKET")
+        httpclient <- httpclient
+      } yield try {
+        val clientID = new String(Base64.decode(clientID_64, Base64.DEFAULT), "UTF-8")
+        val clientSecret = new String(Base64.decode(clientSecret_64, Base64.DEFAULT), "UTF-8")
+        val refreshToken = new String(Base64.decode(refreshToken_64, Base64.DEFAULT), "UTF-8")
+        val bucket = new String(Base64.decode(backet_64, Base64.DEFAULT), "UTF-8")
+        getAccessToken(clientID, clientSecret, refreshToken) match {
+          case Some(token) =>
+            try {
+              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
+              log.debug("prepare " + file.getName + " for uploading to " + uri)
+              val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
+              val byteArray = source.map(_.toByte).toArray
+              source.close()
+              log.debug(file.getName + " prepared")
+              // upload byteArray
+              val builder = new RequestBuilder("PUT")
+              val request = builder.setUrl(uri.toString).
+                addHeader("x-goog-api-version", "2").
+                addHeader("Authorization", "OAuth " + token.access_token).
+                setBody(byteArray).
+                build()
+              // TODO reimplement ApacheAsyncHttpProvider
+              val client = new AsyncHttpClient(new AndroidAsyncHttpProvider(new AsyncHttpClientConfig.Builder().build()))
+              val response = client.executeRequest(request, new AsyncHandler[Response] {
+                val builder = new Response.ResponseBuilder()
+                def onThrowable(t: Throwable) =
+                  log.warn(t.getMessage, t)
+                def onBodyPartReceived(content: HttpResponseBodyPart): STATE =
+                  { builder.accumulate(content); STATE.CONTINUE }
+                def onStatusReceived(status: HttpResponseStatus): STATE =
+                  { builder.accumulate(status); STATE.CONTINUE }
+                def onHeadersReceived(headers: HttpResponseHeaders): STATE =
+                  { builder.accumulate(headers); return STATE.CONTINUE }
+                def onCompleted(): Response =
+                  builder.build()
+              }).get
+              log.debug(uri + " result: " + response.getStatusText)
+              response.getStatusCode match {
                 case 200 =>
                   log.info("upload " + file.getName + " successful")
                 case _ =>
@@ -166,6 +249,9 @@ object GoogleCloud extends Logging {
     if (result != None)
       accessToken.set(result)
     result
+  }
+  class AndroidAsyncHttpProvider(config: AsyncHttpClientConfig) extends JDKAsyncHttpProvider(config) {
+    //TODO
   }
   case class AccessToken(
     val access_token: String,
