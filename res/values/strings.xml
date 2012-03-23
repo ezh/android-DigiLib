@@ -49,5 +49,6 @@
     <string name="report_email">Contact email</string>
     <string name="loading">loading…</string>
     <string name="empty"></string>
-    
+    <string name="error_prepare_environment_failed">prepare environment failed</string>
+
 </resources>

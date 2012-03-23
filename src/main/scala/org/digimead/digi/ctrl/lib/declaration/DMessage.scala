@@ -30,30 +30,37 @@ object DMessage {
   case class IAmBusy(val origin: Origin,
     val message: String)(implicit @transient val logger: RichLogger,
       @transient val dispatcher: Dispatcher) extends DMessage {
-    if (logger.isTraceEnabled) {
-      val t = new Throwable("Intospecting stack frame")
-      t.fillInStackTrace()
-      logger.info("BUSY: " + message + "\n" + t.getStackTraceString)
-    } else
-      logger.info("BUSY: " + message)
+    if (logger.isTraceEnabled)
+      logger.infoWhere("IAmBusy " + message)(4)
+    else
+      logger.info("IAmBusy " + message)
     dispatcher.process(this)
   }
   case class IAmReady(val origin: Origin,
     val message: String)(implicit @transient val logger: RichLogger,
       @transient val dispatcher: Dispatcher) extends DMessage {
-    logger.info("READY: " + message)
+    if (logger.isTraceEnabled)
+      logger.infoWhere("IAmReady " + message)(4)
+    else
+      logger.info("IAmReady " + message)
     dispatcher.process(this)
   }
   case class IAmMumble(val origin: Origin, val message: String,
     @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
       @transient val dispatcher: Dispatcher) extends DMessage {
-    logger.info(message)
+    if (logger.isTraceEnabled)
+      logger.infoWhere("IAmMumble " + message)(4)
+    else
+      logger.info("IAmMumble " + message)
     dispatcher.process(this)
   }
   case class IAmWarn(val origin: Origin, val message: String,
     @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
       @transient val dispatcher: Dispatcher) extends DMessage {
-    logger.warn(message)
+    if (logger.isTraceEnabled)
+      logger.warnWhere("IAmWarn " + message)(4)
+    else
+      logger.warn("IAmWarn " + message)
     dispatcher.process(this)
   }
   case class IAmYell(val origin: Origin, val message: String, val stackTrace: String,
@@ -66,7 +73,7 @@ object DMessage {
         map(t => { t.fillInStackTrace(); t }).map(_.getStackTraceString).get, onClickCallback)(logger, dispatcher)
     def this(origin: Origin, message: String)(implicit logger: RichLogger, dispatcher: Dispatcher) =
       this(origin, message, None)(logger, dispatcher)
-    logger.error(message + "\n" + stackTrace)
+    logger.error("IAmYell " + message + "\n" + stackTrace)
     dispatcher.process(this)
   }
   object IAmMumble {

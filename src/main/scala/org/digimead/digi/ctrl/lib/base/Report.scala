@@ -17,9 +17,6 @@
 package org.digimead.digi.ctrl.lib.base
 
 import java.io.File
-import java.io.FileWriter
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
 import java.util.UUID
 
@@ -27,9 +24,9 @@ import scala.Option.option2Iterable
 import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.storage.GoogleCloud
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.Activity
@@ -47,6 +44,20 @@ object Report extends Logging {
       AnyBase.info.get foreach {
         info =>
           AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+            // move reports from internal to external storage
+            Common.getDirectory(context, AnyBase.reportDirectory, true).foreach {
+              internal =>
+                if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
+                  log.debug("move reports from " + internal + " to" + info.reportPath)
+                  internal.listFiles.foreach {
+                    fileFrom =>
+                      log.debug("move " + fileFrom.getName)
+                      val fileTo = new File(info.reportPath, fileFrom.getName)
+                      Common.copyFile(fileFrom, fileTo)
+                      fileFrom.delete
+                  }
+                }
+            }
             // try to submit reports if there any stack traces
             context match {
               case context: Activity =>

@@ -224,7 +224,11 @@ protected class AppActivity private () extends Actor with Logging {
       val to = files.map(name => new File(appNativePath, name))
       val nativeManifestInstalled: Option[Node] = try {
         to.find(_.getName() == "NativeManifest.xml") match {
-          case Some(description) => Some(scala.xml.XML.loadFile(description))
+          case Some(description) =>
+            if (description.exists)
+              Some(scala.xml.XML.loadFile(description))
+            else
+              None
           case None => None
         }
       } catch {
@@ -311,9 +315,19 @@ protected class AppActivity private () extends Actor with Logging {
       return true
     else if (xmlInstalled == None)
       return false
+    val versionOriginalText = (xmlOriginal.get \ "manifest" \ "build" \ "version").text
+    val versionInstalledText = (xmlInstalled.get \ "manifest" \ "build" \ "version").text
+    if (versionOriginalText.trim.isEmpty) {
+      log.warn("build version in original mainfest not found")
+      return false
+    }
+    if (versionInstalledText.trim.isEmpty) {
+      log.warn("build version in installed mainfest not found")
+      return false
+    }
     try {
-      val versionOriginal = new Version((xmlOriginal.get \ "info" \ "version").text)
-      val versionInstalled = new Version((xmlInstalled.get \ "info" \ "version").text)
+      val versionOriginal = new Version(versionOriginalText)
+      val versionInstalled = new Version(versionInstalledText)
       log.debug("compare versions original: " + versionOriginal + ", installed: " + versionInstalled)
       versionOriginal.compareTo(versionInstalled) <= 0 // original version (from apk) <= installed version
     } catch {
@@ -452,6 +466,6 @@ object AppActivity extends Logging {
   case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
   }) extends Logging {
-    log.debugWhere("create new state " + code)(2)
+    log.debugWhere("create new state " + code)(3)
   }
 }

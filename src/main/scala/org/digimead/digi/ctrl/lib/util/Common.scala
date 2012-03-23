@@ -165,11 +165,37 @@ object Common extends Logging {
     Toast.makeText(context, text, DConstant.toastTimeout).show()
   }
   @Loggable
+  def findBusyBox(): Option[File] = {
+    var busybox: File = null
+    busybox = new File("/sbin/ext/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    busybox = new File("/system/bin/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    busybox = new File("/system/xbin/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    busybox = new File("/bin/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    busybox = new File("/sbin/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    busybox = new File("/xbin/busybox")
+    if (busybox.exists)
+      return Some(busybox)
+    None
+  }
+  @Loggable
   def execChmod(permission: String, file: File, recursive: Boolean = false): Boolean = {
+    val busybox = findBusyBox
+    if (busybox == None)
+      return false
     val args = if (recursive)
-      Array("/bin/chmod", permission, file.getAbsolutePath)
+      Array(busybox.get.getAbsolutePath, "chmod", permission, file.getAbsolutePath)
     else
-      Array("/bin/chmod", "-R", permission, file.getAbsolutePath)
+      Array(busybox.get.getAbsolutePath, "chmod", "-R", permission, file.getAbsolutePath)
     val p = Runtime.getRuntime().exec(args)
     val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
     p.waitFor()
@@ -177,7 +203,7 @@ object Common extends Logging {
     if (retcode != 0) {
       var error = err.readLine()
       while (error != null) {
-        log.fatal("/bin/chmod error: " + error)
+        log.fatal("chmod error: " + error)
         error = err.readLine()
       }
       false

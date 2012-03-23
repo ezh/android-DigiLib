@@ -45,6 +45,9 @@ object FileLogger extends Logger with Logging {
       file = AnyBase.info.get.map(info => new File(info.reportPath, logname))
       bufferedOutput = file.map(f => new BufferedWriter(new FileWriter(f)))
       output = bufferedOutput.map(b => new PrintWriter(b))
+      // write header
+      output.foreach(_.println(AnyBase.info.get.toString + "\n"))
+      bufferedOutput.foreach(_.flush)
     } catch {
       case e =>
         log.error(e.getMessage, e)

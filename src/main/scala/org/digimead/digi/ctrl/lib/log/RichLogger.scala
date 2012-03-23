@@ -57,6 +57,8 @@ class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
   }
   def trace(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, loggerName, msg, Some(t)))
+  def traceWhere(msg: String)(stackLine: Int = -1) =
+    logWhere(msg, trace, trace)(stackLine)
 
   // debug
   /* @see org.slf4j.Logger#isDebugEnabled() */
@@ -77,14 +79,8 @@ class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
   }
   def debug(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, loggerName, msg, Some(t)))
-  def debugWhere(msg: String)(stackLine: Int = -1) {
-    val t = new Throwable(msg)
-    t.fillInStackTrace()
-    if (stackLine == -1)
-      debug(msg, t)
-    else
-      debug(msg + " at " + t.getStackTrace.take(stackLine + 1).last)
-  }
+  def debugWhere(msg: String)(stackLine: Int = -1) =
+    logWhere(msg, debug, debug)(stackLine)
 
   // info
   /* @see org.slf4j.Logger#isInfoEnabled() */
@@ -106,6 +102,8 @@ class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
   }
   def info(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, loggerName, msg, Some(t)))
+  def infoWhere(msg: String)(stackLine: Int = -1) =
+    logWhere(msg, info, info)(stackLine)
 
   // warn
   /* @see org.slf4j.Logger#isWarnEnabled() */
@@ -127,6 +125,8 @@ class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
   }
   def warn(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, loggerName, msg, Some(t)))
+  def warnWhere(msg: String)(stackLine: Int = -1) =
+    logWhere(msg, warn, warn)(stackLine)
 
   // error
   /* @see org.slf4j.Logger#isErrorEnabled() */
@@ -150,4 +150,16 @@ class RichLogger(val loggerName: String) extends MarkerIgnoringBase {
       ExceptionHandler.generateStackTrace(Thread.currentThread, t)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, loggerName, msg, Some(t)))
   }
+  def errorWhere(msg: String)(stackLine: Int = -1) =
+    logWhere(msg, error, error)(stackLine)
+
+  private def logWhere(msg: String, f1: (String, Throwable) => Unit, f2: (String => Unit))(stackLine: Int) {
+    val t = new Throwable(msg)
+    t.fillInStackTrace()
+    if (stackLine == -1)
+      f1(msg, t)
+    else
+      f2(msg + " at " + t.getStackTrace.take(stackLine + 1).last)
+  }
+
 }
