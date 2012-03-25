@@ -38,15 +38,18 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 
-class Community(val context: Activity,
-  val wikiUri: Uri)(implicit @transient val dispatcher: Dispatcher) extends Block[Community.Item] with Logging {
-  val itemWiki = Community.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
+// TODO ui translation help: LANG as link
+// TODO documentation translation help: LANG as link
+// TODO web page/description translation help: LANG as link
+class CommunityBlock(val context: Activity,
+  val wikiUri: Uri)(implicit @transient val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+  val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
-  val itemTranslate = Community.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
+  val itemTranslate = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
   protected val items = Seq(itemWiki)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Community.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
+  private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -55,7 +58,7 @@ class Community(val context: Activity,
     mergeAdapter.addAdapter(adapter)
   }
   @Loggable
-  def onListItemClick(l: ListView, v: View, item: Community.Item) = {
+  def onListItemClick(l: ListView, v: View, item: CommunityBlock.Item) = {
     item match {
       case this.itemWiki => // jump to project
         log.debug("open wiki page at " + wikiUri)
@@ -71,7 +74,7 @@ class Community(val context: Activity,
   }
 }
 
-object Community {
+object CommunityBlock {
   private val name = "name"
   private val description = "description"
   case class Item(name: String, description: String, icon: String = "") extends Block.Item

@@ -41,16 +41,16 @@ import android.widget.TextView.BufferType
 import android.widget.ListView
 import android.widget.TextView
 
-class Legal(val context: Activity,
-  protected val items: List[Legal.Item],
+class LegalBlock(val context: Activity,
+  protected val items: List[LegalBlock.Item],
   _imageGetter: Html.ImageGetter = null,
-  tagHandler: Html.TagHandler = null)(implicit @transient val dispatcher: Dispatcher) extends Block[Legal.Item] with Logging {
+  tagHandler: Html.TagHandler = null)(implicit @transient val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
   private lazy val imageGetter = _imageGetter match {
     case null => new Block.ImageGetter(context)
     case getter => getter
   }
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Legal.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
+  private lazy val adapter = new LegalBlock.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -59,9 +59,9 @@ class Legal(val context: Activity,
     mergeAdapter.addAdapter(adapter)
   }
   @Loggable
-  def onListItemClick(l: ListView, v: View, item: Legal.Item) = {
+  def onListItemClick(l: ListView, v: View, item: LegalBlock.Item) = {
     item match {
-      case item: Legal.Item => // show context menu
+      case item: LegalBlock.Item => // show context menu
         log.debug("open context menu for item " + item)
         l.showContextMenuForChild(v)
       case item =>
@@ -69,7 +69,7 @@ class Legal(val context: Activity,
     }
   }
   @Loggable
-  override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: Legal.Item) {
+  override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: LegalBlock.Item) {
     log.debug("create context menu for " + item)
     menu.setHeaderTitle(Android.getString(context, "context_menu").getOrElse("Context Menu"))
     //inner.icon(this).map(menu.setHeaderIcon(_))
@@ -79,7 +79,7 @@ class Legal(val context: Activity,
       Android.getString(context, "block_legal_send").getOrElse("Send link to ..."))
   }
   @Loggable
-  override def onContextItemSelected(menuItem: MenuItem, item: Legal.Item): Boolean = {
+  override def onContextItemSelected(menuItem: MenuItem, item: LegalBlock.Item): Boolean = {
     menuItem.getItemId match {
       case id if id == Android.getId(context, "block_legal_open") =>
         log.debug("open link from " + item.uri)
@@ -112,7 +112,7 @@ class Legal(val context: Activity,
   }
 }
 
-object Legal {
+object LegalBlock {
   case class Item(val text: String)(val uri: String) extends Block.Item {
     override def toString() = text
   }

@@ -32,12 +32,14 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.TextView
 
-class Thanks(val context: Activity) extends Block[Thanks.Item] with Logging {
+// TODO check apk key (debug/release): ask + market link or respect
+// TODO list of contributor
+class ThanksBlock(val context: Activity) extends Block[ThanksBlock.Item] with Logging {
   protected val items = Seq(
-    Thanks.Item("Someone", "For everything"))
+    ThanksBlock.Item("Someone", "For everything"))
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new SimpleAdapter(context, Thanks.getListValues(items), android.R.layout.simple_list_item_2,
-    Array(Thanks.name, Thanks.description), Array(android.R.id.text1, android.R.id.text2))
+  private lazy val adapter = new SimpleAdapter(context, ThanksBlock.getListValues(items), android.R.layout.simple_list_item_2,
+    Array(ThanksBlock.name, ThanksBlock.description), Array(android.R.id.text1, android.R.id.text2))
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -46,16 +48,16 @@ class Thanks(val context: Activity) extends Block[Thanks.Item] with Logging {
     mergeAdapter.addAdapter(adapter)
   }
   @Loggable
-  def onListItemClick(l: ListView, v: View, item: Thanks.Item) = {
+  def onListItemClick(l: ListView, v: View, item: ThanksBlock.Item) = {
   }
 }
 
-object Thanks {
+object ThanksBlock {
   private val name = "name"
   private val description = "description"
   case class Item(name: String, description: String) extends java.util.HashMap[String, Spanned] with Block.Item {
-    put(Thanks.name, Html.fromHtml(name))
-    put(Thanks.description, Html.fromHtml(description))
+    put(ThanksBlock.name, Html.fromHtml(name))
+    put(ThanksBlock.description, Html.fromHtml(description))
   }
   def getListValues(menu: Seq[Item]): java.util.List[java.util.HashMap[String, Spanned]] = {
     val values = new ArrayList[java.util.HashMap[String, Spanned]]()

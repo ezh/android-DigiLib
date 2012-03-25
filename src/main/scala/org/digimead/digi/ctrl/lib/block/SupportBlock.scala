@@ -43,24 +43,24 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 
-class Support(val context: Activity,
+class SupportBlock(val context: Activity,
   val projectUri: Uri,
   val issuesUri: Uri,
   val emailTo: String,
   val emailSubject: String,
   val voicePhone: String,
-  val skypeUser: String)(implicit @transient val dispatcher: Dispatcher) extends Block[Support.Item] with Logging {
-  val itemProject = Support.Item(Android.getString(context, "block_support_project_title").getOrElse("project %s").format(Android.getString(context, "app_name").get),
+  val skypeUser: String)(implicit @transient val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
+  val itemProject = SupportBlock.Item(Android.getString(context, "block_support_project_title").getOrElse("project %s").format(Android.getString(context, "app_name").get),
     Android.getString(context, "block_support_project_description").getOrElse("open %s project web site").format(Android.getString(context, "app_name").get), "ic_block_support_project")
-  val itemIssues = Support.Item(Android.getString(context, "block_support_issues_title").getOrElse("view or submit an issue"),
+  val itemIssues = SupportBlock.Item(Android.getString(context, "block_support_issues_title").getOrElse("view or submit an issue"),
     Android.getString(context, "block_support_issues_description").getOrElse("bug reports, feature requests and enhancements"), "ic_block_support_issues")
-  val itemEmail = Support.Item(Android.getString(context, "block_email_title").getOrElse("send message"),
+  val itemEmail = SupportBlock.Item(Android.getString(context, "block_email_title").getOrElse("send message"),
     Android.getString(context, "block_support_email_description").getOrElse("email us directly"), "ic_block_support_message")
-  val itemChat = Support.Item(Android.getString(context, "block_chat_title").getOrElse("live chat"),
+  val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat"),
     Android.getString(context, "block_support_chat_description").getOrElse("let's talk via Skype, VoIP, ..."), "ic_block_support_chat")
   protected val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new Support.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
+  private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -69,7 +69,7 @@ class Support(val context: Activity,
     mergeAdapter.addAdapter(adapter)
   }
   @Loggable
-  def onListItemClick(l: ListView, v: View, item: Support.Item) = {
+  def onListItemClick(l: ListView, v: View, item: SupportBlock.Item) = {
     item match {
       case this.itemProject => // jump to project
         log.debug("open project web site at " + projectUri)
@@ -113,7 +113,7 @@ class Support(val context: Activity,
     }
   }
   @Loggable
-  override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: Support.Item) {
+  override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: SupportBlock.Item) {
     log.debug("create context menu for " + item.name)
     menu.setHeaderTitle(Android.getString(context, "context_menu").getOrElse("Context Menu"))
     //inner.icon(this).map(menu.setHeaderIcon(_))
@@ -123,7 +123,7 @@ class Support(val context: Activity,
       Android.getString(context, "block_support_skype_call").getOrElse("Skype call"))
   }
   @Loggable
-  override def onContextItemSelected(menuItem: MenuItem, item: Support.Item): Boolean = {
+  override def onContextItemSelected(menuItem: MenuItem, item: SupportBlock.Item): Boolean = {
     menuItem.getItemId match {
       case id if id == Android.getId(context, "block_support_voice_call") =>
         log.debug("start voice call to " + voicePhone)
@@ -156,7 +156,7 @@ class Support(val context: Activity,
   }
 }
 
-object Support {
+object SupportBlock {
   private val name = "name"
   private val description = "description"
   sealed case class Item(id: Int)(val name: String, val description: String, val icon: String = "") extends Block.Item

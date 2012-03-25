@@ -76,7 +76,6 @@ object Common extends Logging {
     case id if id == FailedMarket.getId(activity) =>
       FailedMarket.createDialog(activity)
     case _ =>
-      log.fatal("unknown dialog id " + id)
       null
   }
   @Loggable

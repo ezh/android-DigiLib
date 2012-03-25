@@ -65,18 +65,19 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def onCreate(savedInstanceState: Bundle): Unit = {
     log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
+    Activity.registeredReceiver.clear // sometimes onDestroy skipped, there is no harm to drop garbage
     activityDialog.set(new ADialog(this)) // lock
   }
   override def onResume() = {
     log.trace("Activity::onResume")
-    Activity.registeredReveivers.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
+    Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     activityDialog.set(null) // unlock
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
     activityDialog.set(null) // unlock
-    Activity.registeredReveivers.keys.foreach(super.unregisterReceiver(_))
+    Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
     super.onPause()
   }
   /*
@@ -85,6 +86,7 @@ trait Activity extends AActivity with AnyBase with Logging {
    */
   override def onDestroy() = {
     log.trace("Activity::onDestroy")
+    Activity.registeredReceiver.clear
     AppActivity.deinit()
     super.onDestroy()
   }
@@ -158,8 +160,8 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
     log.trace("Activity::registerReceiver")
-    assert(!Activity.registeredReveivers.isDefinedAt(receiver))
-    Activity.registeredReveivers(receiver) = (filter, null, null)
+    assert(!Activity.registeredReceiver.isDefinedAt(receiver))
+    Activity.registeredReceiver(receiver) = (filter, null, null)
     super.registerReceiver(receiver, filter)
   } catch {
     case e =>
@@ -168,8 +170,8 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
     log.trace("Activity::registerReceiver")
-    assert(!Activity.registeredReveivers.isDefinedAt(receiver))
-    Activity.registeredReveivers(receiver) = (filter, broadcastPermission, scheduler)
+    assert(!Activity.registeredReceiver.isDefinedAt(receiver))
+    Activity.registeredReceiver(receiver) = (filter, broadcastPermission, scheduler)
     super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
   } catch {
     case e =>
@@ -178,14 +180,14 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def unregisterReceiver(receiver: BroadcastReceiver) {
     log.trace("Activity::unregisterReceiver")
-    Activity.registeredReveivers.remove(receiver)
+    Activity.registeredReceiver.remove(receiver)
     super.unregisterReceiver(receiver)
   }
 }
 
 object Activity {
   /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
-  private val registeredReveivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
+  private val registeredReceiver = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
   class Dialog extends SyncVar[ADialog]() with Logging {
     private var activityDialogGuard: ScheduledExecutorService = null
     super.set(null)
