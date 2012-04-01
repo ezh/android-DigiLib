@@ -189,12 +189,6 @@ protected class AppActivity private () extends Actor with Logging {
       }
     }
   } getOrElse None
-  def filters(): Seq[String] = AppActivity.Context match {
-    case Some(root) =>
-      root.getSharedPreferences(DPreference.Filter, Context.MODE_PRIVATE).getAll().toSeq.map(t => t._1)
-    case None =>
-      Seq()
-  }
   @Loggable
   def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
     context =>

@@ -17,8 +17,11 @@
 package org.digimead.digi.ctrl.lib.util
 
 import android.content.Context
+import scala.ref.WeakReference
 
 object Android {
+  def getString(context: WeakReference[Context], name: String): Option[String] =
+    context.get.flatMap(ctx => getString(ctx, name))
   def getString(context: Context, name: String): Option[String] =
     getId(context, name, "string") match {
       case 0 =>
@@ -26,6 +29,8 @@ object Android {
       case id =>
         Option(context.getString(id))
     }
+  def getString(context: WeakReference[Context], name: String, formatArgs: AnyRef*): Option[String] =
+    context.get.flatMap(ctx => getString(ctx, name, formatArgs: _*))
   def getString(context: Context, name: String, formatArgs: AnyRef*): Option[String] =
     getId(context, name, "string") match {
       case 0 =>
@@ -33,16 +38,26 @@ object Android {
       case id =>
         Option(context.getString(id, formatArgs: _*))
     }
+  def getCapitalized(context: WeakReference[Context], name: String): Option[String] =
+    context.get.flatMap(ctx => getCapitalized(ctx, name))
   def getCapitalized(context: Context, name: String) =
     getString(context, name).map(s => if (s.length > 1)
       s(0).toUpper + s.substring(1)
     else
       s.toUpperCase)
+  def getCapitalized(context: WeakReference[Context], name: String, formatArgs: AnyRef*): Option[String] =
+    context.get.flatMap(ctx => getCapitalized(ctx, name, formatArgs: _*))
   def getCapitalized(context: Context, name: String, formatArgs: AnyRef*) =
     getString(context, name, formatArgs: _*).map(s => if (s.length > 1)
       s(0).toUpper + s.substring(1)
     else
       s.toUpperCase)
-  def getId(context: Context, name: String, scope: String = "id") =
+  def getId(context: WeakReference[Context], name: String): Int =
+    getId(context, name, "id")
+  def getId(context: WeakReference[Context], name: String, scope: String): Int =
+    context.get.map(ctx => getId(ctx, name, scope)).getOrElse(0)
+  def getId(context: Context, name: String): Int =
+    getId(context, name, "id")
+  def getId(context: Context, name: String, scope: String): Int =
     context.getResources().getIdentifier(name, scope, context.getPackageName())
 }

@@ -49,7 +49,7 @@ class CommunityBlock(val context: Activity,
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
   protected val items = Seq(itemWiki)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
+  private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")

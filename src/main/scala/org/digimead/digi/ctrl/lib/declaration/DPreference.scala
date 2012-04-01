@@ -18,6 +18,7 @@ package org.digimead.digi.ctrl.lib.declaration
 
 object DPreference {
   val Main = getClass.getPackage.getName + "@main" // shared preferences name
-  val Filter = getClass.getPackage.getName + "@filter" // shared preferences name
+  val FilterInterface = getClass.getPackage.getName + "@filter_interface" // shared preferences name
+  val FilterConnection = getClass.getPackage.getName + "@filter_connection" // shared preferences name
   val Log = getClass.getPackage.getName + "@log" // shared preferences name
 }

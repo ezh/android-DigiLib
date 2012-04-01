@@ -60,7 +60,7 @@ class SupportBlock(val context: Activity,
     Android.getString(context, "block_support_chat_description").getOrElse("let's talk via Skype, VoIP, ..."), "ic_block_support_chat")
   protected val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "advanced_list_item", "layout"), items)
+  private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")

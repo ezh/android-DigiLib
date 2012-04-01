@@ -300,9 +300,9 @@ object AppCache extends Actor with Logging {
       log.info("initialize AppCache for " + context.getPackageName())
     contextPackageName = context.getPackageName()
     val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
-    period = pref.getLong(DOption.CachePeriod.res, period)
-    cachePath = pref.getString(DOption.CacheFolder.res, context.getCacheDir + "/")
-    cacheClass = pref.getString(DOption.CacheClass.res, cacheClass)
+    period = pref.getLong(DOption.CachePeriod, period)
+    cachePath = pref.getString(DOption.CacheFolder, context.getCacheDir + "/")
+    cacheClass = pref.getString(DOption.CacheClass, cacheClass)
     if (innerCache != null) {
       inner = innerCache
     } else {

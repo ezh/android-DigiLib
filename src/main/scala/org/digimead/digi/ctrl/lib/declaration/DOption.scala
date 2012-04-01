@@ -21,19 +21,23 @@ import org.digimead.digi.ctrl.lib.util.Android
 import android.content.Context
 
 object DOption extends Enumeration {
-  // TODO rewrite with nameMap = LongMap(id) -> names and descriptionMap SoftReference
-  val CachePeriod = Value("cache_period", "cache_period", "cache_period")
-  val CacheFolder = Value("cache_dir", "cache_dir", "cache_dir")
-  val CacheClass = Value("cache_class", "cache_class", "cache_class")
-  val CommConfirmation = Value("comm_confirmation", "comm_confirmation_name", "comm_confirmation_description")
-  val CommWriteLog = Value("comm_writelog", "comm_writelog_name", "comm_writelog_description")
-  val AsRoot = Value("asroot", "service_asroot_name", "service_asroot_description")
-  val Running = Value("running", "service_running_name", "service_running_description")
-  val OnBoot = Value("onboot", "service_onboot_name", "service_onboot_description")
-  class OptVal(val res: String, val name: String, val description: String) extends Val(nextId, name) {
-    def name(context: Context) = Android.getString(context, res)
-    def description(context: Context) = Android.getString(context, res)
+  val CachePeriod: OptVal = Value("cache_period")
+  val CacheFolder: OptVal = Value("cache_dir")
+  val CacheClass: OptVal = Value("cache_class")
+  val ConfirmConn: OptVal = Value("confirm_connection")
+  val WriteConnLog: OptVal = Value("write_connection_log")
+  val AsRoot: OptVal = Value("as_root")
+  val OnBoot: OptVal = Value("on_boot")
+  class OptVal(val r: String, _name: String, _description: String) extends Val(nextId, r) {
+    def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
+    def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
   }
-  protected final def Value(id: String, name: String, description: String): OptVal =
+  object OptVal {
+    implicit def value2string_id(v: OptVal): String = v.r
+  }
+  protected final def Value(id: String, _name: String = null, _description: String = null): OptVal = {
+    val name = if (_name != null) _name else "option_" + id + "_name"
+    val description = if (_description != null) _description else "option_" + id + "_description"
     new OptVal(id, name, description)
+  }
 }

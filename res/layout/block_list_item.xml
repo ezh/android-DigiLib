@@ -18,7 +18,7 @@
     android:layout_height="match_parent"
     android:orientation="horizontal"
     android:paddingBottom="5.0dip"
-    android:paddingRight="5.0dip"
+    android:paddingRight="?android:attr/scrollbarSize"
     android:paddingTop="5.0dip" >
 
     <ImageView

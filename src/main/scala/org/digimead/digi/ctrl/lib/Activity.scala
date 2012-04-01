@@ -28,9 +28,10 @@ import scala.collection.mutable.HashMap
 import scala.concurrent.SyncVar
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.dialog.Report
+import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.util.Common
 
 import android.accounts.AccountManager
 import android.app.{ Activity => AActivity }
@@ -90,7 +91,7 @@ trait Activity extends AActivity with AnyBase with Logging {
     AppActivity.deinit()
     super.onDestroy()
   }
-  def showDialogSafe(id: Int) = future {
+  def showDialogSafe(id: Int, args: Bundle = null) = future {
     try {
       log.trace("Activity::showDialogSafe")
       activityDialog.synchronized {
@@ -98,7 +99,7 @@ trait Activity extends AActivity with AnyBase with Logging {
           activityDialog.wait
         activityDialog.unset
         log.debug("show dialog " + id)
-        runOnUiThread(new Runnable { def run = showDialog(id) })
+        runOnUiThread(new Runnable { def run = if (args == null) showDialog(id) else showDialog(id, args) })
       }
     } catch {
       case e =>
@@ -126,19 +127,27 @@ trait Activity extends AActivity with AnyBase with Logging {
         None
     }
   }
-  override def onCreateDialog(id: Int, data: Bundle): ADialog = {
+  override def onCreateDialog(id: Int): ADialog = {
     log.trace("Activity::onCreateDialog")
     id match {
       case id if id == Report.getId(this) =>
+        log.debug("show Report dialog")
         Report.createDialog(this)
       case id =>
-        log.error("unknown dialog id " + id)
-        super.onCreateDialog(id, data)
+        Option(Common.onCreateDialog(id, this)).foreach(dialog => return dialog)
+        super.onCreateDialog(id)
     }
   }
   override def onPrepareDialog(id: Int, dialog: ADialog): Unit = activityDialog.synchronized {
-    log.trace("Activity::onPrepareDialog")
     super.onPrepareDialog(id, dialog)
+    onPrepareDialogLib(id: Int, dialog: ADialog)
+  }
+  override def onPrepareDialog(id: Int, dialog: ADialog, args: Bundle): Unit = activityDialog.synchronized {
+    super.onPrepareDialog(id, dialog, args)
+    onPrepareDialogLib(id: Int, dialog: ADialog)
+  }
+  private def onPrepareDialogLib(id: Int, dialog: ADialog): Unit = {
+    log.trace("Activity::onPrepareDialog")
     activityDialog.set(dialog)
     id match {
       case id if id == Report.getId(this) =>
