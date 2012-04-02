@@ -147,6 +147,10 @@ object Common extends Logging {
     }).flatten.toSeq
   }
   @Loggable
+  def checkInterfaceInUse(interface: String, aclMask: String): Boolean = {
+    false
+  }
+  @Loggable
   def listPreparedFiles(context: Context): Option[Seq[File]] = for {
     appNativePath <- AppActivity.Inner.appNativePath
   } yield context.getAssets.list(DConstant.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)

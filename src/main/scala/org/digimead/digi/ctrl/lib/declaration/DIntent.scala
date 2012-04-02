@@ -19,6 +19,9 @@ package org.digimead.digi.ctrl.lib.declaration
 object DIntent {
   val Message = DConstant.prefix + "message"
   val Update = DConstant.prefix + "update"
+  val UpdateInterfaceFilter = DConstant.prefix + "update_interface_filter"// args - source package
+  val UpdateConnectionFilter = DConstant.prefix + "update_connection_filter" // args - source package
+  val UpdateOption = DConstant.prefix + "update_option" // args - source package & option
   val Connection = DConstant.prefix + "connection"
   val HostActivity = DConstant.prefix + "host.activity"
   val HostService = DConstant.prefix + "host.service"

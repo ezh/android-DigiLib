@@ -47,7 +47,7 @@ class CommunityBlock(val context: Activity,
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
   val itemTranslate = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
-  protected val items = Seq(itemWiki)
+  val items = Seq(itemWiki)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable

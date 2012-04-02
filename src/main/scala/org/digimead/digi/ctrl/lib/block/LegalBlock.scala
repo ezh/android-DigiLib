@@ -42,7 +42,7 @@ import android.widget.ListView
 import android.widget.TextView
 
 class LegalBlock(val context: Activity,
-  protected val items: List[LegalBlock.Item],
+  val items: List[LegalBlock.Item],
   _imageGetter: Html.ImageGetter = null,
   tagHandler: Html.TagHandler = null)(implicit @transient val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
   private lazy val imageGetter = _imageGetter match {

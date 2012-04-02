@@ -35,7 +35,7 @@ import android.widget.TextView
 // TODO check apk key (debug/release): ask + market link or respect
 // TODO list of contributor
 class ThanksBlock(val context: Activity) extends Block[ThanksBlock.Item] with Logging {
-  protected val items = Seq(
+  val items = Seq(
     ThanksBlock.Item("Someone", "For everything"))
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SimpleAdapter(context, ThanksBlock.getListValues(items), android.R.layout.simple_list_item_2,

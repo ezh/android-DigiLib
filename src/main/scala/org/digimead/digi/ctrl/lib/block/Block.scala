@@ -34,7 +34,7 @@ import android.widget.ListView
 
 trait Block[Item] {
   val context: Activity
-  protected val items: Seq[Block.Item]
+  def items: Seq[Block.Item]
   def appendTo(adapter: MergeAdapter)
   def onListItemClick(l: ListView, v: View, item: Item)
   def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: Item) {}

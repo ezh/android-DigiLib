@@ -58,7 +58,7 @@ class SupportBlock(val context: Activity,
     Android.getString(context, "block_support_email_description").getOrElse("email us directly"), "ic_block_support_message")
   val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat"),
     Android.getString(context, "block_support_chat_description").getOrElse("let's talk via Skype, VoIP, ..."), "ic_block_support_chat")
-  protected val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
+  val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable
