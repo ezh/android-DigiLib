@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2012 Alexey Aksenov ezh@ezh.msk.ru
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl;
+package org.digimead.digi.ctrl.lib.message
 
-import org.digimead.digi.ctrl.lib.info.ComponentState;
+import scala.annotation.implicitNotFound
 
-interface ICtrlHost {
-  String prepare(in String componentPackage); // return path to homedir of component
-  boolean active(); // check is service active (at least 1 request already processed)
-  boolean start(in String componentPackage);
-  ComponentState status(in String componentPackage);
-  boolean stop(in String componentPackage);
-  boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
+import org.digimead.digi.ctrl.lib.log.RichLogger
+
+import android.os.Parcelable
+
+trait DMessage extends Parcelable {
+  val logger: RichLogger
+  val origin: Origin
+  val message: String
+  val dispatcher: Dispatcher
 }

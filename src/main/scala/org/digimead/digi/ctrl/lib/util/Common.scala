@@ -147,8 +147,16 @@ object Common extends Logging {
     }).flatten.toSeq
   }
   @Loggable
-  def checkInterfaceInUse(interface: String, aclMask: String): Boolean = {
-    false
+  def checkInterfaceInUse(interface: String, aclMask: String): Boolean = try {
+    def check(acl: String, str: String): Boolean =
+      str.matches(acl.replaceAll("""\*""", ".+"))
+    val Array(acl0: String, acl1: String, acl2: String, acl3: String, acl4: String) = aclMask.split("[:.]")
+    val Array(i0: String, i1: String, i2: String, i3: String, i4: String) = interface.split("[:.]")
+    check(acl0, i0) & check(acl1, i1) & check(acl2, i2) & check(acl3, i3) & check(acl4, i4)
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      false
   }
   @Loggable
   def listPreparedFiles(context: Context): Option[Seq[File]] = for {

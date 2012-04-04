@@ -188,13 +188,8 @@ protected class AppService private () extends Actor with Logging {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
-          case list: java.util.List[_] =>
-            Common.deserializeFromList(list.asInstanceOf[java.util.List[Byte]]) match {
-              case Some(obj) =>
-                Right(obj.asInstanceOf[ComponentState])
-              case None =>
-                Left("status failed")
-            }
+          case status: ComponentState =>
+            Right(status)
           case null =>
             log.debug("service return null instread of DComponentStatus")
             Left("status failed")
@@ -215,7 +210,8 @@ protected class AppService private () extends Actor with Logging {
   protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get match {
     case Some(service) => service.disconnect(componentPackage, processID, connectionID)
     case None => false
-  }}
+  }
+}
 
 object AppService extends Logging {
   @volatile private var inner: AppService = null

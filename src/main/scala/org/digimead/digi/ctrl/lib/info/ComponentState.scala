@@ -17,8 +17,43 @@
 package org.digimead.digi.ctrl.lib.info
 
 import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.log.Logging
+
+import android.os.Parcelable
+import android.os.Parcel
 
 case class ComponentState(val componentPackage: String,
   val executableState: List[ExecutableState],
-  val state: DState.Value) extends java.io.Serializable {
+  val state: DState.Value) extends Parcelable {
+  def this(in: Parcel) = this(componentPackage = in.readString,
+    executableState =
+      in.readParcelableArray(null) match {
+        case null =>
+          Nil
+        case p =>
+          p.map(_.asInstanceOf[ExecutableState]).toList
+      },
+    state = DState(in.readInt))
+  def writeToParcel(out: Parcel, flags: Int) {
+    ComponentState.log.debug("writeToParcel ComponentState with flags " + flags)
+    out.writeString(componentPackage)
+    out.writeParcelableArray(executableState.toArray, 0)
+    out.writeInt(state.id)
+  }
+  def describeContents() = 0
+}
+
+object ComponentState extends Logging {
+  override protected[lib] val log = Logging.getLogger(this)
+  final val CREATOR: Parcelable.Creator[ComponentState] = new Parcelable.Creator[ComponentState]() {
+    def createFromParcel(in: Parcel): ComponentState = try {
+      log.debug("createFromParcel new ComponentState")
+      new ComponentState(in)
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+        null
+    }
+    def newArray(size: Int): Array[ComponentState] = new Array[ComponentState](size)
+  }
 }

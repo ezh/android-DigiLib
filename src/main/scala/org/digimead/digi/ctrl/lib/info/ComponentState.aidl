@@ -14,15 +14,6 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl;
+package org.digimead.digi.ctrl.lib.info;
 
-import org.digimead.digi.ctrl.lib.info.ComponentState;
-
-interface ICtrlHost {
-  String prepare(in String componentPackage); // return path to homedir of component
-  boolean active(); // check is service active (at least 1 request already processed)
-  boolean start(in String componentPackage);
-  ComponentState status(in String componentPackage);
-  boolean stop(in String componentPackage);
-  boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
-}
+parcelable ComponentState;

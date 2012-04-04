@@ -16,12 +16,60 @@
 
 package org.digimead.digi.ctrl.lib.declaration
 
+import org.digimead.digi.ctrl.lib.log.Logging
+
+import android.os.Parcelable
+import android.os.Parcel
+
 case class DConnection(
   val connectionID: Int,
   val processID: Int,
-  val key: Int) extends java.io.Serializable {
+  val key: Int) extends Parcelable {
   var FD, localIP, localPort, remoteIP, remotePort, PID, UID, GID = -1
   var timestamp: Long = -1
   var cmd: String = ""
+  def this(in: Parcel) = this(connectionID = in.readInt,
+    processID = in.readInt,
+    key = in.readInt)
+  def writeToParcel(out: Parcel, flags: Int) {
+    DConnection.log.debug("writeToParcel DConnection with flags " + flags)
+    out.writeInt(connectionID)
+    out.writeInt(processID)
+    out.writeInt(key)
+    out.writeInt(FD)
+    out.writeInt(localIP)
+    out.writeInt(remoteIP)
+    out.writeInt(remotePort)
+    out.writeInt(PID)
+    out.writeInt(UID)
+    out.writeInt(GID)
+    out.writeLong(timestamp)
+    out.writeString(cmd)
+  }
+  def describeContents() = 0
 }
 
+object DConnection extends Logging {
+  override protected[lib] val log = Logging.getLogger(this)
+  final val CREATOR: Parcelable.Creator[DConnection] = new Parcelable.Creator[DConnection]() {
+    def createFromParcel(in: Parcel): DConnection = try {
+      log.debug("createFromParcel new DConnection")
+      val obj = new DConnection(in)
+      obj.FD = in.readInt()
+      obj.localIP = in.readInt()
+      obj.remoteIP = in.readInt()
+      obj.remotePort = in.readInt()
+      obj.PID = in.readInt()
+      obj.UID = in.readInt()
+      obj.GID = in.readInt()
+      obj.timestamp = in.readLong()
+      obj.cmd = in.readString()
+      obj
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+        null
+    }
+    def newArray(size: Int): Array[DConnection] = new Array[DConnection](size)
+  }
+}

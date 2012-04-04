@@ -72,7 +72,7 @@ case class ExecutableInfo(val id: Int,
     license = in.readString,
     project = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
-    ExecutableInfo.log.debug("writeToParcel with flags " + flags)
+    ExecutableInfo.log.debug("writeToParcel ExecutableInfo with flags " + flags)
     out.writeInt(id)
     commandLine match {
       case Some(commandLine) =>
@@ -102,7 +102,14 @@ case class ExecutableInfo(val id: Int,
 object ExecutableInfo extends Logging {
   override protected[lib] val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {
-    def createFromParcel(in: Parcel): ExecutableInfo = new ExecutableInfo(in)
+    def createFromParcel(in: Parcel): ExecutableInfo = try {
+      log.debug("createFromParcel new ExecutableInfo")
+      new ExecutableInfo(in)
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+        null
+    }
     def newArray(size: Int): Array[ExecutableInfo] = new Array[ExecutableInfo](size)
   }
 }

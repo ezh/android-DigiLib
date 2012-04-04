@@ -20,8 +20,8 @@ import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
-import org.digimead.digi.ctrl.lib.declaration.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
@@ -90,7 +90,7 @@ class LegalBlock(val context: Activity,
           true
         } catch {
           case e =>
-            DMessage.IAmYell("Unable to open license link " + item.uri, e)
+            IAmYell("Unable to open license link " + item.uri, e)
             false
         }
       case id if id == Android.getId(context, "block_legal_send") =>
@@ -102,7 +102,7 @@ class LegalBlock(val context: Activity,
           true
         } catch {
           case e =>
-            DMessage.IAmYell("Unable to send license link " + item.uri, e)
+            IAmYell("Unable to send license link " + item.uri, e)
             false
         }
       case id =>

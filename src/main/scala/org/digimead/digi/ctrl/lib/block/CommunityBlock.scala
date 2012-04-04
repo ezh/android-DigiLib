@@ -20,8 +20,8 @@ import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
-import org.digimead.digi.ctrl.lib.declaration.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
@@ -68,7 +68,7 @@ class CommunityBlock(val context: Activity,
           context.startActivity(intent)
         } catch {
           case e =>
-            DMessage.IAmYell("Unable to open wiki page: " + wikiUri, e)
+            IAmYell("Unable to open wiki page: " + wikiUri, e)
         }
     }
   }

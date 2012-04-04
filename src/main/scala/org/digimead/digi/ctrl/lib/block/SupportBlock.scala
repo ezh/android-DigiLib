@@ -22,8 +22,8 @@ import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.declaration.DMessage.Dispatcher
-import org.digimead.digi.ctrl.lib.declaration.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
@@ -79,7 +79,7 @@ class SupportBlock(val context: Activity,
           context.startActivity(intent)
         } catch {
           case e =>
-            DMessage.IAmYell("Unable to open project link: " + projectUri, e)
+            IAmYell("Unable to open project link: " + projectUri, e)
         }
       case this.itemIssues => // jump to issues
         log.debug("open issues web page at " + projectUri)
@@ -89,7 +89,7 @@ class SupportBlock(val context: Activity,
           context.startActivity(intent)
         } catch {
           case e =>
-            DMessage.IAmYell("Unable to open project link: " + issuesUri, e)
+            IAmYell("Unable to open project link: " + issuesUri, e)
         }
       case this.itemEmail => // create email
         // TODO simple email vs complex with log
@@ -103,7 +103,7 @@ class SupportBlock(val context: Activity,
           context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
         } catch {
           case e =>
-            DMessage.IAmYell("Unable 'send to' email: " + emailTo + " / " + emailSubject, e)
+            IAmYell("Unable 'send to' email: " + emailTo + " / " + emailSubject, e)
         }
       case this.itemChat => // show context menu with call/skype
         log.debug("open context menu for voice call")
@@ -134,7 +134,7 @@ class SupportBlock(val context: Activity,
           true
         } catch {
           case e =>
-            DMessage.IAmYell("Unable start voice call to " + voicePhone, e)
+            IAmYell("Unable start voice call to " + voicePhone, e)
             false
         }
       case id if id == Android.getId(context, "block_support_skype_call") =>
@@ -146,7 +146,7 @@ class SupportBlock(val context: Activity,
           true
         } catch {
           case e =>
-            DMessage.IAmYell("Unable start skype call to " + skypeUser, e)
+            IAmYell("Unable start skype call to " + skypeUser, e)
             false
         }
       case id =>
