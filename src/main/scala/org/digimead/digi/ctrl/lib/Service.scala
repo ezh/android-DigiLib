@@ -16,11 +16,10 @@
 
 package org.digimead.digi.ctrl.lib
 
-import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppService
+import org.digimead.digi.ctrl.lib.log.Logging
 
-import android.app.{ Service => AService }
+import android.app.{Service => AService}
 
 trait Service extends AService with AnyBase with Logging {
   /*
@@ -34,9 +33,14 @@ trait Service extends AService with AnyBase with Logging {
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    * in fact AppService.deinit is sporadic event
    */
-  override def onDestroy() = {
+  override def onDestroy(): Unit = {
     log.trace("Service::onDestroy")
-    AppService.deinit()
-    super.onDestroy()
+    onDestroyBase(this, {
+      if (AnyBase.isLastContext)
+        AppService.deinit()
+      else
+        log.debug("skip onDestroy deinitialization, because there is another context coexists")
+      Service.super.onDestroy()
+    })
   }
 }

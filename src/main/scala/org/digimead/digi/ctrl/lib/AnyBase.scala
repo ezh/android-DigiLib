@@ -36,15 +36,22 @@ import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 import android.content.Context
 
 private[lib] trait AnyBase extends Logging {
-  protected def onCreateBase(context: Context, callSuper: => Any) = {
+  protected def onCreateBase(context: Context, callSuper: => Any) = synchronized {
     log.trace("AnyBase::onCreateBase")
     callSuper
     AnyBase.init(context)
+  }
+  protected def onDestroyBase(context: Context, callSuper: => Any) = synchronized {
+    log.trace("AnyBase::onDestroyBase")
+    callSuper
+    AnyBase.deinit(context)
   }
 }
 
 object AnyBase extends Logging {
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
+  @volatile private var contextPool = Seq[WeakReference[Context]]()
+  @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile var reportDirectory = "report"
   val info = new SyncVar[Option[Info]]
   info.set(None)
@@ -56,14 +63,26 @@ object AnyBase extends Logging {
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true) = synchronized {
+    log.debug("initialize AnyBase context " + context.getClass.getName)
+    AppActivity.resurrect
+    AppService.resurrect
     context match {
       case activity: Activity =>
-        if (AppActivity.context.get != context)
-          AppActivity.init(context)
+        if (!contextPool.exists(_.get == context)) {
+          contextPool = contextPool :+ new WeakReference(context)
+          if (contextPool.isEmpty)
+            AppActivity.init(context)
+        }
       case service: Service =>
-        if (AppService.context.get != context)
-          AppService.init(context)
+        if (!contextPool.exists(_.get == context)) {
+          contextPool = contextPool :+ new WeakReference(context)
+          if (contextPool.isEmpty)
+            AppService.init(context)
+        }
       case context =>
+        // all other contexts are temporary, look at isLastContext
+        if (!contextPool.exists(_.get == context))
+          contextPool = contextPool :+ new WeakReference(context)
         if (stackTraceOnUnknownContext)
           log.fatal("init from unknown context " + context)
     }
@@ -80,6 +99,26 @@ object AnyBase extends Logging {
       // start activity singleton actor
       AppActivity.Inner.start
     }
+  }
+  def deinit(context: Context) = synchronized {
+    log.debug("deinitialize AnyBase context " + context.getClass.getName)
+    contextPool = contextPool.filter(_.get != context)
+    updateContext()
+  }
+  // count only Activity and Service contexts
+  def isLastContext() =
+    contextPool.filter(c => c.get != None && (c.isInstanceOf[android.app.Activity] || c.isInstanceOf[android.app.Service])).size <= 1
+  def getContext(): Option[Context] = currentContext.get match {
+    case None => updateContext()
+    case result: Some[_] => result
+  }
+  private def updateContext(): Option[Context] = {
+    contextPool = contextPool.filter(_.get != None).sortBy(n => n match {
+      case activity if activity.isInstanceOf[android.app.Activity] => 1
+      case service if service.isInstanceOf[android.app.Service] => 2
+      case _ => 3
+    })
+    contextPool.headOption.flatMap(_.get)
   }
   case class Info(val reportPath: File,
     val appVersion: String,

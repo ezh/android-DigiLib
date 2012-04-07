@@ -39,15 +39,30 @@ object AndroidLogger extends Logger {
       })
       record.level match {
         case Logging.Level.Trace =>
-          if (record.throwable.isEmpty) Log.v(tag, record.message) else Log.v(tag, record.message, record.throwable.get)
+          if (record.throwable.isEmpty)
+            Log.v(tag, "[T%05d]%s".format(record.tid, record.message))
+          else
+            Log.v(tag, "[T%05d]%s".format(record.tid, record.message), record.throwable.get)
         case Logging.Level.Debug =>
-          if (record.throwable.isEmpty) Log.d(tag, record.message) else Log.d(tag, record.message, record.throwable.get)
+          if (record.throwable.isEmpty)
+            Log.d(tag, "[T%05d]%s".format(record.tid, record.message))
+          else
+            Log.d(tag, "[T%05d]%s".format(record.tid, record.message), record.throwable.get)
         case Logging.Level.Info =>
-          if (record.throwable.isEmpty) Log.i(tag, record.message) else Log.i(tag, record.message, record.throwable.get)
+          if (record.throwable.isEmpty)
+            Log.i(tag, "[T%05d]%s".format(record.tid, record.message))
+          else
+            Log.i(tag, "[T%05d]%s".format(record.tid, record.message), record.throwable.get)
         case Logging.Level.Warn =>
-          if (record.throwable.isEmpty) Log.w(tag, record.message) else Log.w(tag, record.message, record.throwable.get)
+          if (record.throwable.isEmpty)
+            Log.w(tag, "[T%05d]%s".format(record.tid, record.message))
+          else
+            Log.w(tag, "[T%05d]%s".format(record.tid, record.message), record.throwable.get)
         case Logging.Level.Error =>
-          if (record.throwable.isEmpty) Log.e(tag, record.message) else Log.e(tag, record.message, record.throwable.get)
+          if (record.throwable.isEmpty)
+            Log.e(tag, "[T%05d]%s".format(record.tid, record.message))
+          else
+            Log.e(tag, "[T%05d]%s".format(record.tid, record.message), record.throwable.get)
       }
   }
   /**

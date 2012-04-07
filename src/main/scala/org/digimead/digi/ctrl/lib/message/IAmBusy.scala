@@ -27,17 +27,17 @@ import android.os.Parcel
 case class IAmBusy(val origin: Origin,
   val message: String)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
-  if (logger.isTraceEnabled)
-    logger.infoWhere("IAmBusy " + message)(4)
-  else
-    logger.info("IAmBusy " + message)
+  if (logger != null)
+    if (logger.isTraceEnabled)
+      logger.infoWhere("IAmBusy " + message)(3)
+    else
+      logger.info("IAmBusy " + message)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
     message = in.readString)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmBusy.log.debug("writeToParcel IAmBusy with flags " + flags)
-    out.writeString(logger.getName)
     out.writeParcelable(origin, flags)
     out.writeString(message)
   }
@@ -48,9 +48,8 @@ object IAmBusy extends Logging {
   final val CREATOR: Parcelable.Creator[IAmBusy] = new Parcelable.Creator[IAmBusy]() {
     def createFromParcel(in: Parcel): IAmBusy = try {
       log.debug("createFromParcel new IAmBusy")
-      val logger = Logging.getLogger(in.readString)
       val dispatcher = new Dispatcher { def process(message: DMessage) {} }
-      new IAmBusy(in)(logger, dispatcher)
+      new IAmBusy(in)(null, dispatcher)
     } catch {
       case e =>
         log.error(e.getMessage, e)

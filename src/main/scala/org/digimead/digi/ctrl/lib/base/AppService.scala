@@ -20,22 +20,22 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
 
 import scala.actors.Futures.future
 import scala.actors.Actor
 import scala.concurrent.SyncVar
-import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
+import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
-import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.ICtrlHost
 
 import android.content.ComponentName
@@ -45,12 +45,15 @@ import android.content.ServiceConnection
 import android.os.IBinder
 
 protected class AppService private () extends Actor with Logging {
-  protected lazy val serviceInstance: AtomicReference[ICtrlHost] = new AtomicReference(null)
+  private val lock = new Object
+  protected lazy val serviceInstance = new AtomicReference[ICtrlHost](null)
+  protected lazy val ctrlBindContext = new AtomicReference[Activity](null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
+
   protected lazy val ctrlConnection = new ServiceConnection() with Logging {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
-      log.debug("connected to Control service")
+      log.info("connected to DigiControl service")
       serviceInstance.set(ICtrlHost.Stub.asInterface(iservice))
       if (getState == scala.actors.Actor.State.New) {
         log.debug("start AppService singleton actor")
@@ -59,7 +62,7 @@ protected class AppService private () extends Actor with Logging {
     }
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
-      log.debug("unexpected disconnect from Control service")
+      log.warn("unexpected disconnect from DigiControl service")
       serviceInstance.set(null)
     }
   }
@@ -70,19 +73,47 @@ protected class AppService private () extends Actor with Logging {
       react {
         // TODO suspend actor as scala.actors.Actor.State.Suspended when service lost
         case AppService.Message.Ping =>
-          reply()
+          reply(log.debug("ping"))
         case AppService.Message.Start(componentPackage, onCompleteCallback) =>
-          if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
+          log.info("receive message Start for " + componentPackage)
+          try {
+            if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message Start for " + componentPackage)
         case AppService.Message.Status(componentPackage, onCompleteCallback) =>
           assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
-          onCompleteCallback(componentStatus(componentPackage))
+          log.info("receive message Status for " + componentPackage)
+          try {
+            onCompleteCallback(componentStatus(componentPackage))
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message Status for " + componentPackage)
         case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
-          if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
+          log.info("receive message Stop for " + componentPackage)
+          try {
+            if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message Stop for " + componentPackage)
         case AppService.Message.Disconnect(componentPackage, processID, connectionID, onCompleteCallback) =>
-          if (onCompleteCallback != null)
-            onCompleteCallback(componentDisconnect(componentPackage, processID, connectionID))
-          else
-            componentDisconnect(componentPackage, processID, connectionID)
+          log.info("receive message Disconnect for " + componentPackage)
+          try {
+            if (onCompleteCallback != null)
+              onCompleteCallback(componentDisconnect(componentPackage, processID, connectionID))
+            else
+              componentDisconnect(componentPackage, processID, connectionID)
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message Disconnect for " + componentPackage)
         case message: AnyRef =>
           log.error("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -91,72 +122,18 @@ protected class AppService private () extends Actor with Logging {
     }
   }
   def get(): Option[ICtrlHost] = get(true)
-  def get(throwError: Boolean): Option[ICtrlHost] = synchronized {
-    if (!throwError)
-      return serviceInstance.get() match {
-        case service: ICtrlHost => Some(service)
-        case null => None
-      }
-    serviceInstance.get match {
-      case serviceInstance: ICtrlHost =>
-        Some(serviceInstance)
-      case null =>
-        val t = new Throwable("Intospecting stack frame")
-        t.fillInStackTrace()
-        log.error("uninitialized ICtrlHost at AppService: " + t.getStackTraceString)
-        None
-    }
-  }
+  def get(throwError: Boolean): Option[ICtrlHost] = AppService.get(throwError, serviceInstance)
   @Loggable
   def getWait() = {
     this !? AppService.Message.Ping // actor start ONLY after successful binding
     get
   }
   @Loggable
-  def bind(caller: Activity) = synchronized {
-    AppActivity.Context foreach {
-      context =>
-        if (ctrlBindCounter.incrementAndGet() == 1)
-          if (serviceInstance.get == null)
-            future {
-              val intent = new Intent(DIntent.HostService)
-              intent.putExtra("packageName", context.getPackageName())
-              val successful = if (isInstalled(context)) {
-                log.info("bind to " + DIntent.HostService)
-                context.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)
-              } else {
-                log.warn(DIntent.HostService + " not installed")
-                false
-              }
-              if (!successful)
-                AppActivity.Inner.state.set(AppActivity.State(DState.Broken, Android.getString(context, "error_control_notfound").
-                  getOrElse("Bind failed, DigiControl application not found"),
-                  () => caller.showDialog(InstallControl.getId(context))))
-            }
-          else
-            log.fatal("service " + DIntent.HostService + " already binded")
-    }
-  }
+  def bind(caller: Activity): Unit =
+    AppService.bind(caller, ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
   @Loggable
-  def unbind() = synchronized {
-    AppActivity.Context foreach {
-      context =>
-        if (ctrlBindCounter.decrementAndGet() == 0)
-          if (serviceInstance.get != null) {
-            log.debug("unbind service")
-            context.unbindService(ctrlConnection)
-            serviceInstance.set(null)
-          } else
-            log.warn("service already unbinded")
-    }
-  }
-  @Loggable
-  def isInstalled(ctx: Context): Boolean = {
-    val pm = ctx.getPackageManager()
-    val intent = new Intent(DIntent.HostService)
-    val info = pm.resolveService(intent, 0);
-    info != null
-  }
+  def unbind(): Unit =
+    AppService.unbind(ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
   /*
    * active
    * passive
@@ -180,7 +157,8 @@ protected class AppService private () extends Actor with Logging {
   }
   @Loggable
   protected def componentStart(componentPackage: String): Boolean = get match {
-    case Some(service) => service.start(componentPackage)
+    case Some(service) =>
+      service.start(componentPackage)
     case None => false
   }
   @Loggable
@@ -199,7 +177,7 @@ protected class AppService private () extends Actor with Logging {
           Left(e.getMessage)
       }
     case None =>
-      Left("service unreachable")
+      Left(componentPackage + " service unreachable")
   }
   @Loggable
   protected def componentStop(componentPackage: String): Boolean = get match {
@@ -208,15 +186,17 @@ protected class AppService private () extends Actor with Logging {
   }
   @Loggable
   protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get match {
-    case Some(service) => service.disconnect(componentPackage, processID, connectionID)
+    case Some(service) =>
+      //service.disconnect(componentPackage, processID, connectionID)
+      false
     case None => false
   }
 }
 
 object AppService extends Logging {
   @volatile private var inner: AppService = null
-  @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
   private val deinitializationLock = new SyncVar[Boolean]()
+  private val deinitializationProgress = new ReentrantLock
 
   log.debug("alive")
   @Loggable
@@ -231,44 +211,50 @@ object AppService extends Logging {
       log.info("initialize AppService for " + root.getPackageName())
       resetNatives(root)
     }
-    context = new WeakReference(root)
     if (_inner != null)
       inner = _inner
     else
       inner = new AppService()
   }
-  private[lib] def deinit(): Unit = future {
-    val packageName = AppService.context.get.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppService for " + packageName)
-    deinitializationLock.unset
-    deinitializationLock.get(DTimeout.longest) match {
-      case Some(false) =>
-        log.info("deinitialization AppService for " + packageName + " canceled")
-      case _ =>
-        deinitRoutine(packageName)
+  private[lib] def resurrect() =
+    if (deinitializationProgress.isLocked) {
+      log.info("resurrect AppService core subsystem")
+      deinitializationLock.set(false)
     }
+  private[lib] def deinit(): Unit = future {
+    if (deinitializationProgress.tryLock)
+      try {
+        val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
+        log.info("deinitializing AppService for " + packageName)
+        if (deinitializationLock.isSet)
+          deinitializationLock.unset
+        deinitializationLock.get(DTimeout.longest) match {
+          case Some(false) =>
+            log.info("deinitialization AppService for " + packageName + " canceled")
+          case _ =>
+            deinitRoutine(packageName)
+        }
+      } finally {
+        deinitializationProgress.unlock
+      }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppService for " + packageName)
     assert(inner != null)
     val _inner = inner
     inner = null
-    if (AppActivity.initialized)
-      for {
-        rootSrv <- context.get
-        rootApp <- AppActivity.Context
-      } if (rootApp == rootSrv) {
-        log.info("AppActivity and AppService share the same context. Clear.")
-        AppActivity.deinitRoutine(packageName)
-      }
-    context.get.foreach(resetNatives)
+    if (AnyBase.isLastContext && AppActivity.Inner != null) {
+      log.info("AppService hold last context. Clear.")
+      AppActivity.deinitRoutine(packageName)
+    }
+    AnyBase.getContext.foreach(resetNatives)
   }
   def Inner = inner
   def ICtrlHost = inner.get()
-  def initialized() = synchronized {
-    while (inner != null)
-      wait()
-  }
+  //  def initialized() = synchronized {
+  //    while (inner != null)
+  //      wait()
+  //  }
   @Loggable
   private def resetNatives(context: Context) = future {
     /*    val myUID = Process.myUid
@@ -293,13 +279,65 @@ object AppService extends Logging {
     } else
       true
   }
+  private def get(throwError: Boolean, serviceInstance: AtomicReference[ICtrlHost]): Option[ICtrlHost] = synchronized {
+    if (!throwError)
+      return serviceInstance.get() match {
+        case service: ICtrlHost => Some(service)
+        case null => None
+      }
+    serviceInstance.get match {
+      case service: ICtrlHost => Some(service)
+      case null =>
+        val t = new Throwable("Intospecting stack frame")
+        t.fillInStackTrace()
+        log.error("uninitialized ICtrlHost at AppService: " + t.getStackTraceString)
+        None
+    }
+  }
+  private def bind(caller: Activity, ctrlBindContext: AtomicReference[Activity], ctrlBindCounter: AtomicInteger,
+    serviceInstance: AtomicReference[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
+    if (ctrlBindCounter.incrementAndGet() == 1)
+      if (serviceInstance.get == null && ctrlBindContext.compareAndSet(null, caller)) {
+        val intent = new Intent(DIntent.HostService)
+        intent.putExtra("packageName", caller.getPackageName())
+        val successful = new SyncVar[Boolean]
+        if (isICtrlHostInstalled(caller)) {
+          log.info("bind to service " + DIntent.HostService)
+          caller.runOnUiThread(new Runnable { def run = successful.set(caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) })
+        } else {
+          log.warn(DIntent.HostService + " not installed")
+          successful.set(false)
+        }
+        if (!successful.get)
+          AppActivity.Inner.state.set(AppActivity.State(DState.Broken, Android.getString(caller, "error_control_notfound").
+            getOrElse("Bind failed, DigiControl application not found"),
+            () => caller.showDialog(InstallControl.getId(caller))))
+      } else
+        log.fatal("service " + DIntent.HostService + " already binding/binded")
+  }
+  private def unbind(ctrlBindContext: AtomicReference[Activity], ctrlBindCounter: AtomicInteger,
+    serviceInstance: AtomicReference[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
+    if (ctrlBindCounter.decrementAndGet() == 0)
+      if (serviceInstance.get != null && ctrlBindContext.get != null) {
+        log.info("unbind from service " + DIntent.HostService)
+        val caller = ctrlBindContext.getAndSet(null)
+        caller.runOnUiThread(new Runnable { def run = caller.unbindService(ctrlConnection) })
+        serviceInstance.set(null)
+      } else
+        log.warn("service already unbinded")
+  }
+  @Loggable
+  def isICtrlHostInstalled(ctx: Context): Boolean = {
+    val pm = ctx.getPackageManager()
+    val intent = new Intent(DIntent.HostService)
+    val info = pm.resolveService(intent, 0);
+    info != null
+  }
   object Message {
-    sealed trait Abstract
-    object Ping extends Abstract
-    case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit) extends Abstract
-    case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
-    //    object ListInterfaces extends Abstract
-    case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null) extends Abstract
+    object Ping
+    case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
+    case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit)
+    case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
+    case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null)
   }
 }

@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
+import scala.annotation.elidable
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
@@ -45,6 +46,7 @@ import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
+import annotation.elidable.ASSERTION
 import declaration.DTimeout
 
 /*
@@ -88,8 +90,14 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def onDestroy() = {
     log.trace("Activity::onDestroy")
     Activity.registeredReceiver.clear
-    AppActivity.deinit()
     super.onDestroy()
+    onDestroyBase(this, {
+      if (AnyBase.isLastContext)
+        AppActivity.deinit()
+      else
+        log.debug("skip onDestroy deinitialization, because there is another context coexists")
+      Activity.super.onDestroy()
+    })
   }
   def showDialogSafe(id: Int, args: Bundle = null) = future {
     try {

@@ -21,9 +21,11 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 
 import scala.Array.canBuildFrom
-import scala.actors.Futures._
+import scala.actors.Futures.future
+import scala.actors.Futures.awaitAll
 import scala.actors.Actor
 import scala.annotation.elidable
 import scala.annotation.implicitNotFound
@@ -357,8 +359,8 @@ protected class AppActivity private () extends Actor with Logging {
 
 object AppActivity extends Logging {
   @volatile private var inner: AppActivity = null
-  @volatile private[lib] var context: WeakReference[Context] = new WeakReference(null)
   private val deinitializationLock = new SyncVar[Boolean]()
+  private val deinitializationProgress = new ReentrantLock
 
   log.debug("alive")
   @Loggable
@@ -372,7 +374,7 @@ object AppActivity extends Logging {
     if (inner != null) {
       log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
       // unbind services from bindedICtrlPool
-      context.get.foreach {
+      AnyBase.getContext.foreach {
         context =>
           inner.bindedICtrlPool.keys.foreach(key => {
             inner.bindedICtrlPool.remove(key).map(record => {
@@ -383,41 +385,45 @@ object AppActivity extends Logging {
       }
     } else
       log.info("initialize AppActivity for " + root.getPackageName())
-    context = new WeakReference(root)
     if (_inner != null)
       inner = _inner
     else
       inner = new AppActivity()
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def deinit(): Unit = future {
-    val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppActivity for " + packageName)
-    deinitializationLock.unset
-    deinitializationLock.get(DTimeout.longest) match {
-      case Some(false) =>
-        log.info("deinitialization AppActivity for " + packageName + " canceled")
-      case _ =>
-        deinitRoutine(packageName)
+  private[lib] def resurrect() =
+    if (deinitializationProgress.isLocked) {
+      log.info("resurrect AppActivity core subsystem")
+      deinitializationLock.set(false)
     }
+  private[lib] def deinit(): Unit = future {
+    if (deinitializationProgress.tryLock)
+      try {
+        val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
+        log.info("deinitializing AppActivity for " + packageName)
+        if (deinitializationLock.isSet)
+          deinitializationLock.unset
+        deinitializationLock.get(DTimeout.longest) match {
+          case Some(false) =>
+            log.info("deinitialization AppActivity for " + packageName + " canceled")
+          case _ =>
+            deinitRoutine(packageName)
+        }
+      } finally {
+        deinitializationProgress.unlock
+      }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppActivity for " + packageName)
     assert(inner != null)
     val savedInner = inner
-    val savedContext = context.get
     inner = null
-    context = new WeakReference(null)
-    if (AppActivity.initialized)
-      for {
-        rootApp <- savedContext
-        rootSrv <- AppService.context.get
-      } if (rootApp == rootSrv) {
-        log.info("AppActivity and AppService share the same context. Clear.")
-        AppService.deinitRoutine(packageName)
-      }
+    if (AnyBase.isLastContext && AppService.Inner != null) {
+      log.info("AppActivity hold last context. Clear.")
+      AppService.deinitRoutine(packageName)
+    }
     // unbind services from bindedICtrlPool
-    savedContext.foreach {
+    AnyBase.getContext.foreach {
       context =>
         savedInner.bindedICtrlPool.keys.foreach(key => {
           savedInner.bindedICtrlPool.remove(key).map(record => {
@@ -429,8 +435,8 @@ object AppActivity extends Logging {
     AppCache.deinit()
   }
   def Inner = inner
-  def Context = context.get
-  def initialized = synchronized { inner != null }
+  def Context = AnyBase.getContext
+  //def initialized = synchronized { inner != null }
   object LazyInit {
     // priority -> Seq(functions)
     @volatile private var pool: LongMap[Seq[() => Any]] = LongMap()

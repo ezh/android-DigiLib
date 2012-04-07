@@ -16,19 +16,22 @@
 
 package org.digimead.digi.ctrl.lib.message
 
+import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 
 import android.os.Parcelable
 import android.os.Parcel
 
-case class Origin private (val code: Int, val name: String) extends Parcelable {
+case class Origin private (val code: Int, val name: String,
+  val packageName: String = Origin.packageName) extends Parcelable {
   def this(in: Parcel) =
-    this(code = in.readInt, name = in.readString)
+    this(code = in.readInt, name = in.readString, packageName = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
     Origin.log.debug("writeToParcel Origin with flags " + flags)
     out.writeInt(code)
     out.writeString(name)
+    out.writeString(packageName)
   }
   def describeContents() = 0
 }
@@ -46,4 +49,5 @@ object Origin extends Logging {
     }
     def newArray(size: Int): Array[Origin] = new Array[Origin](size)
   }
+  def packageName = AppActivity.Context.map(_.getPackageName).getOrElse("unknown")
 }

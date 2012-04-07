@@ -35,14 +35,14 @@ case class IAmYell(val origin: Origin, val message: String, val stackTrace: Stri
       map(t => { t.fillInStackTrace(); t }).map(_.getStackTraceString).get, onClickCallback)(logger, dispatcher)
   def this(origin: Origin, message: String)(implicit logger: RichLogger, dispatcher: Dispatcher) =
     this(origin, message, None)(logger, dispatcher)
-  logger.error("IAmYell " + message + "\n" + stackTrace)
+  if (logger != null)
+    logger.error("IAmYell " + message + "\n" + stackTrace)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
     message = in.readString, stackTrace = in.readString, onClickCallback = None)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmYell.log.debug("writeToParcel IAmYell with flags " + flags)
-    out.writeString(logger.getName)
     out.writeParcelable(origin, flags)
     out.writeString(message)
     out.writeString(stackTrace)
@@ -54,9 +54,8 @@ object IAmYell extends Logging {
   final val CREATOR: Parcelable.Creator[IAmYell] = new Parcelable.Creator[IAmYell]() {
     def createFromParcel(in: Parcel): IAmYell = try {
       log.debug("createFromParcel new IAmYell")
-      val logger = Logging.getLogger(in.readString)
       val dispatcher = new Dispatcher { def process(message: DMessage) {} }
-      new IAmYell(in)(logger, dispatcher)
+      new IAmYell(in)(null, dispatcher)
     } catch {
       case e =>
         log.error(e.getMessage, e)
