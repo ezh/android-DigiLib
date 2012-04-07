@@ -197,6 +197,7 @@ object AppService extends Logging {
   @volatile private var inner: AppService = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationProgress = new ReentrantLock
+  private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
   @Loggable
@@ -228,7 +229,7 @@ object AppService extends Logging {
         log.info("deinitializing AppService for " + packageName)
         if (deinitializationLock.isSet)
           deinitializationLock.unset
-        deinitializationLock.get(DTimeout.longest) match {
+        deinitializationLock.get(deinitializationTimeout) match {
           case Some(false) =>
             log.info("deinitialization AppService for " + packageName + " canceled")
           case _ =>

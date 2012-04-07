@@ -107,7 +107,7 @@ object AnyBase extends Logging {
   }
   // count only Activity and Service contexts
   def isLastContext() =
-    contextPool.filter(c => c.get != None && (c.isInstanceOf[android.app.Activity] || c.isInstanceOf[android.app.Service])).size <= 1
+    contextPool.filter(_.get.map(c => c.isInstanceOf[android.app.Activity] || c.isInstanceOf[android.app.Service]) == Some(true)).size <= 1
   def getContext(): Option[Context] = currentContext.get match {
     case None => updateContext()
     case result: Some[_] => result

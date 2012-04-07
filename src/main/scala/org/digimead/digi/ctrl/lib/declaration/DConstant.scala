@@ -23,4 +23,5 @@ object DConstant {
   final val serviceContentProviderSuffix = ".data"
   final val apkNativePath = "armeabi"
   final val SessionAuthority = "org.digimead.digi.ctrl.Session"
+  final val ComponentAuthority = "org.digimead.digi.ctrl.Component"
 }
