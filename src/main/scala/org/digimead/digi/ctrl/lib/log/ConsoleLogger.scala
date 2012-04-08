@@ -21,7 +21,12 @@ object ConsoleLogger extends Logger {
   protected var f = (records: Seq[Logging.Record]) => synchronized {
     records.foreach(r => {
       System.err.println(r.toString())
-      r.throwable.foreach(_.printStackTrace(System.err))
+      r.throwable.foreach(t => System.err.print(try {
+        "\n" + t.getStackTraceString
+      } catch {
+        case e =>
+          "stack trace \"" + t.getMessage + "\" unaviable "
+      }))
     })
     System.err.flush()
   }

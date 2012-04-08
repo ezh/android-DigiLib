@@ -25,4 +25,5 @@ interface ICtrlHost {
   ComponentState status(in String componentPackage);
   boolean stop(in String componentPackage);
   boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
+  List<String> interfaces(in String componentPackage);
 }

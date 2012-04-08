@@ -24,6 +24,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 import scala.actors.Futures.future
 import scala.actors.Actor
+import scala.collection.JavaConversions._
 import scala.concurrent.SyncVar
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -114,6 +115,16 @@ protected class AppService private () extends Actor with Logging {
               log.error(e.getMessage, e)
           }
           log.debug("return from message Disconnect for " + componentPackage)
+        case AppService.Message.ListInterfaces(componentPackage, onCompleteCallback) =>
+          assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
+          log.info("receive message ListInterfaces for " + componentPackage)
+          try {
+            onCompleteCallback(componentActiveInterfaces(componentPackage))
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message ListInterfaces for " + componentPackage)
         case message: AnyRef =>
           log.error("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -134,32 +145,12 @@ protected class AppService private () extends Actor with Logging {
   @Loggable
   def unbind(): Unit =
     AppService.unbind(ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
-  /*
-   * active
-   * passive
-   * unavailable
-   */
-  @Loggable
-  def getInterfaceStatus(interface: String, filters: Seq[String]): Option[Boolean] = {
-    val isListen = false
-    val isAvailable = try {
-      filters.exists(f => interface.matches(f.replaceAll("""\*""", """\\w+""").replaceAll("""\.""", """\\.""")))
-    } catch {
-      case e =>
-        log.error(e.getMessage, e)
-        false
-    }
-    (isListen, isAvailable) match {
-      case (true, _) => Some(true)
-      case (false, true) => Some(false)
-      case (false, false) => None
-    }
-  }
   @Loggable
   protected def componentStart(componentPackage: String): Boolean = get match {
     case Some(service) =>
       service.start(componentPackage)
-    case None => false
+    case None =>
+      false
   }
   @Loggable
   protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get match {
@@ -181,15 +172,29 @@ protected class AppService private () extends Actor with Logging {
   }
   @Loggable
   protected def componentStop(componentPackage: String): Boolean = get match {
-    case Some(service) => service.stop(componentPackage)
-    case None => false
+    case Some(service) =>
+      service.stop(componentPackage)
+    case None =>
+      false
   }
   @Loggable
   protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get match {
     case Some(service) =>
-      //service.disconnect(componentPackage, processID, connectionID)
+      service.disconnect(componentPackage, processID, connectionID)
+    case None =>
       false
-    case None => false
+  }
+  @Loggable
+  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get match {
+    case Some(service) =>
+      service.interfaces(componentPackage) match {
+        case null =>
+          None
+        case list =>
+          Some(list)
+      }
+    case None =>
+      None
   }
 }
 
@@ -340,5 +345,6 @@ object AppService extends Logging {
     case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit)
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
     case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null)
+    case class ListInterfaces(componentPackage: String, onCompleteCallback: (Option[Seq[String]]) => Unit = null)
   }
 }

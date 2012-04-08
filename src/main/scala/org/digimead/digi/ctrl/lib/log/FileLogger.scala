@@ -34,7 +34,12 @@ object FileLogger extends Logger with Logging {
       output =>
         output.write(records.map(r => {
           r.toString() +
-            r.throwable.map(t => "\n" + t.getStackTraceString).getOrElse("")
+            r.throwable.map(t => try {
+              "\n" + t.getStackTraceString
+            } catch {
+              case e =>
+                "stack trace \"" + t.getMessage + "\" unaviable "
+            }).getOrElse("")
         }).mkString("\n"))
         output.newLine
         output.flush
