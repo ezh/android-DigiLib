@@ -215,6 +215,8 @@ object Activity {
         activityDialogGuard = null
       }
       if (d != null) {
+        if (isSet && d == get)
+          log.fatal("overwrite the same dialog")
         log.info("show safe dialog " + d.getClass.getName)
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {

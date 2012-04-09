@@ -195,14 +195,14 @@ protected class AppActivity private () extends Actor with Logging {
   def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
     context =>
       intent.putExtra("__private__", true)
-      flags.foreach(intent.setFlags)
+      flags.foreach(intent.addFlags)
       context.sendBroadcast(intent, DPermission.Base)
   }
   @Loggable
   def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
     context =>
       intent.putExtra("__private__", true)
-      flags.foreach(intent.setFlags)
+      flags.foreach(intent.addFlags)
       context.sendOrderedBroadcast(intent, DPermission.Base)
   }
   @Loggable
