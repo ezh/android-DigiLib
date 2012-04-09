@@ -28,16 +28,17 @@ object DOption extends Enumeration {
   val WriteConnLog: OptVal = Value("write_connection_log")
   val AsRoot: OptVal = Value("as_root")
   val OnBoot: OptVal = Value("on_boot")
-  class OptVal(val r: String, _name: String, _description: String) extends Val(nextId, r) {
+  val Port: OptVal = Value("port", classOf[Int])
+  class OptVal(val r: String, val kind: Class[_], _name: String, _description: String) extends Val(nextId, r) {
     def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
     def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
   }
   object OptVal {
     implicit def value2string_id(v: OptVal): String = v.r
   }
-  protected final def Value(id: String, _name: String = null, _description: String = null): OptVal = {
+  protected final def Value(id: String, kind: Class[_] = classOf[Boolean], _name: String = null, _description: String = null): OptVal = {
     val name = if (_name != null) _name else "option_" + id + "_name"
     val description = if (_description != null) _description else "option_" + id + "_description"
-    new OptVal(id, name, description)
+    new OptVal(id, kind, name, description)
   }
 }
