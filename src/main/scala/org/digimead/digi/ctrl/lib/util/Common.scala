@@ -325,6 +325,23 @@ object Common extends Logging {
       log.error(e.getMessage, e)
       false
   }
+  def unparcelFromList[T <: android.os.Parcelable](s: java.util.List[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] =
+    if (s == null) None else unparcelFromArray[T](s.toList.toArray, loader)
+  def unparcelFromArray[T <: android.os.Parcelable](s: Array[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
+    val p = android.os.Parcel.obtain()
+    p.unmarshall(s, 0, s.length)
+    p.setDataPosition(0)
+    val c = if (loader == null) Class.forName(m.erasure.getName) else Class.forName(m.erasure.getName, true, loader)
+    val f = c.getField("CREATOR")
+    val creator = f.get(null).asInstanceOf[android.os.Parcelable.Creator[T]]
+    val result = Option(creator.createFromParcel(p))
+    p.recycle()
+    result
+  } catch {
+    case e =>
+      log.error("unparcel error", e)
+      None
+  }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =
     serializeToArray(o).toList
   def serializeToArray(o: java.io.Serializable): Array[Byte] = {
@@ -334,14 +351,14 @@ object Common extends Logging {
     oos.close()
     baos.toByteArray()
   }
-  def deserializeFromList(s: java.util.List[Byte]): Option[Object] =
-    if (s == null) None else deserializeFromArray(s.toList.toArray)
-  def deserializeFromArray(s: Array[Byte]): Option[Object] = try {
+  def deserializeFromList[T <: java.io.Serializable](s: java.util.List[Byte])(implicit m: scala.reflect.Manifest[T]): Option[T] =
+    if (s == null) None else deserializeFromArray[T](s.toList.toArray)
+  def deserializeFromArray[T <: java.io.Serializable](s: Array[Byte])(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
     if (s == null) return None
     val ois = new ObjectInputStream(new ByteArrayInputStream(s.toList.toArray))
     val o = ois.readObject()
     ois.close()
-    Some(o)
+    Some(o.asInstanceOf[T])
   } catch {
     case e =>
       log.error("deserialization error", e)

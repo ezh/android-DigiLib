@@ -19,21 +19,15 @@ package org.digimead.digi.ctrl.lib.declaration
 object DProvider {
   val authority = "org.digimead.digi.ctrl"
   case class Row(val session_id: Int,
-    val name: String,
-    val description: String,
-    val componentPackage: String,
     val process_id: Int,
-    val executable_id: Int,
-    val connection_id: Int,
+    val component: Array[Byte],
+    val executable: Array[Byte],
     val connection: Array[Byte])
   object Field extends Enumeration {
     val ID = Value("_id")
-    val Name = Value("name")
-    val Description = Value("description")
-    val ComponentPackage = Value("component_package")
     val ProcessID = Value("process_id")
-    val ExecutableID = Value("executable_id")
-    val ConnectionID = Value("connection_id")
+    val Component = Value("component")
+    val Executable = Value("executable")
     val Connection = Value("connection")
   }
   object Uri extends Enumeration {

@@ -27,7 +27,7 @@ import org.digimead.digi.ctrl.lib.declaration.DState
 import android.os.Parcelable
 import android.os.Parcel
 
-case class ExecutableInfo(val id: Int,
+case class ExecutableInfo(val executableID: Int,
   val commandLine: Option[Seq[String]],
   val port: Option[Int],
   val env: Seq[String],
@@ -38,10 +38,10 @@ case class ExecutableInfo(val id: Int,
   val origin: String,
   val license: String,
   val project: String) extends Parcelable {
-  assert(id >= 0 && id <= 0xFFFF)
+  assert(executableID >= 0 && executableID <= 0xFFFF)
   assert(port == None || (port.get >= 0 && port.get <= 0xFFFF))
   assert(commandLine == None || commandLine.get.nonEmpty)
-  def this(in: Parcel) = this(id = in.readInt,
+  def this(in: Parcel) = this(executableID = in.readInt,
     commandLine = {
       val isNone = in.readByte == 0
       if (isNone) {
@@ -73,7 +73,7 @@ case class ExecutableInfo(val id: Int,
     project = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
     ExecutableInfo.log.debug("writeToParcel ExecutableInfo with flags " + flags)
-    out.writeInt(id)
+    out.writeInt(executableID)
     commandLine match {
       case Some(commandLine) =>
         out.writeByte(1)
