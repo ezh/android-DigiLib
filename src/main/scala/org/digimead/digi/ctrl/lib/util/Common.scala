@@ -224,8 +224,9 @@ object Common extends Logging {
       true
   }
   @Loggable
-  def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.normal)(f: (ICtrlComponent) => Any): Unit = AppActivity.Context foreach {
+  def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppActivity.Context foreach {
     context =>
+      log.debug("start doComponentService with timeout " + operationTimeout)
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
       if (AppActivity.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
         log.debug("reuse service connection")

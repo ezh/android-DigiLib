@@ -178,7 +178,7 @@ trait Activity extends AActivity with AnyBase with Logging {
     }
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
-    log.trace("Activity::registerReceiver")
+    log.trace("Activity::registerReceiver " + receiver)
     assert(!Activity.registeredReceiver.isDefinedAt(receiver))
     Activity.registeredReceiver(receiver) = (filter, null, null)
     super.registerReceiver(receiver, filter)
@@ -188,7 +188,7 @@ trait Activity extends AActivity with AnyBase with Logging {
       null
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
-    log.trace("Activity::registerReceiver")
+    log.trace("Activity::registerReceiver " + receiver)
     assert(!Activity.registeredReceiver.isDefinedAt(receiver))
     Activity.registeredReceiver(receiver) = (filter, broadcastPermission, scheduler)
     super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
@@ -198,7 +198,7 @@ trait Activity extends AActivity with AnyBase with Logging {
       null
   }
   override def unregisterReceiver(receiver: BroadcastReceiver) {
-    log.trace("Activity::unregisterReceiver")
+    log.trace("Activity::unregisterReceiver " + receiver)
     Activity.registeredReceiver.remove(receiver)
     super.unregisterReceiver(receiver)
   }

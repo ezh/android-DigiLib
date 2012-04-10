@@ -51,5 +51,7 @@
     <string name="loading">loading…</string>
     <string name="empty"></string>
     <string name="error_prepare_environment_failed">prepare environment failed</string>
-
+    <string name="Disconnect_All">Disconnect All</string>
+    <string name="session_title">%1$s to %2$s</string>
+    <string name="session_description">%1$s</string>
 </resources>

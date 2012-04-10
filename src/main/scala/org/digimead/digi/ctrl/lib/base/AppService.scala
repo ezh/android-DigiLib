@@ -55,7 +55,9 @@ protected class AppService private () extends Actor with Logging {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
       log.info("connected to DigiControl service")
-      serviceInstance.set(ICtrlHost.Stub.asInterface(iservice))
+      val service = ICtrlHost.Stub.asInterface(iservice)
+      if (service != null)
+        serviceInstance.set(service)
       if (getState == scala.actors.Actor.State.New) {
         log.debug("start AppService singleton actor")
         start() // start service singleton actor
@@ -64,7 +66,7 @@ protected class AppService private () extends Actor with Logging {
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
       log.warn("unexpected disconnect from DigiControl service")
-      serviceInstance.set(null)
+      serviceInstance.unset
     }
   }
 
@@ -152,11 +154,23 @@ protected class AppService private () extends Actor with Logging {
   def unbind(): Unit =
     AppService.unbind(ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
   @Loggable
+  protected def rebind(timeout: Long): Option[ICtrlHost] = {
+    AppActivity.Context.flatMap(_ match {
+      case activity: Activity =>
+        log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
+        bind(activity)
+        get(timeout)
+      case _ =>
+        log.warn("rebind ICtrlHost service failed")
+        None
+    })
+  }
+  @Loggable
   protected def componentStart(componentPackage: String): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.start(componentPackage)
     case None =>
-      false
+      rebind(DTimeout.normal).map(_.start(componentPackage)).getOrElse(false)
   }
   @Loggable
   protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.normal) match {
@@ -174,21 +188,32 @@ protected class AppService private () extends Actor with Logging {
           Left(e.getMessage)
       }
     case None =>
-      Left(componentPackage + " service unreachable")
+      rebind(DTimeout.normal).map(service => try {
+        service.status(componentPackage) match {
+          case status: ComponentState =>
+            Right(status)
+          case null =>
+            log.debug("service return null instread of DComponentStatus")
+            Left("status failed")
+        }
+      } catch {
+        case e =>
+          Left(e.getMessage)
+      }).getOrElse(Left(componentPackage + " service unreachable"))
   }
   @Loggable
   protected def componentStop(componentPackage: String): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.stop(componentPackage)
     case None =>
-      false
+      rebind(DTimeout.normal).map(_.stop(componentPackage)).getOrElse(false)
   }
   @Loggable
   protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.disconnect(componentPackage, processID, connectionID)
     case None =>
-      false
+      rebind(DTimeout.normal).map(_.disconnect(componentPackage, processID, connectionID)).getOrElse(false)
   }
   @Loggable
   def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.normal) match {
@@ -200,7 +225,12 @@ protected class AppService private () extends Actor with Logging {
           Some(list)
       }
     case None =>
-      None
+      rebind(DTimeout.normal).flatMap(_.interfaces(componentPackage) match {
+        case null =>
+          None
+        case list =>
+          Some(list)
+      })
   }
 }
 
