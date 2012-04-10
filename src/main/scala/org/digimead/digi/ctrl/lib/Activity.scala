@@ -155,6 +155,8 @@ trait Activity extends AActivity with AnyBase with Logging {
     onPrepareDialogLib(id: Int, dialog: ADialog)
   }
   private def onPrepareDialogLib(id: Int, dialog: ADialog): Unit = {
+    if (activityDialog.isSet && dialog == activityDialog.get) // guard
+      return
     log.trace("Activity::onPrepareDialog")
     activityDialog.set(dialog)
     id match {

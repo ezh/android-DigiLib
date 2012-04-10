@@ -114,7 +114,7 @@ protected class AppActivity private () extends Actor with Logging {
   } catch {
     case e => log.error(e.getMessage, e); None
   }
-  private[lib] val bindedICtrlPool = new HashMap[String, (ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (ServiceConnection, ICtrlComponent)]
+  private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
   def act = {
     loop {
       react {
@@ -343,6 +343,25 @@ protected class AppActivity private () extends Actor with Logging {
         false
     }
   }
+  @Loggable
+  def synchronizeStateWithICtrlHost() = AppActivity.Context.foreach {
+    activity =>
+      AppService.Inner ! AppService.Message.Status(activity.getPackageName, {
+        case Right(componentState) =>
+          val appState = componentState.state match {
+            case DState.Active =>
+              AppActivity.State(DState.Active)
+            case DState.Broken =>
+              AppActivity.State(DState.Broken, "service failed")
+            case _ =>
+              AppActivity.State(DState.Passive)
+          }
+          AppActivity.Inner.state.set(appState)
+        case Left(error) =>
+          val appState = AppActivity.State(DState.Broken, error)
+          AppActivity.Inner.state.set(appState)
+      })
+  }
   /*protected def listInterfaces(): Either[String, java.util.List[String]] =
     AppService().get() match {
       case Some(service) =>
@@ -380,7 +399,7 @@ object AppActivity extends Logging {
           inner.bindedICtrlPool.keys.foreach(key => {
             inner.bindedICtrlPool.remove(key).map(record => {
               log.debug("remove service connection to " + key + " from bindedICtrlPool")
-              context.unbindService(record._1)
+              record._1.unbindService(record._2)
             })
           })
       }
@@ -429,7 +448,7 @@ object AppActivity extends Logging {
         savedInner.bindedICtrlPool.keys.foreach(key => {
           savedInner.bindedICtrlPool.remove(key).map(record => {
             log.debug("remove service connection to " + key + " from bindedICtrlPool")
-            context.unbindService(record._1)
+            record._1.unbindService(record._2)
           })
         })
     }

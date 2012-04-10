@@ -70,12 +70,14 @@ object AnyBase extends Logging {
       case activity: Activity =>
         if (!contextPool.exists(_.get == context)) {
           contextPool = contextPool :+ new WeakReference(context)
+          updateContext()
           if (contextPool.isEmpty)
             AppActivity.init(context)
         }
       case service: Service =>
         if (!contextPool.exists(_.get == context)) {
           contextPool = contextPool :+ new WeakReference(context)
+          updateContext()
           if (contextPool.isEmpty)
             AppService.init(context)
         }
@@ -96,12 +98,20 @@ object AnyBase extends Logging {
       Report.init(context)
       uncaughtExceptionHandler.register(context)
       log.debug("start AppActivity singleton actor")
-      // start activity singleton actor
       AppActivity.Inner.start
     }
   }
   def deinit(context: Context) = synchronized {
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
+    AppActivity.Inner.bindedICtrlPool.foreach(t => {
+      val key = t._1
+      val (bindContext, connection, component) = t._2
+      if (bindContext == context)
+        AppActivity.Inner.bindedICtrlPool.remove(key).map(record => {
+          log.debug("remove service connection to " + key + " from bindedICtrlPool")
+          record._1.unbindService(record._2)
+        })
+    })
     contextPool = contextPool.filter(_.get != context)
     updateContext()
   }
@@ -112,13 +122,14 @@ object AnyBase extends Logging {
     case None => updateContext()
     case result: Some[_] => result
   }
-  private def updateContext(): Option[Context] = {
-    contextPool = contextPool.filter(_.get != None).sortBy(n => n match {
-      case activity if activity.isInstanceOf[android.app.Activity] => 1
-      case service if service.isInstanceOf[android.app.Service] => 2
+  private def updateContext(): Option[Context] = synchronized {
+    contextPool = contextPool.filter(_.get != None).sortBy(n => n.get match {
+      case Some(activity) if activity.isInstanceOf[android.app.Activity] => 1
+      case Some(service) if service.isInstanceOf[android.app.Service] => 2
       case _ => 3
     })
-    contextPool.headOption.flatMap(_.get)
+    contextPool.headOption.foreach(currentContext = _)
+    currentContext.get
   }
   case class Info(val reportPath: File,
     val appVersion: String,

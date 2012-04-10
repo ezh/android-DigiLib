@@ -229,7 +229,7 @@ object Common extends Logging {
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
       if (AppActivity.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
         log.debug("reuse service connection")
-        f(AppActivity.Inner.bindedICtrlPool(componentPackage)._2)
+        f(AppActivity.Inner.bindedICtrlPool(componentPackage)._3)
         return
       }
       // lock for bindService
@@ -259,7 +259,7 @@ object Common extends Logging {
             if (service != null) {
               if (reuse) {
                 log.debug("add service connection to bindedICtrlPool")
-                AppActivity.Inner.bindedICtrlPool(componentPackage) = (connection, service)
+                AppActivity.Inner.bindedICtrlPool(componentPackage) = (context, connection, service)
               }
               f(service)
             }

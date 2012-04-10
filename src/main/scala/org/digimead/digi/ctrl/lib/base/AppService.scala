@@ -47,7 +47,7 @@ import android.os.IBinder
 
 protected class AppService private () extends Actor with Logging {
   private val lock = new Object
-  protected lazy val serviceInstance = new AtomicReference[ICtrlHost](null)
+  protected lazy val serviceInstance = new SyncVar[ICtrlHost]()
   protected lazy val ctrlBindContext = new AtomicReference[Activity](null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
 
@@ -132,13 +132,19 @@ protected class AppService private () extends Actor with Logging {
       }
     }
   }
-  def get(): Option[ICtrlHost] = get(true)
-  def get(throwError: Boolean): Option[ICtrlHost] = AppService.get(throwError, serviceInstance)
+  def get(): Option[ICtrlHost] =
+    get(true)
+  def get(timeout: Long): Option[ICtrlHost] =
+    get(timeout, true)
+  def get(throwError: Boolean): Option[ICtrlHost] =
+    get(0, true)
+  def get(timeout: Long, throwError: Boolean): Option[ICtrlHost] =
+    AppService.get(timeout, throwError, serviceInstance)
+  def getWait(): ICtrlHost =
+    getWait(true)
   @Loggable
-  def getWait() = {
-    this !? AppService.Message.Ping // actor start ONLY after successful binding
-    get
-  }
+  def getWait(throwError: Boolean): ICtrlHost =
+    AppService.get(-1, throwError, serviceInstance).get
   @Loggable
   def bind(caller: Activity): Unit =
     AppService.bind(caller, ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
@@ -146,14 +152,14 @@ protected class AppService private () extends Actor with Logging {
   def unbind(): Unit =
     AppService.unbind(ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
   @Loggable
-  protected def componentStart(componentPackage: String): Boolean = get match {
+  protected def componentStart(componentPackage: String): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.start(componentPackage)
     case None =>
       false
   }
   @Loggable
-  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get match {
+  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.normal) match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
@@ -171,21 +177,21 @@ protected class AppService private () extends Actor with Logging {
       Left(componentPackage + " service unreachable")
   }
   @Loggable
-  protected def componentStop(componentPackage: String): Boolean = get match {
+  protected def componentStop(componentPackage: String): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.stop(componentPackage)
     case None =>
       false
   }
   @Loggable
-  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get match {
+  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.normal) match {
     case Some(service) =>
       service.disconnect(componentPackage, processID, connectionID)
     case None =>
       false
   }
   @Loggable
-  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get match {
+  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.normal) match {
     case Some(service) =>
       service.interfaces(componentPackage) match {
         case null =>
@@ -285,25 +291,36 @@ object AppService extends Logging {
     } else
       true
   }
-  private def get(throwError: Boolean, serviceInstance: AtomicReference[ICtrlHost]): Option[ICtrlHost] = synchronized {
-    if (!throwError)
-      return serviceInstance.get() match {
+  private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[ICtrlHost]): Option[ICtrlHost] = synchronized {
+    if (timeout == -1) {
+      if (!throwError)
+        return Some(serviceInstance.get)
+      serviceInstance.get match {
         case service: ICtrlHost => Some(service)
-        case null => None
+        case null =>
+          val t = new Throwable("Intospecting stack frame")
+          t.fillInStackTrace()
+          log.error("uninitialized ICtrlHost at AppService: " + t.getStackTraceString)
+          Some(null)
       }
-    serviceInstance.get match {
-      case service: ICtrlHost => Some(service)
-      case null =>
-        val t = new Throwable("Intospecting stack frame")
-        t.fillInStackTrace()
-        log.error("uninitialized ICtrlHost at AppService: " + t.getStackTraceString)
-        None
+    } else {
+      assert(timeout >= 0)
+      if (!throwError)
+        return serviceInstance.get(timeout)
+      serviceInstance.get(timeout) match {
+        case result @ Some(service) => result
+        case None =>
+          val t = new Throwable("Intospecting stack frame")
+          t.fillInStackTrace()
+          log.error("uninitialized ICtrlHost at AppService: " + t.getStackTraceString)
+          None
+      }
     }
   }
   private def bind(caller: Activity, ctrlBindContext: AtomicReference[Activity], ctrlBindCounter: AtomicInteger,
-    serviceInstance: AtomicReference[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
+    serviceInstance: SyncVar[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
     if (ctrlBindCounter.incrementAndGet() == 1)
-      if (serviceInstance.get == null && ctrlBindContext.compareAndSet(null, caller)) {
+      if (!serviceInstance.isSet && ctrlBindContext.compareAndSet(null, caller)) {
         val intent = new Intent(DIntent.HostService)
         intent.putExtra("packageName", caller.getPackageName())
         val successful = new SyncVar[Boolean]
@@ -322,13 +339,13 @@ object AppService extends Logging {
         log.fatal("service " + DIntent.HostService + " already binding/binded")
   }
   private def unbind(ctrlBindContext: AtomicReference[Activity], ctrlBindCounter: AtomicInteger,
-    serviceInstance: AtomicReference[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
+    serviceInstance: SyncVar[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
     if (ctrlBindCounter.decrementAndGet() == 0)
       if (serviceInstance.get != null && ctrlBindContext.get != null) {
         log.info("unbind from service " + DIntent.HostService)
         val caller = ctrlBindContext.getAndSet(null)
         caller.runOnUiThread(new Runnable { def run = caller.unbindService(ctrlConnection) })
-        serviceInstance.set(null)
+        serviceInstance.unset
       } else
         log.warn("service already unbinded")
   }
