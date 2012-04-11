@@ -29,7 +29,7 @@ case class IAmBusy(val origin: Origin,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
     if (logger.isTraceEnabled)
-      logger.infoWhere("IAmBusy " + message)(3)
+      logger.infoWhere("IAmBusy " + message, 3)
     else
       logger.info("IAmBusy " + message)
   dispatcher.process(this)

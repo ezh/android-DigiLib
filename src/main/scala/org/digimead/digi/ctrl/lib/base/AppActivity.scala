@@ -33,7 +33,6 @@ import scala.collection.JavaConversions._
 import scala.collection.immutable.LongMap
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
-import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 import scala.xml.Node
 import scala.xml.XML
@@ -53,6 +52,7 @@ import org.digimead.digi.ctrl.lib.info.ComponentInfo
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.Version
+import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.ICtrlComponent
 
 import android.app.Activity
@@ -66,17 +66,17 @@ protected class AppActivity private () extends Actor with Logging {
     private var lastNonBusyState: AppActivity.State = null
     private var busyCounter = 0
     set(AppActivity.State(DState.Unknown))
-    override def set(newState: AppActivity.State) = synchronized {
+    override def set(newState: AppActivity.State, signalAll: Boolean = true): Unit = synchronized {
       if (newState.code == DState.Busy) {
         busyCounter += 1
         log.debug("increase status busy counter to " + busyCounter)
         if (isSet && get.code != DState.Busy)
           lastNonBusyState = get
-        super.set(newState)
+        super.set(newState, signalAll)
       } else if (busyCounter != 0) {
         lastNonBusyState = newState
       } else
-        super.set(newState)
+        super.set(newState, signalAll)
       log.debug("set status to " + newState)
       AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
@@ -422,7 +422,7 @@ object AppActivity extends Logging {
         val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
         log.info("deinitializing AppActivity for " + packageName)
         if (deinitializationLock.isSet)
-          deinitializationLock.unset
+          deinitializationLock.unset()
         deinitializationLock.get(deinitializationTimeout) match {
           case Some(false) =>
             log.info("deinitialization AppActivity for " + packageName + " canceled")
@@ -497,6 +497,6 @@ object AppActivity extends Logging {
   case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
   }) extends Logging {
-    log.debugWhere("create new state " + code)(3)
+    log.debugWhere("create new state " + code, 3)
   }
 }

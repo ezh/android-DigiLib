@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl;
 
+import android.content.Intent;
 import org.digimead.digi.ctrl.lib.info.ComponentState;
 
 interface ICtrlHost {
@@ -25,4 +26,5 @@ interface ICtrlHost {
   boolean stop(in String componentPackage);
   boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
   List<String> interfaces(in String componentPackage);
+  List<Intent> pending_connections(in String componentPackage);
 }

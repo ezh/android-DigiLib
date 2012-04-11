@@ -58,7 +58,9 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   }
   def trace(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg, Some(t)))
-  def traceWhere(msg: String)(stackLine: Int = -1) =
+  def traceWhere(msg: String): Unit =
+    logWhere(msg, trace, trace)(4)
+  def traceWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, trace, trace)(stackLine)
 
   // debug
@@ -80,7 +82,9 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   }
   def debug(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg, Some(t)))
-  def debugWhere(msg: String)(stackLine: Int = -1) =
+  def debugWhere(msg: String): Unit =
+    logWhere(msg, debug, debug)(4)
+  def debugWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, debug, debug)(stackLine)
 
   // info
@@ -103,7 +107,9 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   }
   def info(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg, Some(t)))
-  def infoWhere(msg: String)(stackLine: Int = -1) =
+  def infoWhere(msg: String): Unit =
+    logWhere(msg, info, info)(4)
+  def infoWhere(msg: String, stackLine: Int = 4): Unit =
     logWhere(msg, info, info)(stackLine)
 
   // warn
@@ -126,7 +132,9 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   }
   def warn(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg, Some(t)))
-  def warnWhere(msg: String)(stackLine: Int = -1) =
+  def warnWhere(msg: String): Unit =
+    logWhere(msg, warn, warn)(4)
+  def warnWhere(msg: String, stackLine: Int = 4): Unit =
     logWhere(msg, warn, warn)(stackLine)
 
   // error
@@ -151,7 +159,9 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
       ExceptionHandler.generateStackTrace(Thread.currentThread, t)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg, Some(t)))
   }
-  def errorWhere(msg: String)(stackLine: Int = -1) =
+  def errorWhere(msg: String): Unit =
+    logWhere(msg, error, error)(4)
+  def errorWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, error, error)(stackLine)
 
   private def logWhere(msg: String, f1: (String, Throwable) => Unit, f2: (String => Unit))(stackLine: Int) {

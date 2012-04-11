@@ -21,7 +21,6 @@ import java.util.Date
 
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
-import scala.concurrent.SyncVar
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -32,6 +31,7 @@ import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.ExceptionHandler
+import org.digimead.digi.ctrl.lib.util.SyncVar
 
 import android.content.Context
 

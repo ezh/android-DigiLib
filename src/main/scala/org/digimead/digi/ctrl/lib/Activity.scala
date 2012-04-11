@@ -16,23 +16,23 @@
 
 package org.digimead.digi.ctrl.lib
 
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
-import scala.annotation.elidable
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
-import scala.concurrent.SyncVar
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.dialog.Report
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Common
+import org.digimead.digi.ctrl.lib.util.SyncVar
 
 import android.accounts.AccountManager
 import android.app.{ Activity => AActivity }
@@ -43,10 +43,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
-import annotation.elidable.ASSERTION
 import declaration.DTimeout
 
 /*
@@ -54,13 +54,7 @@ import declaration.DTimeout
  */
 trait Activity extends AActivity with AnyBase with Logging {
   protected[lib] val activityDialog = new Activity.Dialog
-  lazy val uiThreadID: Long = {
-    val id = new SyncVar[Long]()
-    runOnUiThread(new Runnable {
-      def run = id.set(Thread.currentThread.getId)
-    })
-    id.get
-  }
+  val uiThreadID: Long = Looper.getMainLooper.getThread.getId
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
@@ -69,17 +63,17 @@ trait Activity extends AActivity with AnyBase with Logging {
     log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
     Activity.registeredReceiver.clear // sometimes onDestroy skipped, there is no harm to drop garbage
-    activityDialog.set(new ADialog(this)) // lock
+    activityDialog.set(null) // lock
   }
   override def onResume() = {
     log.trace("Activity::onResume")
     Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
-    activityDialog.set(null) // unlock
+    activityDialog.unset()
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
-    activityDialog.set(null) // unlock
+    activityDialog.set(null) // lock
     Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
     super.onPause()
   }
@@ -101,13 +95,19 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   def showDialogSafe(id: Int, args: Bundle = null) = future {
     try {
-      log.trace("Activity::showDialogSafe")
+      log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
+      assert(uiThreadID != Thread.currentThread.getId)
       activityDialog.synchronized {
-        while (activityDialog.get != null)
+        while (activityDialog.get(0) match {
+          case Some(d) => log.debug("wait previous safe dialog" + d); true
+          case None => false
+        }) {
           activityDialog.wait
-        activityDialog.unset
-        log.debug("show dialog " + id)
+          Thread.sleep(500) // short gap between dialogs
+        }
+        activityDialog.unset()
         runOnUiThread(new Runnable { def run = if (args == null) showDialog(id) else showDialog(id, args) })
+        log.debug("show new safe dialog " + id)
       }
     } catch {
       case e =>
@@ -115,20 +115,23 @@ trait Activity extends AActivity with AnyBase with Logging {
         None
     }
   }
-  def showDialogSafe[T <% ADialog](dialog: () => T): Option[T] = activityDialog.synchronized {
+  def showDialogSafe[T <: ADialog](dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Option[T] = {
     try {
-      log.trace("Activity::showDialogSafe")
+      log.trace("Activity::showDialogSafe " + m.erasure.getName + "at thread " + currentThread.getId + " and ui " + uiThreadID)
       assert(uiThreadID != Thread.currentThread.getId)
-      while (activityDialog.get != null)
-        activityDialog.wait
-      activityDialog.unset
-      this.runOnUiThread(new Runnable { def run = activityDialog.set(dialog()) })
-      activityDialog.get.asInstanceOf[T] match {
-        case null =>
-          None
-        case d =>
-          Some(d)
+      activityDialog.synchronized {
+        while (activityDialog.get(0) match {
+          case Some(d) => log.debug("wait previous safe dialog" + d); true
+          case None => false
+        }) {
+          activityDialog.wait
+          Thread.sleep(500) // short gap between dialogs
+        }
+        activityDialog.unset()
+        this.runOnUiThread(new Runnable { def run = activityDialog.set(dialog()) })
+        log.debug("show new safe dialog " + activityDialog.get)
       }
+      Option(activityDialog.get.asInstanceOf[T])
     } catch {
       case e =>
         log.error(e.getMessage, e)
@@ -146,11 +149,11 @@ trait Activity extends AActivity with AnyBase with Logging {
         super.onCreateDialog(id)
     }
   }
-  override def onPrepareDialog(id: Int, dialog: ADialog): Unit = activityDialog.synchronized {
+  override def onPrepareDialog(id: Int, dialog: ADialog): Unit = {
     super.onPrepareDialog(id, dialog)
     onPrepareDialogLib(id: Int, dialog: ADialog)
   }
-  override def onPrepareDialog(id: Int, dialog: ADialog, args: Bundle): Unit = activityDialog.synchronized {
+  override def onPrepareDialog(id: Int, dialog: ADialog, args: Bundle): Unit = {
     super.onPrepareDialog(id, dialog, args)
     onPrepareDialogLib(id: Int, dialog: ADialog)
   }
@@ -207,19 +210,41 @@ trait Activity extends AActivity with AnyBase with Logging {
 object Activity {
   /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
   private val registeredReceiver = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
-  class Dialog extends SyncVar[ADialog]() with Logging {
+  class Dialog extends SyncVar[ADialog] with Logging {
     private var activityDialogGuard: ScheduledExecutorService = null
-    super.set(null)
+    private val isPrivateReplace = new AtomicBoolean(false)
+    private val lock = new Object
+
     @Loggable
-    override def set(d: ADialog) = synchronized {
+    override def set(d: ADialog, signalAll: Boolean = true): Unit = lock.synchronized {
+      log.debug("set safe dialog to '" + d + "'")
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
       }
+      get(0) match {
+        case Some(previousDialog) if previousDialog != null =>
+          if (d == previousDialog) {
+            log.fatal("overwrite the same dialog '" + d + "'")
+            return
+          }
+          log.info("replace safe dialog '" + value + "' with new one '" + d + "'")
+          isPrivateReplace.synchronized {
+            if (previousDialog.isShowing) {
+              // we want replace dialog
+              isPrivateReplace.set(true)
+              previousDialog.dismiss
+              while (isSet && isPrivateReplace.get)
+                isPrivateReplace.wait
+            } else {
+              log.warn("replace hidden safe dialog")
+              previousDialog.setOnDismissListener(null)
+              previousDialog.dismiss
+            }
+          }
+        case _ =>
+      }
       if (d != null) {
-        if (isSet && d == get)
-          log.fatal("overwrite the same dialog")
-        log.info("show safe dialog " + d.getClass.getName)
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {
           def run() = {
@@ -240,20 +265,25 @@ object Activity {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
-            Dialog.super.set(null)
-            Dialog.this.notify
+            if (isPrivateReplace.getAndSet(false)) {
+              // there is set(N) waiting for us
+              // do it silent for external routines
+              isPrivateReplace.synchronized {
+                value.set(false, null)
+                isPrivateReplace.notifyAll
+              }
+            } else {
+              unset(false)
+              Dialog.this.notifyAll()
+            }
           }
         })
-      } else {
-        if (isSet)
-          get match {
-            case d: Dialog => d.dismiss
-            case _ =>
-          }
-        log.info("reset safe dialog")
       }
-      super.set(d)
-      notify
+      super.set(d, signalAll)
+    }
+    override def unset(signalAll: Boolean = true) = {
+      log.debug("unset safe dialog " + value.get._2)
+      super.unset(signalAll)
     }
   }
   object Dialog {

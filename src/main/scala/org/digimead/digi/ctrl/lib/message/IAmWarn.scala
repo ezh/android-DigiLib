@@ -30,7 +30,7 @@ case class IAmWarn(val origin: Origin, val message: String,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
     if (logger.isTraceEnabled)
-      logger.warnWhere("IAmWarn " + message)(4)
+      logger.warnWhere("IAmWarn " + message)
     else
       logger.warn("IAmWarn " + message)
   dispatcher.process(this)

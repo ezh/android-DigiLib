@@ -326,9 +326,19 @@ object Common extends Logging {
       log.error(e.getMessage, e)
       false
   }
+  def parcelToList(o: android.os.Parcelable, flags: Int = 0): java.util.List[Byte] =
+    parcelToArray(o).toList
+  def parcelToArray(o: android.os.Parcelable, flags: Int = 0): Array[Byte] = {
+    val parcel = android.os.Parcel.obtain
+    o.writeToParcel(parcel, flags)
+    val result = parcel.marshall
+    parcel.recycle()
+    result
+  }
   def unparcelFromList[T <: android.os.Parcelable](s: java.util.List[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] =
     if (s == null) None else unparcelFromArray[T](s.toList.toArray, loader)
   def unparcelFromArray[T <: android.os.Parcelable](s: Array[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
+    assert(m.erasure.getName != "java.lang.Object")
     val p = android.os.Parcel.obtain()
     p.unmarshall(s, 0, s.length)
     p.setDataPosition(0)
@@ -340,7 +350,7 @@ object Common extends Logging {
     result
   } catch {
     case e =>
-      log.error("unparcel error", e)
+      log.error("unparcel '" + m.erasure.getName + "' error", e)
       None
   }
   def serializeToList(o: java.io.Serializable): java.util.List[Byte] =

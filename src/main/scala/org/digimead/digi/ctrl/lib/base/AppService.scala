@@ -25,7 +25,6 @@ import java.util.concurrent.locks.ReentrantLock
 import scala.actors.Futures.future
 import scala.actors.Actor
 import scala.collection.JavaConversions._
-import scala.concurrent.SyncVar
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -35,6 +34,7 @@ import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.ICtrlHost
@@ -66,7 +66,7 @@ protected class AppService private () extends Actor with Logging {
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
       log.warn("unexpected disconnect from DigiControl service")
-      serviceInstance.unset
+      serviceInstance.unset()
     }
   }
 
@@ -127,6 +127,16 @@ protected class AppService private () extends Actor with Logging {
               log.error(e.getMessage, e)
           }
           log.debug("return from message ListInterfaces for " + componentPackage)
+        case AppService.Message.ListPendingConnections(componentPackage, onCompleteCallback) =>
+          assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
+          log.info("receive message ListPendingConnections for " + componentPackage)
+          try {
+            onCompleteCallback(componentPendingConnections(componentPackage))
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          log.debug("return from message ListPendingConnections for " + componentPackage)
         case message: AnyRef =>
           log.error("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -232,6 +242,23 @@ protected class AppService private () extends Actor with Logging {
           Some(list)
       })
   }
+  @Loggable
+  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(DTimeout.normal) match {
+    case Some(service) =>
+      service.pending_connections(componentPackage) match {
+        case null =>
+          None
+        case list =>
+          Some(list)
+      }
+    case None =>
+      rebind(DTimeout.normal).flatMap(_.pending_connections(componentPackage) match {
+        case null =>
+          None
+        case list =>
+          Some(list)
+      })
+  }
 }
 
 object AppService extends Logging {
@@ -269,7 +296,7 @@ object AppService extends Logging {
         val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
         log.info("deinitializing AppService for " + packageName)
         if (deinitializationLock.isSet)
-          deinitializationLock.unset
+          deinitializationLock.unset()
         deinitializationLock.get(deinitializationTimeout) match {
           case Some(false) =>
             log.info("deinitialization AppService for " + packageName + " canceled")
@@ -375,7 +402,7 @@ object AppService extends Logging {
         log.info("unbind from service " + DIntent.HostService)
         val caller = ctrlBindContext.getAndSet(null)
         caller.runOnUiThread(new Runnable { def run = caller.unbindService(ctrlConnection) })
-        serviceInstance.unset
+        serviceInstance.unset()
       } else
         log.warn("service already unbinded")
   }
@@ -393,5 +420,6 @@ object AppService extends Logging {
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
     case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null)
     case class ListInterfaces(componentPackage: String, onCompleteCallback: (Option[Seq[String]]) => Unit = null)
+    case class ListPendingConnections(componentPackage: String, onCompleteCallback: (Option[Seq[Intent]]) => Unit = null)
   }
 }
