@@ -93,7 +93,7 @@ trait Activity extends AActivity with AnyBase with Logging {
       Activity.super.onDestroy()
     })
   }
-  def showDialogSafe(id: Int, args: Bundle = null) = future {
+  def showDialogSafe(id: Int, args: Bundle = null): Option[ADialog] = {
     try {
       log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
       assert(uiThreadID != Thread.currentThread.getId)
@@ -109,6 +109,7 @@ trait Activity extends AActivity with AnyBase with Logging {
         runOnUiThread(new Runnable { def run = if (args == null) showDialog(id) else showDialog(id, args) })
         log.debug("show new safe dialog " + id)
       }
+      activityDialog.get(DTimeout.longest)
     } catch {
       case e =>
         log.error(e.getMessage, e)
@@ -131,11 +132,23 @@ trait Activity extends AActivity with AnyBase with Logging {
         this.runOnUiThread(new Runnable { def run = activityDialog.set(dialog()) })
         log.debug("show new safe dialog " + activityDialog.get)
       }
-      Option(activityDialog.get.asInstanceOf[T])
+      activityDialog.get(DTimeout.longest).asInstanceOf[Option[T]]
     } catch {
       case e =>
         log.error(e.getMessage, e)
         None
+    }
+  }
+  def waitSafeDialogAndGap(timeout: Long) = {
+    while (activityDialog.get(0) match {
+      case Some(d) => log.debug("wait previous safe dialog" + d); true
+      case None => false
+    }) {
+      activityDialog.synchronized {
+        activityDialog.wait
+        activityDialog.notifyAll
+      }
+      Thread.sleep(timeout)
     }
   }
   override def onCreateDialog(id: Int): ADialog = {
