@@ -21,7 +21,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
@@ -59,9 +60,14 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.DialogInterface
 import annotation.elidable.ASSERTION
+import android.os.Bundle
+import android.app.Dialog
+import android.os.Looper
 
 protected class AppActivity private () extends Actor with Logging {
+  private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
   lazy val state = new SyncVar[AppActivity.State]() with Logging {
     private var lastNonBusyState: AppActivity.State = null
     private var busyCounter = 0
@@ -115,6 +121,59 @@ protected class AppActivity private () extends Actor with Logging {
     case e => log.error(e.getMessage, e); None
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
+  private val isSafeDialogEnabled = new AtomicBoolean(false)
+  val activitySafeDialog = new AppActivity.SafeDialog
+  private val activitySafeDialogActor = new Actor {
+    def act = {
+      loop {
+        react {
+          case AppActivity.Message.ShowDialog(activity, dialog, onDismiss) =>
+            val s = sender
+            log.info("receive message ShowDialog " + dialog)
+            // wait for previous dialog
+            activitySafeDialog.synchronized {
+              while (activitySafeDialog.isSet)
+                activitySafeDialog.wait
+            }
+            // wait isSafeDialogEnabled
+            isSafeDialogEnabled.synchronized {
+              while (!isSafeDialogEnabled.get)
+                isSafeDialogEnabled.wait
+            }
+            // show dialog
+            val result = onMessageShowDialog(activity, dialog, onDismiss)
+            log.debug("return from message ShowDialog with result " + result)
+            if (s.receiver.getState == Actor.State.Blocked)
+              s ! result // only for ShowDialogSafeWait
+          case AppActivity.Message.ShowDialogResource(activity, dialog, args, onDismiss) =>
+            val s = sender
+            log.info("receive message ShowDialogResource " + dialog)
+            // wait for previous dialog
+            activitySafeDialog.synchronized {
+              while (activitySafeDialog.isSet)
+                activitySafeDialog.wait
+            }
+            // wait isSafeDialogEnabled
+            isSafeDialogEnabled.synchronized {
+              while (!isSafeDialogEnabled.get)
+                isSafeDialogEnabled.wait
+            }
+            // show dialog
+            val result = onMessageShowDialogResource(activity, dialog, args, onDismiss)
+            log.debug("return from message ShowDialog with result " + result)
+            if (s.receiver.getState == Actor.State.Blocked)
+              s ! result // only for ShowDialogSafeWait
+          case message: AnyRef =>
+            log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
+          case message =>
+            log.errorWhere("skip unknown message " + message)
+        }
+      }
+    }
+  }
+  activitySafeDialogActor.start
+  log.debug("disable safe dialogs")
+
   def act = {
     loop {
       react {
@@ -124,10 +183,73 @@ protected class AppActivity private () extends Actor with Logging {
           else
             callback(prepareEnvironment(activity, keep, public))
         case message: AnyRef =>
-          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
-          log.error("skip unknown message " + message)
+          log.errorWhere("skip unknown message " + message)
       }
+    }
+  }
+  def showDialogSafe(activity: Activity, id: Int): Unit =
+    showDialogSafe(activity, id, null)
+  def showDialogSafe(activity: Activity, id: Int, args: Bundle): Unit =
+    showDialogSafe(activity, id, args, null)
+  @Loggable
+  def showDialogSafe(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit) {
+    log.trace("Activity::showDialogSafe id " + id)
+    activitySafeDialogActor ! AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
+  }
+  def showDialogSafeWait(activity: Activity, id: Int): Option[Dialog] =
+    showDialogSafeWait(activity, id, null)
+  def showDialogSafeWait(activity: Activity, id: Int, args: Bundle): Option[Dialog] =
+    showDialogSafeWait(activity, id, args, null)
+  @Loggable
+  def showDialogSafeWait(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit): Option[Dialog] = try {
+    log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
+    assert(uiThreadID != Thread.currentThread.getId)
+    (activitySafeDialogActor !? AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      None
+  }
+  def showDialogSafe[T <: Dialog](activity: Activity, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Unit =
+    showDialogSafe[T](activity, dialog, null)
+  @Loggable
+  def showDialogSafe[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]) {
+    log.trace("Activity::showDialogSafe " + m.erasure.getName)
+    activitySafeDialogActor ! AppActivity.Message.ShowDialog(activity, dialog, Option(onDismiss))
+  }
+  def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Option[T] =
+    showDialogSafeWait[T](activity, dialog, null)
+  @Loggable
+  def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
+    log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + currentThread.getId + " and ui " + uiThreadID)
+    assert(uiThreadID != Thread.currentThread.getId)
+    (activitySafeDialogActor !? AppActivity.Message.ShowDialog(activity, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      None
+  }
+  @Loggable
+  def setDialogSafe(dialog: Dialog) {
+    assert(!activitySafeDialog.isSet)
+    activitySafeDialog.put(dialog)
+  }
+  @Loggable
+  def enableSafeDialogs() {
+    log.debug("enable safe dialogs")
+    isSafeDialogEnabled.synchronized {
+      isSafeDialogEnabled.set(true)
+      isSafeDialogEnabled.notifyAll
+    }
+  }
+  @Loggable
+  def disableSafeDialogs() {
+    log.debug("disable safe dialogs")
+    isSafeDialogEnabled.synchronized {
+      isSafeDialogEnabled.set(false)
+      isSafeDialogEnabled.notifyAll
     }
   }
   @Loggable
@@ -374,12 +496,52 @@ protected class AppActivity private () extends Actor with Logging {
       case None =>
         Left("service unreachable")
     }*/
+  @Loggable
+  private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
+    assert(!activitySafeDialog.isSet)
+    activity.runOnUiThread(new Runnable { def run = activitySafeDialog.set(dialog()) })
+    log.debug("show new safe dialog " + activitySafeDialog.get)
+    (activitySafeDialog.get(DTimeout.longest) match {
+      case Some(d) =>
+        log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
+        Option(d)
+      case None =>
+        log.error("unable to show safe dialog for " + m.erasure.getName)
+        None
+    })
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      None
+  }
+  @Loggable
+  private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
+    assert(!activitySafeDialog.isSet)
+    activity.runOnUiThread(new Runnable {
+      def run = args match {
+        case Some(bundle) => activity.showDialog(id, bundle)
+        case None => activity.showDialog(id)
+      }
+    })
+    activitySafeDialog.get(DTimeout.longest) match {
+      case Some(d) =>
+        log.debug("show new safe dialog " + d + " for id " + id)
+        Option(d)
+      case None =>
+        log.error("unable to show safe dialog for id " + id)
+        None
+    }
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      None
+  }
 }
 
 object AppActivity extends Logging {
   @volatile private var inner: AppActivity = null
   private val deinitializationLock = new SyncVar[Boolean]()
-  private val deinitializationProgress = new ReentrantLock
+  private val deinitializationInProgressLock = new AtomicBoolean(false)
   private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
@@ -411,13 +573,14 @@ object AppActivity extends Logging {
       inner = new AppActivity()
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect() =
-    if (deinitializationProgress.isLocked) {
-      log.info("resurrect AppActivity core subsystem")
-      deinitializationLock.set(false)
-    }
+  private[lib] def resurrect() = deinitializationInProgressLock.synchronized {
+    while (deinitializationInProgressLock.get)
+      deinitializationInProgressLock.wait
+    log.info("resurrect AppActivity core subsystem")
+    deinitializationLock.set(false)
+  }
   private[lib] def deinit(): Unit = future {
-    if (deinitializationProgress.tryLock)
+    if (deinitializationInProgressLock.compareAndSet(false, true))
       try {
         val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
         log.info("deinitializing AppActivity for " + packageName)
@@ -430,7 +593,10 @@ object AppActivity extends Logging {
             deinitRoutine(packageName)
         }
       } finally {
-        deinitializationProgress.unlock
+        deinitializationInProgressLock.synchronized {
+          deinitializationInProgressLock.set(false)
+          deinitializationInProgressLock.notifyAll
+        }
       }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
@@ -490,9 +656,98 @@ object AppActivity extends Logging {
     def isEmpty = synchronized { pool.isEmpty }
     def nonEmpty = synchronized { pool.nonEmpty }
   }
+  class SafeDialog extends SyncVar[Dialog] with Logging {
+    private var activityDialogGuard: ScheduledExecutorService = null
+    private val isPrivateReplace = new AtomicBoolean(false)
+    private val lock = new Object
+
+    @Loggable
+    override def set(d: Dialog, signalAll: Boolean = true): Unit = lock.synchronized {
+      log.debug("set safe dialog to '" + d + "'")
+      if (activityDialogGuard != null) {
+        activityDialogGuard.shutdownNow
+        activityDialogGuard = null
+      }
+      get(0) match {
+        case Some(previousDialog) if previousDialog != null =>
+          if (d == previousDialog) {
+            log.fatal("overwrite the same dialog '" + d + "'")
+            return
+          }
+          log.info("replace safe dialog '" + value + "' with new one '" + d + "'")
+          isPrivateReplace.synchronized {
+            if (previousDialog.isShowing) {
+              // we want replace dialog
+              isPrivateReplace.set(true)
+              previousDialog.dismiss
+              while (isSet && isPrivateReplace.get)
+                isPrivateReplace.wait
+            } else {
+              log.warn("replace hidden safe dialog")
+              previousDialog.setOnDismissListener(null)
+              previousDialog.dismiss
+            }
+          }
+        case _ =>
+      }
+      if (d != null) {
+        activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
+        activityDialogGuard.schedule(new Runnable {
+          def run() = {
+            log.fatal("dismiss stalled dialog " + d.getClass.getName)
+            if (activityDialogGuard != null) {
+              activityDialogGuard.shutdownNow
+              activityDialogGuard = null
+            }
+            if (d.isShowing)
+              d.dismiss
+          }
+        }, DTimeout.longest, TimeUnit.MILLISECONDS)
+        d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
+          @Loggable
+          override def onDismiss(dialog: DialogInterface) = SafeDialog.this.synchronized {
+            log.info("dismiss safe dialog " + d.getClass.getName)
+            if (activityDialogGuard != null) {
+              activityDialogGuard.shutdownNow
+              activityDialogGuard = null
+            }
+            if (isPrivateReplace.getAndSet(false)) {
+              // there is set(N) waiting for us
+              // do it silent for external routines
+              isPrivateReplace.synchronized {
+                value.set(false, null)
+                isPrivateReplace.notifyAll
+              }
+            } else {
+              unset(false)
+              SafeDialog.this.notifyAll()
+            }
+          }
+        })
+      }
+      super.set(d, signalAll)
+    }
+    override def unset(signalAll: Boolean = true) = {
+      log.debug("unset safe dialog " + value.get._2)
+      if (activityDialogGuard != null) {
+        activityDialogGuard.shutdownNow
+        activityDialogGuard = null
+      }
+      super.get(0).foreach {
+        previousDialog =>
+          if (previousDialog != null && previousDialog.isShowing) {
+            previousDialog.setOnDismissListener(null)
+            previousDialog.dismiss
+          }
+      }
+      super.unset(signalAll)
+    }
+  }
   object Message {
     sealed trait Abstract
     case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
+    case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
+    case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
   }
   case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
     log.g_a_s_e("default onClick callback for " + getClass().getName())

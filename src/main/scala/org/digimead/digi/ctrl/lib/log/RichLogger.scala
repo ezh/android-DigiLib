@@ -59,7 +59,7 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   def trace(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg, Some(t)))
   def traceWhere(msg: String): Unit =
-    logWhere(msg, trace, trace)(4)
+    logWhere(msg, trace, trace)(-2)
   def traceWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, trace, trace)(stackLine)
 
@@ -83,7 +83,7 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   def debug(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg, Some(t)))
   def debugWhere(msg: String): Unit =
-    logWhere(msg, debug, debug)(4)
+    logWhere(msg, debug, debug)(-2)
   def debugWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, debug, debug)(stackLine)
 
@@ -108,7 +108,7 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   def info(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg, Some(t)))
   def infoWhere(msg: String): Unit =
-    logWhere(msg, info, info)(4)
+    logWhere(msg, info, info)(-2)
   def infoWhere(msg: String, stackLine: Int = 4): Unit =
     logWhere(msg, info, info)(stackLine)
 
@@ -133,7 +133,7 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   def warn(msg: String, t: Throwable) =
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg, Some(t)))
   def warnWhere(msg: String): Unit =
-    logWhere(msg, warn, warn)(4)
+    logWhere(msg, warn, warn)(-2)
   def warnWhere(msg: String, stackLine: Int = 4): Unit =
     logWhere(msg, warn, warn)(stackLine)
 
@@ -160,7 +160,7 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg, Some(t)))
   }
   def errorWhere(msg: String): Unit =
-    logWhere(msg, error, error)(4)
+    logWhere(msg, error, error)(-2)
   def errorWhere(msg: String, stackLine: Int): Unit =
     logWhere(msg, error, error)(stackLine)
 
@@ -169,7 +169,11 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
     t.fillInStackTrace()
     if (stackLine == -1)
       f1(msg, t)
-    else
+    else if (stackLine == -2) {
+      val trace = t.getStackTrace
+      val skip = trace.takeWhile(_.getFileName == "RichLogger.scala").size
+      f2(msg + " at " + trace.take(skip + 1).last)
+    } else
       f2(msg + " at " + t.getStackTrace.take(stackLine + 1).last)
   }
 

@@ -138,9 +138,9 @@ protected class AppService private () extends Actor with Logging {
           }
           log.debug("return from message ListPendingConnections for " + componentPackage)
         case message: AnyRef =>
-          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
-          log.error("skip unknown message " + message)
+          log.errorWhere("skip unknown message " + message)
       }
     }
   }

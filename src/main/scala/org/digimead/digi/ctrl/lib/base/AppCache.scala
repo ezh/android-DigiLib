@@ -270,9 +270,9 @@ object AppCache extends Actor with Logging {
           inner = null
           init(context, innerCache)
         case message: AnyRef =>
-          log.error("skip unknown message " + message.getClass.getName + ": " + message)
+          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
-          log.error("skip unknown message " + message)
+          log.errorWhere("skip unknown message " + message)
       }
     }
   }
