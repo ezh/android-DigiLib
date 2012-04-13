@@ -16,29 +16,37 @@
 
 package org.digimead.digi.ctrl.lib.block
 
+import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.log.RichLogger
+import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.graphics.drawable.Drawable
+import android.text.ClipboardManager
 import android.text.Html
 import android.view.ContextMenu
 import android.view.MenuItem
 import android.view.View
 import android.widget.ListView
+import android.widget.Toast
 
-trait Block[Item] {
+trait Block[T <: Block.Item] {
   val context: Activity
-  def items: Seq[Block.Item]
+  def items: Seq[T]
   def appendTo(adapter: MergeAdapter)
-  def onListItemClick(l: ListView, v: View, item: Item)
-  def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: Item) {}
-  def onContextItemSelected(menuItem: MenuItem, item: Item): Boolean = false
+  def onListItemClick(l: ListView, v: View, item: T)
+  def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: T) {}
+  def onContextItemSelected(menuItem: MenuItem, item: T): Boolean = false
   def reset() =
     items.foreach(_.view = new WeakReference(null))
 }
@@ -57,6 +65,36 @@ object Block {
           log.debug("drawable not found \"" + source + "\"")
           null
       }
+    }
+  }
+  def copyLink(context: Activity, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+    try {
+      val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+      clipboard.setText(copyText)
+      val message = Android.getString(context, "block_copy_link_to_clipboard").
+        getOrElse("Copy link to clipboard")
+      context.runOnUiThread(new Runnable {
+        def run = Toast.makeText(context, message, DConstant.toastTimeout).show()
+      })
+      true
+    } catch {
+      case e =>
+        IAmYell("Unable to copy to clipboard link for " + item, e)(logger, dispatcher)
+        false
+    }
+  }
+  def sendLink(context: Activity, item: Item, subjectText: CharSequence, bodyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+    try {
+      val intent = new Intent(Intent.ACTION_SEND)
+      intent.setType("text/plain")
+      intent.putExtra(Intent.EXTRA_SUBJECT, subjectText)
+      intent.putExtra(Intent.EXTRA_TEXT, bodyText)
+      context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
+      true
+    } catch {
+      case e =>
+        IAmYell("Unable 'send link' description for " + item, e)(logger, dispatcher)
+        false
     }
   }
 }

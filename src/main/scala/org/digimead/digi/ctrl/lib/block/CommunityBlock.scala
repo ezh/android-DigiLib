@@ -30,7 +30,10 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
+import android.view.ContextMenu
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -42,7 +45,7 @@ import android.widget.TextView
 // TODO documentation translation help: LANG as link
 // TODO web page/description translation help: LANG as link
 class CommunityBlock(val context: Activity,
-  val wikiUri: Uri)(implicit @transient val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+  val wikiUri: Uri)(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
   val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
   val itemTranslate = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
@@ -70,6 +73,44 @@ class CommunityBlock(val context: Activity,
           case e =>
             IAmYell("Unable to open wiki page: " + wikiUri, e)
         }
+    }
+  }
+  @Loggable
+  override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: CommunityBlock.Item) {
+    log.debug("create context menu for " + item.name)
+    menu.setHeaderTitle(item.name)
+    if (item.icon.nonEmpty)
+      Android.getId(context, item.icon, "drawable") match {
+        case i if i != 0 =>
+          menu.setHeaderIcon(i)
+        case _ =>
+      }
+    item match {
+      case this.itemWiki =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
+      case item =>
+        log.fatal("unsupported context menu item " + item)
+    }
+  }
+  @Loggable
+  override def onContextItemSelected(menuItem: MenuItem, item: CommunityBlock.Item): Boolean = {
+    item match {
+      case this.itemWiki =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, wikiUri.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, wikiUri.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        }
+      case item =>
+        log.fatal("unsupported context menu item " + item)
+        false
     }
   }
 }

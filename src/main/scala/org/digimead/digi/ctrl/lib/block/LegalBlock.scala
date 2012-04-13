@@ -44,7 +44,7 @@ import android.widget.TextView
 class LegalBlock(val context: Activity,
   val items: List[LegalBlock.Item],
   _imageGetter: Html.ImageGetter = null,
-  tagHandler: Html.TagHandler = null)(implicit @transient val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
+  tagHandler: Html.TagHandler = null)(implicit val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
   private lazy val imageGetter = _imageGetter match {
     case null => new Block.ImageGetter(context)
     case getter => getter
@@ -71,8 +71,12 @@ class LegalBlock(val context: Activity,
   @Loggable
   override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: LegalBlock.Item) {
     log.debug("create context menu for " + item)
-    menu.setHeaderTitle(Android.getString(context, "context_menu").getOrElse("Context Menu"))
-    //inner.icon(this).map(menu.setHeaderIcon(_))
+    menu.setHeaderTitle(Android.getString(context, "block_legal_title").getOrElse("legal"))
+    Android.getId(context, "ic_launcher", "drawable") match {
+      case i if i != 0 =>
+        menu.setHeaderIcon(i)
+      case _ =>
+    }
     menu.add(Menu.NONE, Android.getId(context, "block_legal_open"), 1,
       Android.getString(context, "block_legal_open").getOrElse("Open license"))
     menu.add(Menu.NONE, Android.getId(context, "block_legal_send"), 1,

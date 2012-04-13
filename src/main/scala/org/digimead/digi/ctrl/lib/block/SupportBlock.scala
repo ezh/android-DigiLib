@@ -49,7 +49,7 @@ class SupportBlock(val context: Activity,
   val emailTo: String,
   val emailSubject: String,
   val voicePhone: String,
-  val skypeUser: String)(implicit @transient val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
+  val skypeUser: String)(implicit val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
   val itemProject = SupportBlock.Item(Android.getString(context, "block_support_project_title").getOrElse("project %s").format(Android.getString(context, "app_name").get),
     Android.getString(context, "block_support_project_description").getOrElse("open %s project web site").format(Android.getString(context, "app_name").get), "ic_block_support_project")
   val itemIssues = SupportBlock.Item(Android.getString(context, "block_support_issues_title").getOrElse("view or submit an issue"),
@@ -115,42 +115,90 @@ class SupportBlock(val context: Activity,
   @Loggable
   override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: SupportBlock.Item) {
     log.debug("create context menu for " + item.name)
-    menu.setHeaderTitle(Android.getString(context, "context_menu").getOrElse("Context Menu"))
-    //inner.icon(this).map(menu.setHeaderIcon(_))
-    menu.add(Menu.NONE, Android.getId(context, "block_support_voice_call"), 1,
-      Android.getString(context, "block_support_voice_call").getOrElse("Voice call"))
-    menu.add(Menu.NONE, Android.getId(context, "block_support_skype_call"), 1,
-      Android.getString(context, "block_support_skype_call").getOrElse("Skype call"))
+    menu.setHeaderTitle(item.name)
+    if (item.icon.nonEmpty)
+      Android.getId(context, item.icon, "drawable") match {
+        case i if i != 0 =>
+          menu.setHeaderIcon(i)
+        case _ =>
+      }
+    item match {
+      case this.itemProject =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
+      case this.itemIssues =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
+      case this.itemEmail =>
+      // none
+      case this.itemChat =>
+        menu.add(Menu.NONE, Android.getId(context, "block_support_voice_call"), 1,
+          Android.getString(context, "block_support_voice_call").getOrElse("Voice call"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_skype_call"), 1,
+          Android.getString(context, "block_support_skype_call").getOrElse("Skype call"))
+      case item =>
+        log.fatal("unsupported context menu item " + item)
+    }
   }
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: SupportBlock.Item): Boolean = {
-    menuItem.getItemId match {
-      case id if id == Android.getId(context, "block_support_voice_call") =>
-        log.debug("start voice call to " + voicePhone)
-        try {
-          val intent = new Intent(Intent.ACTION_CALL)
-          intent.setData(Uri.parse("tel:" + voicePhone))
-          context.startActivity(intent)
-          true
-        } catch {
-          case e =>
-            IAmYell("Unable start voice call to " + voicePhone, e)
+    item match {
+      case this.itemProject =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, projectUri.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, projectUri.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        } case this.itemIssues =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, issuesUri.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, issuesUri.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        } case this.itemEmail =>
+        false
+      case this.itemChat =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_support_voice_call") =>
+            log.debug("start voice call to " + voicePhone)
+            try {
+              val intent = new Intent(Intent.ACTION_CALL)
+              intent.setData(Uri.parse("tel:" + voicePhone))
+              context.startActivity(intent)
+              true
+            } catch {
+              case e =>
+                IAmYell("Unable start voice call to " + voicePhone, e)
+                false
+            }
+          case id if id == Android.getId(context, "block_support_skype_call") =>
+            log.debug("start skype call to " + skypeUser)
+            try {
+              val intent = new Intent("android.intent.action.VIEW")
+              intent.setData(Uri.parse("skype:" + skypeUser))
+              context.startActivity(intent)
+              true
+            } catch {
+              case e =>
+                IAmYell("Unable start skype call to " + skypeUser, e)
+                false
+            }
+          case id =>
+            log.fatal("unknown context menu id " + id)
             false
         }
-      case id if id == Android.getId(context, "block_support_skype_call") =>
-        log.debug("start skype call to " + skypeUser)
-        try {
-          val intent = new Intent("android.intent.action.VIEW")
-          intent.setData(Uri.parse("skype:" + skypeUser))
-          context.startActivity(intent)
-          true
-        } catch {
-          case e =>
-            IAmYell("Unable start skype call to " + skypeUser, e)
-            false
-        }
-      case id =>
-        log.fatal("unknown context menu id " + id)
+      case item =>
+        log.fatal("unsupported context menu item " + item)
         false
     }
   }

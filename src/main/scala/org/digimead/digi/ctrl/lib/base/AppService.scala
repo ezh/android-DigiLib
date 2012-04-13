@@ -19,12 +19,12 @@ package org.digimead.digi.ctrl.lib.base
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.locks.ReentrantLock
 
 import scala.actors.Futures.future
 import scala.actors.Actor
-import scala.collection.JavaConversions._
+import scala.collection.JavaConversions.asScalaBuffer
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -264,7 +264,7 @@ protected class AppService private () extends Actor with Logging {
 object AppService extends Logging {
   @volatile private var inner: AppService = null
   private val deinitializationLock = new SyncVar[Boolean]()
-  private val deinitializationProgress = new ReentrantLock
+  private val deinitializationInProgressLock = new AtomicBoolean(false)
   private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
@@ -285,13 +285,19 @@ object AppService extends Logging {
     else
       inner = new AppService()
   }
-  private[lib] def resurrect() =
-    if (deinitializationProgress.isLocked) {
-      log.info("resurrect AppService core subsystem")
-      deinitializationLock.set(false)
+  private[lib] def resurrect() = {
+    deinitializationLock.set(false)
+    if (deinitializationInProgressLock.get) {
+      log.debug("deinitialization in progress, waiting...")
+      deinitializationInProgressLock.synchronized {
+        while (deinitializationInProgressLock.get)
+          deinitializationInProgressLock.wait
+      }
     }
+    log.info("resurrect AppService core subsystem")
+  }
   private[lib] def deinit(): Unit = future {
-    if (deinitializationProgress.tryLock)
+    if (deinitializationInProgressLock.compareAndSet(false, true))
       try {
         val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
         log.info("deinitializing AppService for " + packageName)
@@ -304,7 +310,10 @@ object AppService extends Logging {
             deinitRoutine(packageName)
         }
       } finally {
-        deinitializationProgress.unlock
+        deinitializationInProgressLock.synchronized {
+          deinitializationInProgressLock.set(false)
+          deinitializationInProgressLock.notifyAll
+        }
       }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {

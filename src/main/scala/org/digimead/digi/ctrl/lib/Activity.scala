@@ -83,7 +83,7 @@ trait Activity extends AActivity with AnyBase with Logging {
       Activity.super.onDestroy()
     })
   }
-  override def onCreateDialog(id: Int): Dialog = {
+  override def onCreateDialog(id: Int, args: Bundle): Dialog = {
     log.trace("Activity::onCreateDialog")
     id match {
       case id if id == Report.getId(this) =>
@@ -94,16 +94,8 @@ trait Activity extends AActivity with AnyBase with Logging {
         super.onCreateDialog(id)
     }
   }
-  override def onPrepareDialog(id: Int, dialog: Dialog): Unit = {
-    super.onPrepareDialog(id, dialog)
-    onPrepareDialogLib(id: Int, dialog: Dialog)
-  }
   override def onPrepareDialog(id: Int, dialog: Dialog, args: Bundle): Unit = {
     super.onPrepareDialog(id, dialog, args)
-    onPrepareDialogLib(id: Int, dialog: Dialog)
-  }
-  private def onPrepareDialogLib(id: Int, dialog: Dialog): Unit = {
-
     if (AppActivity.Inner.activitySafeDialog.get(0) == Some(dialog)) // guard
       return
     log.trace("Activity::onPrepareDialog")

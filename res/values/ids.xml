@@ -21,7 +21,13 @@
     <item name="block_support_skype_call" type="id"/>
     <item name="block_legal_open" type="id"/>
     <item name="block_legal_send" type="id"/>
+    <item name="block_link_copy" type="id"/>
+    <item name="block_link_send" type="id"/>
     <item name="report" type="id"/>
     <item name="quit" type="id"/>
+    <item name="new_connection" type="id"/>
+    <item name="process_pending_operations" type="id"/>
+    <item name="session_disconnect" type="id"/>
+    <item name="session_disconnect_all" type="id"/>
 
 </resources>

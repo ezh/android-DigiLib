@@ -61,10 +61,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.DialogInterface
-import annotation.elidable.ASSERTION
 import android.os.Bundle
 import android.app.Dialog
 import android.os.Looper
+import android.net.Uri
+import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
@@ -328,6 +329,14 @@ protected class AppActivity private () extends Actor with Logging {
       context.sendOrderedBroadcast(intent, DPermission.Base)
   }
   @Loggable
+  def giveTheSign(key: Uri, data: Bundle): Unit = AppActivity.Context foreach {
+    context =>
+      log.debug("send the " + key)
+      val intent = new Intent(DIntent.SignResponse, key)
+      intent.putExtras(data)
+      sendPrivateBroadcast(intent)
+  }
+  @Loggable
   protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
     for {
       ctx <- AppActivity.Context
@@ -507,6 +516,7 @@ protected class AppActivity private () extends Actor with Logging {
         Option(d)
       case None =>
         log.error("unable to show safe dialog for " + m.erasure.getName)
+        activitySafeDialog.unset()
         None
     })
   } catch {
@@ -518,17 +528,26 @@ protected class AppActivity private () extends Actor with Logging {
   private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
     assert(!activitySafeDialog.isSet)
     activity.runOnUiThread(new Runnable {
-      def run = args match {
-        case Some(bundle) => activity.showDialog(id, bundle)
-        case None => activity.showDialog(id)
+      def run = {
+        args match {
+          case Some(bundle) => activity.showDialog(id, bundle)
+          case None => activity.showDialog(id)
+        }
       }
     })
     activitySafeDialog.get(DTimeout.longest) match {
       case Some(d) =>
-        log.debug("show new safe dialog " + d + " for id " + id)
-        Option(d)
+        if (d != null) {
+          log.debug("show new safe dialog " + d + " for id " + id)
+          Option(d)
+        } else {
+          log.error("unable to show safe dialog for id " + id)
+          activitySafeDialog.unset()
+          None
+        }
       case None =>
         log.error("unable to show safe dialog for id " + id)
+        activitySafeDialog.unset()
         None
     }
   } catch {
@@ -574,10 +593,20 @@ object AppActivity extends Logging {
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect() = deinitializationInProgressLock.synchronized {
-    while (deinitializationInProgressLock.get)
-      deinitializationInProgressLock.wait
+    deinitializationLock.set(false) // try to cancel
+    if (deinitializationInProgressLock.get) {
+      log.debug("deinitialization in progress, waiting...")
+      deinitializationInProgressLock.synchronized {
+        while (deinitializationInProgressLock.get)
+          deinitializationInProgressLock.wait
+      }
+    }
     log.info("resurrect AppActivity core subsystem")
-    deinitializationLock.set(false)
+    AppActivity.Inner match {
+      case activity: AppActivity =>
+        activity.activitySafeDialog.unset()
+      case null =>
+    }
   }
   private[lib] def deinit(): Unit = future {
     if (deinitializationInProgressLock.compareAndSet(false, true))
