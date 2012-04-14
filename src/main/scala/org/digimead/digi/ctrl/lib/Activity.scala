@@ -18,7 +18,6 @@ package org.digimead.digi.ctrl.lib
 
 import scala.Array.canBuildFrom
 import scala.annotation.elidable
-import scala.annotation.migration
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
@@ -27,6 +26,7 @@ import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.dialog.Report
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 
 import android.accounts.AccountManager
@@ -57,6 +57,7 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def onResume() = {
     log.trace("Activity::onResume")
+    AppActivity.Inner.resetDialogSafe
     Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     super.onResume()
   }
@@ -64,7 +65,8 @@ trait Activity extends AActivity with AnyBase with Logging {
     log.trace("Activity::onPause")
     Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
     AppActivity.Inner.disableSafeDialogs
-    AppActivity.Inner.activitySafeDialog.unset()
+    AppActivity.Inner.resetDialogSafe
+    Android.enableRotation(this)
     super.onPause()
   }
   /*
@@ -96,10 +98,8 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def onPrepareDialog(id: Int, dialog: Dialog, args: Bundle): Unit = {
     super.onPrepareDialog(id, dialog, args)
-    if (AppActivity.Inner.activitySafeDialog.get(0) == Some(dialog)) // guard
-      return
     log.trace("Activity::onPrepareDialog")
-    AppActivity.Inner.activitySafeDialog.set(dialog)
+    AppActivity.Inner.setDialogSafe(dialog)
     id match {
       case id if id == Report.getId(this) =>
         log.debug("prepare Report dialog")

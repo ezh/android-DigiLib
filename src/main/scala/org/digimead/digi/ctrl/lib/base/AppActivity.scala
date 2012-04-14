@@ -123,7 +123,7 @@ protected class AppActivity private () extends Actor with Logging {
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
   private val isSafeDialogEnabled = new AtomicBoolean(false)
-  val activitySafeDialog = new AppActivity.SafeDialog
+  private val activitySafeDialog = new AppActivity.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
       loop {
@@ -133,11 +133,13 @@ protected class AppActivity private () extends Actor with Logging {
             log.info("receive message ShowDialog " + dialog)
             // wait for previous dialog
             activitySafeDialog.synchronized {
+              log.trace("wait activitySafeDialog lock")
               while (activitySafeDialog.isSet)
                 activitySafeDialog.wait
             }
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
+              log.trace("wait isSafeDialogEnabled lock")
               while (!isSafeDialogEnabled.get)
                 isSafeDialogEnabled.wait
             }
@@ -151,11 +153,13 @@ protected class AppActivity private () extends Actor with Logging {
             log.info("receive message ShowDialogResource " + dialog)
             // wait for previous dialog
             activitySafeDialog.synchronized {
+              log.trace("wait activitySafeDialog lock")
               while (activitySafeDialog.isSet)
                 activitySafeDialog.wait
             }
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
+              log.trace("wait isSafeDialogEnabled lock")
               while (!isSafeDialogEnabled.get)
                 isSafeDialogEnabled.wait
             }
@@ -234,9 +238,15 @@ protected class AppActivity private () extends Actor with Logging {
   }
   @Loggable
   def setDialogSafe(dialog: Dialog) {
-    assert(!activitySafeDialog.isSet)
-    activitySafeDialog.put(dialog)
+    assert(!activitySafeDialog.isSet || (activitySafeDialog.isSet && activitySafeDialog.get == null))
+    activitySafeDialog.set((dialog, null))
   }
+  @Loggable
+  def resetDialogSafe() =
+    activitySafeDialog.unset()
+  @Loggable
+  def getDialogSafe(timeout: Long): Option[Dialog] =
+    activitySafeDialog.get(timeout).map(_._1)
   @Loggable
   def enableSafeDialogs() {
     log.debug("enable safe dialogs")
@@ -508,11 +518,22 @@ protected class AppActivity private () extends Actor with Logging {
   @Loggable
   private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
     assert(!activitySafeDialog.isSet)
-    activity.runOnUiThread(new Runnable { def run = activitySafeDialog.set(dialog()) })
+    if (!isActivityValid(activity)) {
+      resetDialogSafe
+      return None
+    }
+    activity.runOnUiThread(new Runnable {
+      def run = activitySafeDialog.set((dialog(), () => {
+        log.trace("safe dialog dismiss callback")
+        Android.enableRotation(activity)
+        onDismiss.foreach(_())
+      }))
+    })
     log.debug("show new safe dialog " + activitySafeDialog.get)
     (activitySafeDialog.get(DTimeout.longest) match {
-      case Some(d) =>
+      case Some((d, c)) =>
         log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
+        Android.disableRotation(activity)
         Option(d)
       case None =>
         log.error("unable to show safe dialog for " + m.erasure.getName)
@@ -527,6 +548,10 @@ protected class AppActivity private () extends Actor with Logging {
   @Loggable
   private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
     assert(!activitySafeDialog.isSet)
+    if (!isActivityValid(activity)) {
+      resetDialogSafe
+      return None
+    }
     activity.runOnUiThread(new Runnable {
       def run = {
         args match {
@@ -536,9 +561,15 @@ protected class AppActivity private () extends Actor with Logging {
       }
     })
     activitySafeDialog.get(DTimeout.longest) match {
-      case Some(d) =>
+      case Some((d, c)) =>
         if (d != null) {
           log.debug("show new safe dialog " + d + " for id " + id)
+          activitySafeDialog.updateDismissCallback(() => {
+            log.trace("safe dialog dismiss callback")
+            Android.enableRotation(activity)
+            onDismiss.foreach(_())
+          })
+          Android.disableRotation(activity)
           Option(d)
         } else {
           log.error("unable to show safe dialog for id " + id)
@@ -555,6 +586,8 @@ protected class AppActivity private () extends Actor with Logging {
       log.error(e.getMessage, e)
       None
   }
+  private def isActivityValid(activity: Activity): Boolean =
+    !activity.isFinishing && activity.getWindow != null
 }
 
 object AppActivity extends Logging {
@@ -651,7 +684,6 @@ object AppActivity extends Logging {
   }
   def Inner = inner
   def Context = AnyBase.getContext
-  //def initialized = synchronized { inner != null }
   object LazyInit {
     // priority -> Seq(functions)
     @volatile private var pool: LongMap[Seq[() => Any]] = LongMap()
@@ -685,25 +717,26 @@ object AppActivity extends Logging {
     def isEmpty = synchronized { pool.isEmpty }
     def nonEmpty = synchronized { pool.nonEmpty }
   }
-  class SafeDialog extends SyncVar[Dialog] with Logging {
+  // Tuple2 [ dialog, onDismiss callback ]
+  class SafeDialog extends SyncVar[(Dialog, () => Unit)] with Logging {
     private var activityDialogGuard: ScheduledExecutorService = null
     private val isPrivateReplace = new AtomicBoolean(false)
     private val lock = new Object
 
     @Loggable
-    override def set(d: Dialog, signalAll: Boolean = true): Unit = lock.synchronized {
+    override def set(d: (Dialog, () => Unit), signalAll: Boolean = true): Unit = lock.synchronized {
       log.debug("set safe dialog to '" + d + "'")
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
       }
       get(0) match {
-        case Some(previousDialog) if previousDialog != null =>
-          if (d == previousDialog) {
+        case Some((previousDialog, dismissCallback)) if previousDialog != null =>
+          if (d._1 == previousDialog) {
             log.fatal("overwrite the same dialog '" + d + "'")
             return
           }
-          log.info("replace safe dialog '" + value + "' with new one '" + d + "'")
+          log.info("replace safe dialog '" + value + "' with new one '" + d._1 + "'")
           isPrivateReplace.synchronized {
             if (previousDialog.isShowing) {
               // we want replace dialog
@@ -723,24 +756,25 @@ object AppActivity extends Logging {
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {
           def run() = {
-            log.fatal("dismiss stalled dialog " + d.getClass.getName)
+            log.fatal("dismiss stalled dialog " + d._1.getClass.getName)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
-            if (d.isShowing)
-              d.dismiss
+            if (d._1.isShowing)
+              d._1.dismiss
           }
         }, DTimeout.longest, TimeUnit.MILLISECONDS)
-        d.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
+        d._1.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
           @Loggable
           override def onDismiss(dialog: DialogInterface) = SafeDialog.this.synchronized {
-            log.info("dismiss safe dialog " + d.getClass.getName)
+            log.info("dismiss safe dialog " + d._1.getClass.getName)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
             if (isPrivateReplace.getAndSet(false)) {
+              log.g_a_s_e("!")
               // there is set(N) waiting for us
               // do it silent for external routines
               isPrivateReplace.synchronized {
@@ -756,6 +790,10 @@ object AppActivity extends Logging {
       }
       super.set(d, signalAll)
     }
+    def updateDismissCallback(f: () => Unit) {
+      val (d, c) = super.get
+      super.set((d, f))
+    }
     override def unset(signalAll: Boolean = true) = {
       log.debug("unset safe dialog " + value.get._2)
       if (activityDialogGuard != null) {
@@ -763,10 +801,14 @@ object AppActivity extends Logging {
         activityDialogGuard = null
       }
       super.get(0).foreach {
-        previousDialog =>
-          if (previousDialog != null && previousDialog.isShowing) {
-            previousDialog.setOnDismissListener(null)
-            previousDialog.dismiss
+        case (previousDialog, dismissCallback) =>
+          if (previousDialog != null) {
+            if (previousDialog.isShowing) {
+              previousDialog.setOnDismissListener(null)
+              previousDialog.dismiss
+            }
+            if (dismissCallback != null)
+              dismissCallback()
           }
       }
       super.unset(signalAll)

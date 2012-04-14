@@ -38,9 +38,9 @@ class SyncVar[A] extends Logging {
         case (true, result) => return result
         case (false, _) => true
       }) value.synchronized {
-        log.traceWhere(this + " get() waiting")
+        log.traceWhere(this + " get() waiting", Logging.Where.BEFORE)
         value.wait
-        log.traceWhere(this + " get() running")
+        log.traceWhere(this + " get() running", Logging.Where.BEFORE)
       }
       // unreachable point
       value.get._2
@@ -53,12 +53,12 @@ class SyncVar[A] extends Logging {
   protected def waitMeasuringElapsed(timeout: Long): Long = if (timeout <= 0) 0 else {
     val start = System.currentTimeMillis
     value.synchronized {
-      log.traceWhere(this + " get(" + timeout + ") waiting")
+      log.traceWhere(this + " get(" + timeout + ") waiting", -4)
       value.wait(timeout)
     }
     val elapsed = System.currentTimeMillis - start
     val result = if (elapsed < 0) 0 else elapsed
-    log.traceWhere(this + " get(" + timeout + ") running, reserve " + (timeout - result))
+    log.traceWhere(this + " get(" + timeout + ") running, reserve " + (timeout - result), -4)
     result
   }
 
@@ -99,9 +99,9 @@ class SyncVar[A] extends Logging {
         case (true, result) => return result
         case (false, _) => true
       }) value.synchronized {
-        log.traceWhere(this + " take() waiting")
+        log.traceWhere(this + " take() waiting", Logging.Where.BEFORE)
         value.wait
-        log.traceWhere(this + " take() running")
+        log.traceWhere(this + " take() running", Logging.Where.BEFORE)
       }
       // unreachable point
       value.get._2
@@ -120,9 +120,9 @@ class SyncVar[A] extends Logging {
   def put(x: A, signalAll: Boolean = true): Unit = {
     while (!value.compareAndSet((false, null.asInstanceOf[A]), (true, x)))
       value.synchronized {
-        log.traceWhere(this + " put(...) waiting")
+        log.traceWhere(this + " put(...) waiting", Logging.Where.BEFORE)
         value.wait
-        log.traceWhere(this + " put(...) running")
+        log.traceWhere(this + " put(...) running", Logging.Where.BEFORE)
       }
     value.synchronized {
       if (signalAll)

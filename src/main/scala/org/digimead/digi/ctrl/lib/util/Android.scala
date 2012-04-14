@@ -16,10 +16,19 @@
 
 package org.digimead.digi.ctrl.lib.util
 
-import android.content.Context
 import scala.ref.WeakReference
 
-object Android {
+import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.log.Logging
+
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
+import android.content.Context
+import android.os.Build
+import android.view.Surface
+
+object Android extends Logging {
   def getString(context: WeakReference[Context], name: String): Option[String] =
     context.get.flatMap(ctx => getString(ctx, name))
   def getString(context: Context, name: String): Option[String] =
@@ -60,4 +69,30 @@ object Android {
     getId(context, name, "id")
   def getId(context: Context, name: String, scope: String): Int =
     context.getResources().getIdentifier(name, scope, context.getPackageName())
+  @Loggable
+  def disableRotation(activity: Activity) {
+    val orientation = activity.getResources().getConfiguration().orientation
+    val rotation = activity.getWindowManager().getDefaultDisplay().getOrientation()
+    // Copied from Android docs, since we don't have these values in Froyo 2.2
+    var SCREEN_ORIENTATION_REVERSE_LANDSCAPE = 8
+    var SCREEN_ORIENTATION_REVERSE_PORTRAIT = 9
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.FROYO) {
+      SCREEN_ORIENTATION_REVERSE_LANDSCAPE = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+      SCREEN_ORIENTATION_REVERSE_PORTRAIT = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    }
+    if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_90) {
+      if (orientation == Configuration.ORIENTATION_PORTRAIT)
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+      else if (orientation == Configuration.ORIENTATION_LANDSCAPE)
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+    } else if (rotation == Surface.ROTATION_180 || rotation == Surface.ROTATION_270) {
+      if (orientation == Configuration.ORIENTATION_PORTRAIT)
+        activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_PORTRAIT)
+      else if (orientation == Configuration.ORIENTATION_LANDSCAPE)
+        activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
+    }
+  }
+  @Loggable
+  def enableRotation(activity: Activity) =
+    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
 }

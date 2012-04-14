@@ -103,15 +103,21 @@ object AnyBase extends Logging {
   }
   def deinit(context: Context) = synchronized {
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
-    AppActivity.Inner.bindedICtrlPool.foreach(t => {
-      val key = t._1
-      val (bindContext, connection, component) = t._2
-      if (bindContext == context)
-        AppActivity.Inner.bindedICtrlPool.remove(key).map(record => {
-          log.debug("remove service connection to " + key + " from bindedICtrlPool")
-          record._1.unbindService(record._2)
-        })
-    })
+    // unbind bindedICtrlPool entities for context
+    if (AppActivity.Inner != null)
+      AppActivity.Inner.bindedICtrlPool.foreach(t => {
+        val key = t._1
+        val (bindContext, connection, component) = t._2
+        if (bindContext == context)
+          AppActivity.Inner.bindedICtrlPool.remove(key).map(record => {
+            log.debug("remove service connection to " + key + " from bindedICtrlPool")
+            record._1.unbindService(record._2)
+          })
+      })
+    // unbind bindedICtrlPool entities for context
+    if (AppService.Inner != null && AppService.Inner.ctrlBindContext.get == context)
+      AppService.Inner.unbind
+    // update contextPool
     contextPool = contextPool.filter(_.get != context)
     updateContext()
   }

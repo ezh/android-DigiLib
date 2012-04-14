@@ -48,9 +48,8 @@ import android.os.IBinder
 protected class AppService private () extends Actor with Logging {
   private val lock = new Object
   protected lazy val serviceInstance = new SyncVar[ICtrlHost]()
-  protected lazy val ctrlBindContext = new AtomicReference[Activity](null)
+  protected[lib] lazy val ctrlBindContext = new AtomicReference[Activity](null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
-
   protected lazy val ctrlConnection = new ServiceConnection() with Logging {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
@@ -69,6 +68,7 @@ protected class AppService private () extends Actor with Logging {
       serviceInstance.unset()
     }
   }
+  private val rebindInProgressLock = new AtomicBoolean(false)
 
   log.debug("alive")
   def act = {
@@ -165,25 +165,35 @@ protected class AppService private () extends Actor with Logging {
     AppService.unbind(ctrlBindContext, ctrlBindCounter, serviceInstance, ctrlConnection)
   @Loggable
   protected def rebind(timeout: Long): Option[ICtrlHost] = {
-    AppActivity.Context.flatMap(_ match {
-      case activity: Activity =>
-        log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
-        bind(activity)
-        get(timeout)
-      case _ =>
-        log.warn("rebind ICtrlHost service failed")
-        None
-    })
+    if (rebindInProgressLock.compareAndSet(false, true)) {
+      var result: Option[ICtrlHost] = None
+      while (result == None && AppService.Inner != null) {
+        AppActivity.Context.foreach(_ match {
+          case activity: Activity =>
+            log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
+            bind(activity)
+          case _ =>
+            log.warn("rebind ICtrlHost service failed")
+            None
+        })
+        result = get(timeout)
+      }
+      log.warn("rebind ICtrlHost service finished, result: " + result)
+      rebindInProgressLock.set(false)
+      result
+    } else
+      get(0)
   }
   @Loggable
-  protected def componentStart(componentPackage: String): Boolean = get(DTimeout.normal) match {
+  protected def componentStart(componentPackage: String): Boolean = get(0) match {
     case Some(service) =>
       service.start(componentPackage)
     case None =>
-      rebind(DTimeout.normal).map(_.start(componentPackage)).getOrElse(false)
+      future { rebind(DTimeout.normal) }
+      false
   }
   @Loggable
-  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.normal) match {
+  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(0) match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
@@ -198,35 +208,27 @@ protected class AppService private () extends Actor with Logging {
           Left(e.getMessage)
       }
     case None =>
-      rebind(DTimeout.normal).map(service => try {
-        service.status(componentPackage) match {
-          case status: ComponentState =>
-            Right(status)
-          case null =>
-            log.debug("service return null instread of DComponentStatus")
-            Left("status failed")
-        }
-      } catch {
-        case e =>
-          Left(e.getMessage)
-      }).getOrElse(Left(componentPackage + " service unreachable"))
+      future { rebind(DTimeout.normal) }
+      Left(componentPackage + " service unreachable")
   }
   @Loggable
-  protected def componentStop(componentPackage: String): Boolean = get(DTimeout.normal) match {
+  protected def componentStop(componentPackage: String): Boolean = get(0) match {
     case Some(service) =>
       service.stop(componentPackage)
     case None =>
-      rebind(DTimeout.normal).map(_.stop(componentPackage)).getOrElse(false)
+      future { rebind(DTimeout.normal) }
+      false
   }
   @Loggable
-  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.normal) match {
+  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(0) match {
     case Some(service) =>
       service.disconnect(componentPackage, processID, connectionID)
     case None =>
-      rebind(DTimeout.normal).map(_.disconnect(componentPackage, processID, connectionID)).getOrElse(false)
+      future { rebind(DTimeout.normal) }
+      false
   }
   @Loggable
-  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.normal) match {
+  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(0) match {
     case Some(service) =>
       service.interfaces(componentPackage) match {
         case null =>
@@ -235,15 +237,11 @@ protected class AppService private () extends Actor with Logging {
           Some(list)
       }
     case None =>
-      rebind(DTimeout.normal).flatMap(_.interfaces(componentPackage) match {
-        case null =>
-          None
-        case list =>
-          Some(list)
-      })
+      future { rebind(DTimeout.normal) }
+      None
   }
   @Loggable
-  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(DTimeout.normal) match {
+  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(0) match {
     case Some(service) =>
       service.pending_connections(componentPackage) match {
         case null =>
@@ -252,12 +250,8 @@ protected class AppService private () extends Actor with Logging {
           Some(list)
       }
     case None =>
-      rebind(DTimeout.normal).flatMap(_.pending_connections(componentPackage) match {
-        case null =>
-          None
-        case list =>
-          Some(list)
-      })
+      future { rebind(DTimeout.normal) }
+      None
   }
 }
 
@@ -392,7 +386,7 @@ object AppService extends Logging {
         val successful = new SyncVar[Boolean]
         if (isICtrlHostInstalled(caller)) {
           log.info("bind to service " + DIntent.HostService)
-          caller.runOnUiThread(new Runnable { def run = successful.set(caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) })
+          successful.set(caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE))
         } else {
           log.warn(DIntent.HostService + " not installed")
           successful.set(false)
@@ -407,13 +401,19 @@ object AppService extends Logging {
   private def unbind(ctrlBindContext: AtomicReference[Activity], ctrlBindCounter: AtomicInteger,
     serviceInstance: SyncVar[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
     if (ctrlBindCounter.decrementAndGet() == 0)
-      if (serviceInstance.get != null && ctrlBindContext.get != null) {
-        log.info("unbind from service " + DIntent.HostService)
-        val caller = ctrlBindContext.getAndSet(null)
-        caller.runOnUiThread(new Runnable { def run = caller.unbindService(ctrlConnection) })
+      if (serviceInstance.isSet) {
+        if (serviceInstance.get != null && ctrlBindContext.get != null) {
+          log.info("unbind from service " + DIntent.HostService)
+          val caller = ctrlBindContext.getAndSet(null)
+          caller.unbindService(ctrlConnection)
+          serviceInstance.unset()
+        } else
+          log.warn("service already unbinded")
+      } else {
+        ctrlBindContext.set(null)
         serviceInstance.unset()
-      } else
-        log.warn("service already unbinded")
+        log.warn("service lost")
+      }
   }
   @Loggable
   def isICtrlHostInstalled(ctx: Context): Boolean = {

@@ -157,4 +157,9 @@ object Logging {
     case object Warn extends Level
     case object Error extends Level
   }
+  object Where {
+    val ALL = -1
+    val HERE = -2
+    val BEFORE = -3
+  }
 }

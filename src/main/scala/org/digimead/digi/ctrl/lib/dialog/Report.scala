@@ -64,7 +64,7 @@ object Report extends Logging {
         def onClick(dialog: DialogInterface, which: Int) = {
           AnyBase.info.get.foreach {
             info =>
-              AppActivity.Inner.activitySafeDialog.get(0).foreach(_.dismiss)
+              AppActivity.Inner.resetDialogSafe
               future {
                 AppActivity.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
@@ -90,7 +90,7 @@ object Report extends Logging {
                 }
                 val i = new AtomicInteger()
                 org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
-                  AppActivity.Inner.activitySafeDialog.get(0) match {
+                  AppActivity.Inner.getDialogSafe(0) match {
                     case Some(dialog) =>
                       activity.runOnUiThread(new Runnable {
                         def run = dialog.asInstanceOf[AlertDialog].setMessage("uploading " + i.incrementAndGet + "/" + n)
@@ -98,7 +98,7 @@ object Report extends Logging {
                     case _ =>
                   }
                 }))
-                AppActivity.Inner.activitySafeDialog.get(0).foreach(_.dismiss)
+                AppActivity.Inner.resetDialogSafe
                 org.digimead.digi.ctrl.lib.base.Report.clean()
               }
           }
@@ -107,7 +107,7 @@ object Report extends Logging {
       setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          AppActivity.Inner.activitySafeDialog.get(0).foreach(_.dismiss)
+          AppActivity.Inner.resetDialogSafe
           org.digimead.digi.ctrl.lib.base.Report.clean()
         }
       }).
