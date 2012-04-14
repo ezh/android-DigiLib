@@ -132,11 +132,9 @@ protected class AppActivity private () extends Actor with Logging {
             val s = sender
             log.info("receive message ShowDialog " + dialog)
             // wait for previous dialog
-            activitySafeDialog.synchronized {
-              log.trace("wait activitySafeDialog lock")
-              while (activitySafeDialog.isSet)
-                activitySafeDialog.wait
-            }
+            log.trace("wait activitySafeDialog lock")
+            activitySafeDialog.put((null, null)) // wait
+            activitySafeDialog.unset()
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
               log.trace("wait isSafeDialogEnabled lock")
@@ -152,11 +150,9 @@ protected class AppActivity private () extends Actor with Logging {
             val s = sender
             log.info("receive message ShowDialogResource " + dialog)
             // wait for previous dialog
-            activitySafeDialog.synchronized {
-              log.trace("wait activitySafeDialog lock")
-              while (activitySafeDialog.isSet)
-                activitySafeDialog.wait
-            }
+            log.trace("wait activitySafeDialog lock")
+            activitySafeDialog.put((null, null)) // wait
+            activitySafeDialog.unset()
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
               log.trace("wait isSafeDialogEnabled lock")
@@ -736,7 +732,7 @@ object AppActivity extends Logging {
             log.fatal("overwrite the same dialog '" + d + "'")
             return
           }
-          log.info("replace safe dialog '" + value + "' with new one '" + d._1 + "'")
+          log.info("replace safe dialog '" + previousDialog + "' with new one '" + d._1 + "'")
           isPrivateReplace.synchronized {
             if (previousDialog.isShowing) {
               // we want replace dialog
@@ -778,7 +774,7 @@ object AppActivity extends Logging {
               // there is set(N) waiting for us
               // do it silent for external routines
               isPrivateReplace.synchronized {
-                value.set(false, null)
+                value.set(None)
                 isPrivateReplace.notifyAll
               }
             } else {
@@ -795,7 +791,7 @@ object AppActivity extends Logging {
       super.set((d, f))
     }
     override def unset(signalAll: Boolean = true) = {
-      log.debug("unset safe dialog " + value.get._2)
+      log.debug("unset safe dialog " + value)
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null

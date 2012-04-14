@@ -29,21 +29,21 @@ import org.digimead.digi.ctrl.lib.log.Logging
  */
 
 class SyncVar[A] extends Logging {
-  protected val value = new AtomicReference[(Boolean, A)](false, null.asInstanceOf[A])
+  protected val value = new AtomicReference[Option[A]](None)
 
   def get(): A = value.get match {
-    case (true, result) => result
-    case (false, _) =>
+    case Some(result) => result
+    case None =>
       while (value.get match {
-        case (true, result) => return result
-        case (false, _) => true
+        case Some(result) => return result
+        case None => true
       }) value.synchronized {
         log.traceWhere(this + " get() waiting", Logging.Where.BEFORE)
         value.wait
         log.traceWhere(this + " get() running", Logging.Where.BEFORE)
       }
       // unreachable point
-      value.get._2
+      value.get.getOrElse(null.asInstanceOf[A])
   }
 
   /**
@@ -71,12 +71,12 @@ class SyncVar[A] extends Logging {
    *  @return            `None` if variable is undefined after `timeout`, `Some(value)` otherwise
    */
   def get(timeout: Long): Option[A] = value.get match {
-    case (true, result) => Some(result)
-    case (false, _) =>
+    case Some(result) => Some(result)
+    case None =>
       var rest = timeout
       while ((value.get match {
-        case (true, result) => return Some(result)
-        case (false, _) => true
+        case Some(result) => return Some(result)
+        case None => true
       }) && rest > 0) {
         /**
          * Defending against the system clock going backward
@@ -86,29 +86,26 @@ class SyncVar[A] extends Logging {
         val elapsed = waitMeasuringElapsed(rest)
         rest -= elapsed
       }
-      value.get match {
-        case (true, result) => Some(result)
-        case (false, _) => None
-      }
+      value.get
   }
 
-  def take(): A = value.getAndSet(false, null.asInstanceOf[A]) match {
-    case (true, result) => result
-    case (false, _) =>
-      while (value.getAndSet(false, null.asInstanceOf[A]) match {
-        case (true, result) => return result
-        case (false, _) => true
+  def take(): A = value.getAndSet(None) match {
+    case Some(result) => result
+    case None =>
+      while (value.getAndSet(None) match {
+        case Some(result) => return result
+        case None => true
       }) value.synchronized {
         log.traceWhere(this + " take() waiting", Logging.Where.BEFORE)
         value.wait
         log.traceWhere(this + " take() running", Logging.Where.BEFORE)
       }
       // unreachable point
-      value.get._2
+      value.get.getOrElse(null.asInstanceOf[A])
   }
 
   def set(x: A, signalAll: Boolean = true): Unit = {
-    value.set(true, x)
+    value.set(Some(x))
     value.synchronized {
       if (signalAll)
         value.notifyAll
@@ -118,9 +115,9 @@ class SyncVar[A] extends Logging {
   }
 
   def put(x: A, signalAll: Boolean = true): Unit = {
-    while (!value.compareAndSet((false, null.asInstanceOf[A]), (true, x)))
+    while (!value.compareAndSet(None, Some(x)))
       value.synchronized {
-        log.traceWhere(this + " put(...) waiting", Logging.Where.BEFORE)
+        log.traceWhere(this + " put(...) waiting, current value is " + value, Logging.Where.BEFORE)
         value.wait
         log.traceWhere(this + " put(...) running", Logging.Where.BEFORE)
       }
@@ -132,10 +129,10 @@ class SyncVar[A] extends Logging {
     }
   }
 
-  def isSet: Boolean = value.get._1
+  def isSet: Boolean = value.get != None
 
   def unset(signalAll: Boolean = true): Unit = {
-    value.set(false, null.asInstanceOf[A])
+    value.set(None)
     value.synchronized {
       if (signalAll)
         value.notifyAll
