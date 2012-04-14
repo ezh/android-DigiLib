@@ -58,22 +58,6 @@ object Report extends Logging {
                   }
                 }
             }
-            // try to submit reports if there any stack traces
-            context match {
-              case context: Activity =>
-                AnyBase.info.get.foreach {
-                  info =>
-                    Thread.sleep(DTimeout.normal) // take it gently ;-)
-                    log.debug("looking for stack trace reports in: " + info.reportPath)
-                    val dir = new File(info.reportPath + "/")
-                    val reports = Option(dir.list()).flatten
-                    if (reports.exists(_.endsWith(".stacktrace")))
-                      org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
-                    else
-                      clean()
-                }
-              case _ =>
-            }
           }
       }
     } catch {

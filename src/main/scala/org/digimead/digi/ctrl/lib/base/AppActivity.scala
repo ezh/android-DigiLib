@@ -23,6 +23,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
@@ -65,6 +66,7 @@ import android.os.Bundle
 import android.app.Dialog
 import android.os.Looper
 import android.net.Uri
+
 import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
@@ -122,6 +124,7 @@ protected class AppActivity private () extends Actor with Logging {
     case e => log.error(e.getMessage, e); None
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
+  private[lib] val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicBoolean(false)
   private val activitySafeDialog = new AppActivity.SafeDialog
   private val activitySafeDialogActor = new Actor {
@@ -258,6 +261,25 @@ protected class AppActivity private () extends Actor with Logging {
       isSafeDialogEnabled.set(false)
       isSafeDialogEnabled.notifyAll
     }
+  }
+  @Loggable
+  def disableRotation() = AppActivity.Context match {
+    case Some(activity) if activity.isInstanceOf[Activity] =>
+      if (lockRotationCounter.getAndIncrement == 0)
+        Android.disableRotation(activity.asInstanceOf[Activity])
+      log.trace("set rotation lock to " + lockRotationCounter.get)
+    case context =>
+      log.warn("unable to disable rotation, invalid context " + context)
+  }
+  @Loggable
+  def enableRotation() = AppActivity.Context match {
+    case Some(activity) if activity.isInstanceOf[Activity] =>
+      lockRotationCounter.compareAndSet(0, 1)
+      if (lockRotationCounter.decrementAndGet == 0)
+        Android.enableRotation(activity.asInstanceOf[Activity])
+      log.trace("set rotation lock to " + lockRotationCounter.get)
+    case context =>
+      log.warn("unable to enable rotation, invalid context " + context)
   }
   @Loggable
   def getCachedComponentInfo(locale: String, localeLanguage: String,
@@ -521,7 +543,7 @@ protected class AppActivity private () extends Actor with Logging {
     activity.runOnUiThread(new Runnable {
       def run = activitySafeDialog.set((dialog(), () => {
         log.trace("safe dialog dismiss callback")
-        Android.enableRotation(activity)
+        AppActivity.Inner.enableRotation()
         onDismiss.foreach(_())
       }))
     })
@@ -529,7 +551,7 @@ protected class AppActivity private () extends Actor with Logging {
     (activitySafeDialog.get(DTimeout.longest) match {
       case Some((d, c)) =>
         log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
-        Android.disableRotation(activity)
+        AppActivity.Inner.disableRotation()
         Option(d)
       case None =>
         log.error("unable to show safe dialog for " + m.erasure.getName)
@@ -562,10 +584,10 @@ protected class AppActivity private () extends Actor with Logging {
           log.debug("show new safe dialog " + d + " for id " + id)
           activitySafeDialog.updateDismissCallback(() => {
             log.trace("safe dialog dismiss callback")
-            Android.enableRotation(activity)
+            AppActivity.Inner.enableRotation()
             onDismiss.foreach(_())
           })
-          Android.disableRotation(activity)
+          AppActivity.Inner.disableRotation()
           Option(d)
         } else {
           log.error("unable to show safe dialog for id " + id)

@@ -22,10 +22,12 @@ import java.io.PrintWriter
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.Date
 
+import scala.Option.option2Iterable
 import scala.actors.Futures.future
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
@@ -145,5 +147,22 @@ object Report extends Logging {
         if (ostream != null)
           ostream.close()
       }
+  }
+  @Loggable // try to submit reports if there any stack traces
+  def searchAndSubmit() = AppActivity.Context match {
+    case context: Activity =>
+      AnyBase.info.get.foreach {
+        info =>
+          Thread.sleep(DTimeout.normal) // take it gently ;-)
+          log.debug("looking for stack trace reports in: " + info.reportPath)
+          val dir = new File(info.reportPath + "/")
+          val reports = Option(dir.list()).flatten
+          if (reports.exists(_.endsWith(".stacktrace")))
+            org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
+          else
+            org.digimead.digi.ctrl.lib.base.Report.clean()
+      }
+    case context =>
+      log.debug("skip searchAndSubmit - inappropriate context " + context)
   }
 }

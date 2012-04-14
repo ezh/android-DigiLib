@@ -63,7 +63,7 @@ object InstallControl extends Logging {
             intent.addCategory(Intent.CATEGORY_BROWSABLE)
             activity.startActivity(intent)
           } catch {
-            case _ => activity.showDialog(FailedMarket.getId(activity))
+            case _ => AppActivity.Inner.showDialogSafe(activity, FailedMarket.getId(activity))
           }
         }
       }).

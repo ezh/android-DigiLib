@@ -57,6 +57,7 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def onResume() = {
     log.trace("Activity::onResume")
+    AppActivity.Inner.lockRotationCounter.set(0)
     AppActivity.Inner.resetDialogSafe
     Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     super.onResume()
@@ -64,6 +65,7 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def onPause() {
     log.trace("Activity::onPause")
     Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
+    AppActivity.Inner.lockRotationCounter.set(0)
     AppActivity.Inner.disableSafeDialogs
     AppActivity.Inner.resetDialogSafe
     Android.enableRotation(this)

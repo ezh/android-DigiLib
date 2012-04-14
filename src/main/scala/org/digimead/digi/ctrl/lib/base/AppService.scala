@@ -185,7 +185,7 @@ protected class AppService private () extends Actor with Logging {
       get(0)
   }
   @Loggable
-  protected def componentStart(componentPackage: String): Boolean = get(0) match {
+  protected def componentStart(componentPackage: String): Boolean = get(DTimeout.shortest) match {
     case Some(service) =>
       service.start(componentPackage)
     case None =>
@@ -193,7 +193,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(0) match {
+  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.shortest) match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
@@ -212,7 +212,7 @@ protected class AppService private () extends Actor with Logging {
       Left(componentPackage + " service unreachable")
   }
   @Loggable
-  protected def componentStop(componentPackage: String): Boolean = get(0) match {
+  protected def componentStop(componentPackage: String): Boolean = get(DTimeout.shortest) match {
     case Some(service) =>
       service.stop(componentPackage)
     case None =>
@@ -220,7 +220,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(0) match {
+  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.shortest) match {
     case Some(service) =>
       service.disconnect(componentPackage, processID, connectionID)
     case None =>
@@ -228,7 +228,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(0) match {
+  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.shortest) match {
     case Some(service) =>
       service.interfaces(componentPackage) match {
         case null =>
@@ -241,7 +241,7 @@ protected class AppService private () extends Actor with Logging {
       None
   }
   @Loggable
-  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(0) match {
+  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(DTimeout.shortest) match {
     case Some(service) =>
       service.pending_connections(componentPackage) match {
         case null =>
