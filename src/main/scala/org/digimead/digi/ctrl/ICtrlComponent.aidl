@@ -27,4 +27,8 @@ interface ICtrlComponent {
   boolean pre(in int id, in String workdir);
   ExecutableInfo executable(in int id, in String workdir);
   boolean post(in int id, in String workdir);
+  List<String> accessAllowRules();
+  List<String> accessDenyRules();
+  boolean accessRuleImplicitInteractive();
+  boolean accessRulesOrder(); // ADA vs DAD
 }

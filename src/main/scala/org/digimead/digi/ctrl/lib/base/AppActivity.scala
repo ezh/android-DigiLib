@@ -200,6 +200,7 @@ protected class AppActivity private () extends Actor with Logging {
   @Loggable
   def showDialogSafe(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit) {
     log.trace("Activity::showDialogSafe id " + id)
+    assert(id != 0)
     activitySafeDialogActor ! AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
   }
   def showDialogSafeWait(activity: Activity, id: Int): Option[Dialog] =
@@ -209,7 +210,7 @@ protected class AppActivity private () extends Actor with Logging {
   @Loggable
   def showDialogSafeWait(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit): Option[Dialog] = try {
     log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
-    assert(uiThreadID != Thread.currentThread.getId)
+    assert(uiThreadID != Thread.currentThread.getId && id != 0)
     (activitySafeDialogActor !? AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
   } catch {
     case e =>

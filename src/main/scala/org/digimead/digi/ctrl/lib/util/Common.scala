@@ -28,6 +28,7 @@ import java.io.InputStreamReader
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
@@ -38,16 +39,19 @@ import java.util.Date
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
-import scala.annotation.implicitNotFound
+import scala.annotation.elidable
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
+import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.declaration.DConnection
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
+import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
@@ -64,6 +68,7 @@ import android.os.Environment
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
+import annotation.elidable.ASSERTION
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
@@ -148,12 +153,42 @@ object Common extends Logging {
   }
   @Loggable
   def checkInterfaceInUse(interface: String, aclMask: String): Boolean = try {
+    log.debug("check interface " + interface + " against " + aclMask)
     def check(acl: String, str: String): Boolean =
       str.matches(acl.replaceAll("""\*""", ".+"))
     val Array(acl0: String, acl1: String, acl2: String, acl3: String, acl4: String) = aclMask.split("[:.]")
     val Array(i0: String, i1: String, i2: String, i3: String, i4: String) = interface.split("[:.]")
     check(acl0, i0) & check(acl1, i1) & check(acl2, i2) & check(acl3, i3) & check(acl4, i4)
   } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      false
+  }
+  @Loggable
+  def existsInConnectionFilter(service: ICtrlComponent, connection: DConnection, isAllowACL: Boolean): Boolean = try {
+    AppActivity.Context.map {
+      context =>
+        val ip = InetAddress.getByAddress(BigInt(connection.remoteIP).toByteArray).getHostAddress
+        log.debug("check connection with remote IP " + ip + " against " + (if (isAllowACL) "allow ACL" else "deny ACL"))
+        val acl = ip.split("""\.""") match {
+          case Array(ip1, ip2, ip3, ip4) =>
+            (ip1 + """\."""" + ip2 + """\."""" + ip3 + """\."""" + ip4).replaceAll("""\*""", ".+")
+          case _ =>
+            null
+        }
+        (if (isAllowACL) service.accessAllowRules else service.accessDenyRules).foreach {
+          acl =>
+            if (ip == acl)
+              return true
+            else {
+              if (acl != null && ip.matches(acl))
+                return true
+            }
+        }
+        false
+    } getOrElse false
+  } catch {
+    case ce: ControlThrowable => throw ce // propagate
     case e =>
       log.error(e.getMessage, e)
       false
