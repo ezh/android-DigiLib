@@ -31,4 +31,5 @@ interface ICtrlComponent {
   List<String> accessDenyRules();
   boolean accessRuleImplicitInteractive();
   boolean accessRulesOrder(); // ADA vs DAD
+  Map interfaceRules(); // String, Boolean
 }
