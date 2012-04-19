@@ -18,13 +18,17 @@ package org.digimead.digi.ctrl.lib.log
 
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
+
+import scala.Array.canBuildFrom
 import scala.collection.immutable.HashSet
 import scala.collection.immutable.HashMap
+import scala.ref.WeakReference
+
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.slf4j.LoggerFactory
+
 import android.content.Context
-import scala.ref.WeakReference
 
 trait Logging {
   implicit protected[lib] val log: RichLogger = Logging.getLogger(this)

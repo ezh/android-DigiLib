@@ -290,8 +290,7 @@ object ComponentInfo extends Logging {
           log.warn("descriptor field \"" + kind.field + "\" contain the URL is not in a valid form")
           return None
         case e: IOException =>
-          log.warn("descriptor field \"" + kind.field + "\" contain valid URL but the connection to target couldn't be established")
-          return None
+          log.trace("descriptor field \"" + kind.field + "\" contain valid URL but the connection to target couldn't be established")
       }
       Some(in)
     case Check.MarketURL(field) =>

@@ -104,7 +104,7 @@ trait Activity extends AActivity with AnyBase with Logging {
     AppActivity.Inner.setDialogSafe(dialog)
     id match {
       case id if id == Report.getId(this) =>
-        log.debug("prepare Report dialog")
+        log.debug("prepare Report dialog with id " + id)
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
           case Some(stash) =>

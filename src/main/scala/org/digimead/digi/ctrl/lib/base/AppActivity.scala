@@ -425,7 +425,8 @@ protected class AppActivity private () extends Actor with Logging {
               entityTo.delete()
             val outStream = new BufferedOutputStream(new FileOutputStream(entityTo, true), 8192)
             Common.writeToStream(am.open(entityFrom), outStream)
-            val permission = if (makePublic) "a+rx" else "u+x"
+            // -rwxr-xr-x 755 vs -rwx------ 700
+            val permission = if (makePublic) 755 else 700
             val result = Common.execChmod(permission, entityTo)
             if (!result)
               state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
@@ -457,7 +458,7 @@ protected class AppActivity private () extends Actor with Logging {
         if (!appNativePath.exists()) {
           log.debug("prepare native path: " + appNativePath.getAbsolutePath())
           appNativePath.mkdirs()
-          val result = Common.execChmod("a+x", appNativePath, true)
+          val result = Common.execChmod(711, appNativePath)
           if (!result)
             state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
               getOrElse("Error prepare native path, chmod failed"),
@@ -573,9 +574,16 @@ protected class AppActivity private () extends Actor with Logging {
     }
     activity.runOnUiThread(new Runnable {
       def run = {
-        args match {
-          case Some(bundle) => activity.showDialog(id, bundle)
-          case None => activity.showDialog(id)
+        try {
+          args match {
+            case Some(bundle) => activity.showDialog(id, bundle)
+            case None => activity.showDialog(id)
+          }
+        } catch {
+          case e =>
+            log.error(e.getMessage + " on activity " + activity, e)
+            activitySafeDialog.unset()
+            None
         }
       }
     })

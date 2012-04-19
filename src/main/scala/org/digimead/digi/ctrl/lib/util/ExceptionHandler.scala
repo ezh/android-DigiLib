@@ -51,7 +51,7 @@ object ExceptionHandler extends Logging {
   def generateStackTrace(t: Thread, e: Throwable) = AnyBase.info.get.foreach {
     info =>
       // Here you should have a more robust, permanent record of problems
-      val reportName = Report.reportPrefix + ".stacktrace"
+      val reportName = Report.reportPrefix + ".trc"
       val result = new StringWriter()
       val printWriter = new PrintWriter(result)
       e.printStackTrace(printWriter)

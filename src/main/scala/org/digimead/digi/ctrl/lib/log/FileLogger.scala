@@ -16,15 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.log
 
-import android.content.Context
-import java.io.PrintWriter
 import java.io.BufferedWriter
-import java.io.FileWriter
 import java.io.File
-import android.os.Environment
-import org.digimead.digi.ctrl.lib.util.Common
+import java.io.FileWriter
+
+import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.AnyBase
+
+import android.content.Context
 
 object FileLogger extends Logger with Logging {
   private[lib] var file: Option[File] = None
@@ -45,20 +45,17 @@ object FileLogger extends Logger with Logging {
         output.flush
     }
   }
+  @Loggable
   override def init(context: Context) = synchronized {
-    try {
-      val logname = Report.reportPrefix + ".log"
-      deinit
-      // open new
-      file = AnyBase.info.get.map(info => new File(info.reportPath, logname))
-      output = file.map(f => new BufferedWriter(new FileWriter(f)))
-      // write header
-      output.foreach(_.write(AnyBase.info.get.toString + "\n"))
-      output.foreach(_.flush)
-    } catch {
-      case e =>
-        log.error(e.getMessage, e)
-    }
+    val logname = Report.reportPrefix + ".log"
+    deinit
+    // open new
+    file = AnyBase.info.get.map(info => new File(info.reportPath, logname))
+    log.debug("open new log file " + file)
+    output = file.map(f => new BufferedWriter(new FileWriter(f)))
+    // write header
+    output.foreach(_.write(AnyBase.info.get.toString + "\n"))
+    output.foreach(_.flush)
   }
   override def deinit() = synchronized {
     try {

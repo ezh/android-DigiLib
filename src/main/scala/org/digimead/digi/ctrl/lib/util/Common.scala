@@ -23,6 +23,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FileWriter
+import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.ObjectInputStream
@@ -39,7 +40,6 @@ import java.util.Date
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
-import scala.annotation.elidable
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
@@ -51,7 +51,6 @@ import org.digimead.digi.ctrl.lib.base.AppActivity
 import org.digimead.digi.ctrl.lib.declaration.DConnection
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
-import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
@@ -68,12 +67,13 @@ import android.os.Environment
 import android.os.IBinder
 import android.text.ClipboardManager
 import android.widget.Toast
-import annotation.elidable.ASSERTION
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
+  @volatile private var busybox: Option[File] = null
   log.debug("alive")
   def dateString(date: Date) = df.format(date)
+  def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
   @Loggable
   def onCreateDialog(id: Int, activity: Activity) = id match {
     case id if id == InstallControl.getId(activity) =>
@@ -84,19 +84,31 @@ object Common extends Logging {
       null
   }
   @Loggable
-  def getDirectory(context: Context, name: String, forceInternal: Boolean = true): Option[File] = {
+  def getDirectory(context: Context, name: String, forceInternal: Boolean = false): Option[File] = {
     var result: Option[File] = None
+    log.debug("get working directory, mode 'force internal': " + forceInternal)
     if (!forceInternal) {
       // try to use external storage
       try {
-        result = Option(context.getExternalFilesDir(null)).flatMap(base =>
-          if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
+        result = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
+          val isMounted = Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
+          val base = new File(new File(preBase, "DigiApps"), context.getPackageName)
+          log.debug("try SD storage directory " + base + ", SD storage is mounted: " + isMounted)
+          if (isMounted) {
             Some(new File(base, name))
           } else
-            None)
+            None
+        })
+        if (result == None)
+          log.warn("external storage " + Option(Environment.getExternalStorageDirectory) + " unavailable")
         result.foreach(dir => {
-          if (!dir.exists)
-            dir.mkdirs
+          if (!dir.exists) {
+            log.warn("required directory " + dir + " not exists, create")
+            if (!dir.mkdirs) {
+              log.error("mkdir '" + dir + "' failed")
+              result = None
+            }
+          }
         })
       } catch {
         case e =>
@@ -214,36 +226,54 @@ object Common extends Logging {
   }
   @Loggable
   def findBusyBox(): Option[File] = {
-    var busybox: File = null
-    busybox = new File("/sbin/ext/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    busybox = new File("/system/bin/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    busybox = new File("/system/xbin/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    busybox = new File("/bin/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    busybox = new File("/sbin/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    busybox = new File("/xbin/busybox")
-    if (busybox.exists)
-      return Some(busybox)
-    None
+    val names = Seq("busybox", "toolbox")
+    if (busybox != null)
+      busybox
+    for (name <- names) {
+      var f: File = null
+      f = new File("/sbin/ext/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/system/bin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/system/xbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/bin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/sbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/xbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+    }
+    busybox = None
+    busybox
   }
   @Loggable
-  def execChmod(permission: String, file: File, recursive: Boolean = false): Boolean = {
+  def execChmod(permission: Int, file: File, recursive: Boolean = false): Boolean = {
     val busybox = findBusyBox
     if (busybox == None)
       return false
     val args = if (recursive)
-      Array(busybox.get.getAbsolutePath, "chmod", permission, file.getAbsolutePath)
+      Array(busybox.get.getAbsolutePath, "chmod", "-R", permission.toString, file.getAbsolutePath)
     else
-      Array(busybox.get.getAbsolutePath, "chmod", "-R", permission, file.getAbsolutePath)
+      Array(busybox.get.getAbsolutePath, "chmod", permission.toString, file.getAbsolutePath)
     val p = Runtime.getRuntime().exec(args)
     val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
     p.waitFor()
@@ -251,7 +281,7 @@ object Common extends Logging {
     if (retcode != 0) {
       var error = err.readLine()
       while (error != null) {
-        log.fatal("chmod error: " + error)
+        throw new IOException("chmod '" + args.mkString(" ") + "' error: " + error)
         error = err.readLine()
       }
       false

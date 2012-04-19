@@ -117,14 +117,20 @@ object Report extends Logging {
   }
   def submit(description: String): Unit = submit(null, Some(description))
   @Loggable
-  def submit(userActivity: android.app.Activity = null, description: Option[String] = None): Unit = AppActivity.Context.foreach {
-    case activity: Activity =>
-      if (userActivity != null)
-        takeScreenshot(userActivity)
+  def submit(activity: Activity = null, description: Option[String] = None): Unit = {
+    if (activity != null) {
+      takeScreenshot(activity)
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
       AppActivity.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
-    case context =>
-      log.fatal("unable to launch report dialog from illegal context")
+    } else {
+      AppActivity.Context.foreach {
+        case activity: Activity =>
+          description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
+          AppActivity.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+        case context =>
+          log.fatal("unable to launch report dialog from illegal context")
+      }
+    }
   }
   @Loggable
   def takeScreenshot(activity: android.app.Activity) = AnyBase.info.get.foreach {
@@ -149,20 +155,15 @@ object Report extends Logging {
       }
   }
   @Loggable // try to submit reports if there any stack traces
-  def searchAndSubmit() = AppActivity.Context match {
-    case context: Activity =>
-      AnyBase.info.get.foreach {
-        info =>
-          Thread.sleep(DTimeout.normal) // take it gently ;-)
-          log.debug("looking for stack trace reports in: " + info.reportPath)
-          val dir = new File(info.reportPath + "/")
-          val reports = Option(dir.list()).flatten
-          if (reports.exists(_.endsWith(".stacktrace")))
-            org.digimead.digi.ctrl.lib.dialog.Report.submit("stack trace detected")
-          else
-            org.digimead.digi.ctrl.lib.base.Report.clean()
-      }
-    case context =>
-      log.debug("skip searchAndSubmit - inappropriate context " + context)
-  }
+  def searchAndSubmit(activity: Activity) = AnyBase.info.get.map {
+    info =>
+      Thread.sleep(DTimeout.normal) // take it gently ;-)
+      log.info("looking for stack trace reports in: " + info.reportPath)
+      val dir = new File(info.reportPath + "/")
+      val reports = Option(dir.list()).flatten
+      if (reports.exists(_.endsWith(".trc")))
+        org.digimead.digi.ctrl.lib.dialog.Report.submit(activity, Some("stack trace detected"))
+      else
+        org.digimead.digi.ctrl.lib.base.Report.clean()
+  } getOrElse ({ "skip searchAndSubmit - uninitialized AnyBase.info" })
 }

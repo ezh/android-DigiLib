@@ -57,5 +57,9 @@
     <string name="Apply">Apply</string>
     <string name="Cancel">Cancel</string>
     <string name="Back">Back</string>
+    <string name="menu_help">Help</string>
+    <string name="menu_gplay">Google Play</string>
+    <string name="menu_report">Report</string>
+    <string name="menu_control">DigiControl</string>
 
 </resources>

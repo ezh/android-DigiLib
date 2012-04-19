@@ -38,7 +38,7 @@ import android.content.Context
 import android.content.Intent
 
 object Report extends Logging {
-  def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateString(new Date())
+  def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateFile(new Date())
   private[lib] def init(context: Context): Unit = synchronized {
     try {
       AnyBase.info.get foreach {
@@ -48,7 +48,7 @@ object Report extends Logging {
             Common.getDirectory(context, AnyBase.reportDirectory, true).foreach {
               internal =>
                 if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
-                  log.debug("move reports from " + internal + " to" + info.reportPath)
+                  log.debug("move reports from " + internal + " to " + info.reportPath)
                   internal.listFiles.foreach {
                     fileFrom =>
                       log.debug("move " + fileFrom.getName)
@@ -81,7 +81,7 @@ object Report extends Logging {
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {
-            if (force || reports.exists(_.endsWith(".stacktrace"))) {
+            if (force || reports.exists(_.endsWith(".trc"))) {
               val sessionId = UUID.randomUUID.toString + "-"
               val futures = reports.map(name => {
                 val report = new File(info.reportPath, name)
