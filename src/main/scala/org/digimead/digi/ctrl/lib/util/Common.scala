@@ -83,54 +83,84 @@ object Common extends Logging {
     case _ =>
       null
   }
+  // -rwx--x--x 711
   @Loggable
-  def getDirectory(context: Context, name: String, forceInternal: Boolean = false): Option[File] = {
-    var result: Option[File] = None
+  def getDirectory(context: Context, name: String, forceInternal: Boolean = false, chmod: Int = 711): Option[File] = {
+    var directory: Option[File] = None
+    var isExternal = true
+    var isNew = false
     log.debug("get working directory, mode 'force internal': " + forceInternal)
     if (!forceInternal) {
       // try to use external storage
       try {
-        result = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
+        directory = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
           val isMounted = Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
-          val base = new File(new File(preBase, "DigiApps"), context.getPackageName)
-          log.debug("try SD storage directory " + base + ", SD storage is mounted: " + isMounted)
+          val baseDigiApps = new File(preBase, "DigiApps")
+          val basePackage = new File(baseDigiApps, context.getPackageName)
+          log.debug("try SD storage directory " + basePackage + ", SD storage is mounted: " + isMounted)
           if (isMounted) {
-            Some(new File(base, name))
+            var baseReady = true
+            if (baseReady && !baseDigiApps.exists) {
+              if (!baseDigiApps.mkdir) {
+                log.error("mkdir '" + baseDigiApps + "' failed")
+                baseReady = false
+              }
+            }
+            if (baseReady && !basePackage.exists) {
+              if (!basePackage.mkdir) {
+                log.error("mkdir '" + basePackage + "' failed")
+                baseReady = false
+              }
+            }
+            if (baseReady)
+              Some(new File(basePackage, name))
+            else
+              None
           } else
             None
         })
-        if (result == None)
+        if (directory == None)
           log.warn("external storage " + Option(Environment.getExternalStorageDirectory) + " unavailable")
-        result.foreach(dir => {
+        directory.foreach(dir => {
           if (!dir.exists) {
-            log.warn("required directory " + dir + " not exists, create")
-            if (!dir.mkdirs) {
+            log.warn("directory " + dir + " does not exists, creating")
+            if (dir.mkdir)
+              isNew = true
+            else {
               log.error("mkdir '" + dir + "' failed")
-              result = None
+              directory = None
             }
           }
         })
       } catch {
         case e =>
           log.debug(e.getMessage, e)
-          result = None
+          directory = None
       }
     }
-    if (result == None) {
+    if (directory == None) {
       // try to use internal storage
+      isExternal = false
       try {
-        result = Option(context.getFilesDir()).flatMap(base => Some(new File(base, name)))
-        result.foreach(dir => {
+        directory = Option(context.getFilesDir()).flatMap(base => Some(new File(base, name)))
+        directory.foreach(dir => {
           if (!dir.exists)
-            dir.mkdirs
+            if (dir.mkdir)
+              isNew = true
+            else {
+              log.error("mkdir '" + dir + "' failed")
+              directory = None
+            }
         })
       } catch {
         case e =>
           log.debug(e.getMessage, e)
-          result = None
+          directory = None
       }
     }
-    result
+    if (directory != None && isNew && !isExternal)
+      try { Common.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
+    directory
   }
   @Loggable
   def listInterfaces(): Seq[String] = {
@@ -274,6 +304,7 @@ object Common extends Logging {
       Array(busybox.get.getAbsolutePath, "chmod", "-R", permission.toString, file.getAbsolutePath)
     else
       Array(busybox.get.getAbsolutePath, "chmod", permission.toString, file.getAbsolutePath)
+    log.debug(args.tail.mkString(" "))
     val p = Runtime.getRuntime().exec(args)
     val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
     p.waitFor()
@@ -341,7 +372,7 @@ object Common extends Logging {
         } catch {
           case e: TimeoutException =>
             // Operation timed out, so log it and attempt to cancel the thread
-            log.warn("doComponentService timeout", e)
+            log.warn("doComponentService " + componentPackage + " timeout", e)
             executionFuture.cancel(true)
             service = null
             if (!reuse)

@@ -110,8 +110,9 @@ protected class AppActivity private () extends Actor with Logging {
     }
   }
   lazy val internalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getFilesDir()))
-  lazy val externalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getExternalFilesDir(null)))
-  lazy val appNativePath = internalStorage.map(is => new File(is, DConstant.apkNativePath))
+  // -rwx--x--x 711
+  lazy val externalStorage = AppActivity.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
+  lazy val appNativePath = AppActivity.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, 700))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
     AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
@@ -177,15 +178,11 @@ protected class AppActivity private () extends Actor with Logging {
   }
   activitySafeDialogActor.start
   log.debug("disable safe dialogs")
+  log.debug("alive")
 
   def act = {
     loop {
       react {
-        case AppActivity.Message.PrepareEnvironment(activity, keep, public, callback) =>
-          if (callback == null)
-            prepareEnvironment(activity, keep, public)
-          else
-            callback(prepareEnvironment(activity, keep, public))
         case message: AnyRef =>
           log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -365,145 +362,10 @@ protected class AppActivity private () extends Actor with Logging {
       intent.putExtras(data)
       sendPrivateBroadcast(intent)
   }
-  @Loggable
-  protected def prepareEnvironment(caller: Activity, keep: Boolean, makePublic: Boolean): Boolean = {
-    for {
-      ctx <- AppActivity.Context
-      appNativePath <- appNativePath
-      info <- AnyBase.info.get
-    } yield {
-      // Copy armeabi from assests to files folder:
-      // /data/data/PKG_NAME/files
-      if (!prepareNativePath(caller))
-        return false
-      val am = ctx.getAssets()
-      val files = am.list(DConstant.apkNativePath)
-      val from = files.map(name => DConstant.apkNativePath + "/" + name)
-      val to = files.map(name => new File(appNativePath, name))
-      val nativeManifestInstalled: Option[Node] = try {
-        to.find(_.getName() == "NativeManifest.xml") match {
-          case Some(description) =>
-            if (description.exists)
-              Some(scala.xml.XML.loadFile(description))
-            else
-              None
-          case None => None
-        }
-      } catch {
-        case e =>
-          log.error(e.getMessage, e)
-          None
-      }
-      if (nativeManifest == None) {
-        log.fatal("couldn't install native armeabi files without proper manifest")
-        state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_manifest").
-          getOrElse("Error prepare environment, manifest for native files not found")))
-        return false
-      }
-      // compare versionCode
-      val appBuildFile = new File(appNativePath, ".build")
-      val appBuild = try {
-        if (appBuildFile.exists) scala.io.Source.fromFile(appBuildFile).getLines.mkString.trim else ""
-      } catch {
-        case e => ""
-      }
-      if ((info.appBuild == appBuild) && keep && to.forall(_.exists) && nativeManifestInstalled != None &&
-        checkEnvironmentVersion(nativeManifest, nativeManifestInstalled)) {
-        log.debug("skip, armeabi files already installed")
-        true
-      } else {
-        log.debug("update native files")
-        val results: Seq[Boolean] = for (
-          i <- 0 until from.length;
-          entityFrom = from(i);
-          entityTo = to(i)
-        ) yield {
-          try {
-            val toName = entityTo.getName()
-            log.debug("copy armeabi resource from apk:/" + entityFrom + " to " + entityTo)
-            if (entityTo.exists())
-              entityTo.delete()
-            val outStream = new BufferedOutputStream(new FileOutputStream(entityTo, true), 8192)
-            Common.writeToStream(am.open(entityFrom), outStream)
-            // -rwxr-xr-x 755 vs -rwx------ 700
-            val permission = if (makePublic) 755 else 700
-            val result = Common.execChmod(permission, entityTo)
-            if (!result)
-              state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
-                getOrElse("Error prepare environment, chmod failed"),
-                () => caller.showDialog(InstallControl.getId(ctx))))
-            // save appBuild
-            Common.writeToFile(appBuildFile, info.appBuild)
-            result
-          } catch {
-            case e =>
-              state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_unknown").
-                getOrElse("Error prepare environment, unknown error"),
-                () => caller.showDialog(InstallControl.getId(ctx))))
-              false
-            // TODO               return "Error process " + outFileName + ": " +!!! e.getMessage()!!!;
-          }
-        }
-        !results.exists(_ == false) // all true
-      }
-    }
-  } getOrElse false
-  @Loggable
-  private def prepareNativePath(caller: Activity): Boolean = {
-    for {
-      ctx <- AppActivity.Context
-      appNativePath <- appNativePath
-    } yield {
-      try {
-        if (!appNativePath.exists()) {
-          log.debug("prepare native path: " + appNativePath.getAbsolutePath())
-          appNativePath.mkdirs()
-          val result = Common.execChmod(711, appNativePath)
-          if (!result)
-            state.set(AppActivity.State(DState.Broken, Android.getString(ctx, "error_prepare_chmod").
-              getOrElse("Error prepare native path, chmod failed"),
-              () => caller.showDialog(InstallControl.getId(ctx))))
-          result
-        } else
-          true
-      } catch {
-        case e =>
-          log.error(e.getMessage(), e)
-          false
-      }
-    }
-  } getOrElse false
   /*
    *  true - all ok
    *  false - we need some work
    */
-  @Loggable
-  private[base] def checkEnvironmentVersion(xmlOriginal: Option[Node], xmlInstalled: Option[Node]): Boolean = {
-    if (xmlOriginal == None)
-      return true
-    else if (xmlInstalled == None)
-      return false
-    val versionOriginalText = (xmlOriginal.get \\ "manifest" \ "build" \ "version").text
-    val versionInstalledText = (xmlInstalled.get \\ "manifest" \ "build" \ "version").text
-    if (versionOriginalText.trim.isEmpty) {
-      log.warn("build version in original mainfest not found")
-      return false
-    }
-    if (versionInstalledText.trim.isEmpty) {
-      log.warn("build version in installed mainfest not found")
-      return false
-    }
-    try {
-      val versionOriginal = new Version(versionOriginalText)
-      val versionInstalled = new Version(versionInstalledText)
-      log.debug("compare versions original: " + versionOriginal + ", installed: " + versionInstalled)
-      versionOriginal.compareTo(versionInstalled) <= 0 // original version (from apk) <= installed version
-    } catch {
-      case e =>
-        log.error(e.getMessage(), e)
-        false
-    }
-  }
   @Loggable
   def synchronizeStateWithICtrlHost() = AppActivity.Context.foreach {
     activity =>
@@ -843,7 +705,6 @@ object AppActivity extends Logging {
   }
   object Message {
     sealed trait Abstract
-    case class PrepareEnvironment(activity: Activity, keep: Boolean, makePublic: Boolean, callback: (Boolean) => Any) extends Abstract
     case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
     case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
   }

@@ -38,7 +38,6 @@ case class IAmReady(val origin: Origin,
     message = in.readString)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmReady.log.debug("writeToParcel IAmReady with flags " + flags)
-    out.writeString(logger.getName)
     out.writeParcelable(origin, flags)
     out.writeString(message)
   }

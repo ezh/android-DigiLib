@@ -20,7 +20,7 @@ import android.content.Intent;
 import org.digimead.digi.ctrl.lib.info.ComponentState;
 
 interface ICtrlHost {
-  String prepare(in String componentPackage); // return path to homedir of component
+  List<String> directories(in String componentPackage);
   boolean start(in String componentPackage);
   ComponentState status(in String componentPackage);
   boolean stop(in String componentPackage);

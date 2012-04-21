@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import scala.actors.Futures.future
 import scala.actors.Actor
-import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -69,74 +69,113 @@ protected class AppService private () extends Actor with Logging {
     }
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
-
+  private val actorSecondLevelLock: AnyRef = new Object
   log.debug("alive")
+
   def act = {
     loop {
       react {
         // TODO suspend actor as scala.actors.Actor.State.Suspended when service lost
         case AppService.Message.Ping =>
-          reply(log.debug("ping"))
-        case AppService.Message.Start(componentPackage, onCompleteCallback) =>
-          log.info("receive message Start for " + componentPackage)
-          try {
-            if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            reply(log.debug("ping"))
           }
-          log.debug("return from message Start for " + componentPackage)
+        case AppService.Message.ListDirectories(componentPackage, onCompleteCallback) =>
+          assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
+          future {
+            log.info("receive message ListDirectories for " + componentPackage)
+            try {
+              onCompleteCallback(componentDirectories(componentPackage))
+            } catch {
+              case e =>
+                log.error(e.getMessage, e)
+            }
+            log.debug("return from message ListDirectories for " + componentPackage)
+          }
+        case AppService.Message.Start(componentPackage, onCompleteCallback) =>
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message Start for " + componentPackage)
+              try {
+                if (onCompleteCallback != null) onCompleteCallback(componentStart(componentPackage)) else componentStart(componentPackage)
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message Start for " + componentPackage)
+            }
+          }
         case AppService.Message.Status(componentPackage, onCompleteCallback) =>
           assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
-          log.info("receive message Status for " + componentPackage)
-          try {
-            onCompleteCallback(componentStatus(componentPackage))
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message Status for " + componentPackage)
+              try {
+                onCompleteCallback(componentStatus(componentPackage))
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message Status for " + componentPackage)
+            }
           }
-          log.debug("return from message Status for " + componentPackage)
         case AppService.Message.Stop(componentPackage, onCompleteCallback) =>
-          log.info("receive message Stop for " + componentPackage)
-          try {
-            if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message Stop for " + componentPackage)
+              try {
+                if (onCompleteCallback != null) onCompleteCallback(componentStop(componentPackage)) else componentStop(componentPackage)
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message Stop for " + componentPackage)
+            }
           }
-          log.debug("return from message Stop for " + componentPackage)
         case AppService.Message.Disconnect(componentPackage, processID, connectionID, onCompleteCallback) =>
-          log.info("receive message Disconnect for " + componentPackage)
-          try {
-            if (onCompleteCallback != null)
-              onCompleteCallback(componentDisconnect(componentPackage, processID, connectionID))
-            else
-              componentDisconnect(componentPackage, processID, connectionID)
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message Disconnect for " + componentPackage)
+              try {
+                if (onCompleteCallback != null)
+                  onCompleteCallback(componentDisconnect(componentPackage, processID, connectionID))
+                else
+                  componentDisconnect(componentPackage, processID, connectionID)
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message Disconnect for " + componentPackage)
+            }
           }
-          log.debug("return from message Disconnect for " + componentPackage)
         case AppService.Message.ListInterfaces(componentPackage, onCompleteCallback) =>
           assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
-          log.info("receive message ListInterfaces for " + componentPackage)
-          try {
-            onCompleteCallback(componentActiveInterfaces(componentPackage))
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message ListInterfaces for " + componentPackage)
+              try {
+                onCompleteCallback(componentActiveInterfaces(componentPackage))
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message ListInterfaces for " + componentPackage)
+            }
           }
-          log.debug("return from message ListInterfaces for " + componentPackage)
         case AppService.Message.ListPendingConnections(componentPackage, onCompleteCallback) =>
           assert(onCompleteCallback != null, { val e = "onCompleteCallback lost"; log.error(e); e })
-          log.info("receive message ListPendingConnections for " + componentPackage)
-          try {
-            onCompleteCallback(componentPendingConnections(componentPackage))
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+          future {
+            actorSecondLevelLock.synchronized {
+              log.info("receive message ListPendingConnections for " + componentPackage)
+              try {
+                onCompleteCallback(componentPendingConnections(componentPackage))
+              } catch {
+                case e =>
+                  log.error(e.getMessage, e)
+              }
+              log.debug("return from message ListPendingConnections for " + componentPackage)
+            }
           }
-          log.debug("return from message ListPendingConnections for " + componentPackage)
         case message: AnyRef =>
           log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
         case message =>
@@ -185,7 +224,20 @@ protected class AppService private () extends Actor with Logging {
       get(0)
   }
   @Loggable
-  protected def componentStart(componentPackage: String): Boolean = get(DTimeout.shortest) match {
+  def componentDirectories(componentPackage: String): Option[(String, String)] = get(DTimeout.short) match {
+    case Some(service) =>
+      service.directories(componentPackage) match {
+        case null =>
+          None
+        case list =>
+          Some(list.head, list.last)
+      }
+    case None =>
+      future { rebind(DTimeout.normal) }
+      None
+  }
+  @Loggable
+  protected def componentStart(componentPackage: String): Boolean = get(DTimeout.short) match {
     case Some(service) =>
       service.start(componentPackage)
     case None =>
@@ -193,7 +245,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.shortest) match {
+  protected def componentStatus(componentPackage: String): Either[String, ComponentState] = get(DTimeout.short) match {
     case Some(service) =>
       try {
         service.status(componentPackage) match {
@@ -212,7 +264,7 @@ protected class AppService private () extends Actor with Logging {
       Left(componentPackage + " service unreachable")
   }
   @Loggable
-  protected def componentStop(componentPackage: String): Boolean = get(DTimeout.shortest) match {
+  protected def componentStop(componentPackage: String): Boolean = get(DTimeout.short) match {
     case Some(service) =>
       service.stop(componentPackage)
     case None =>
@@ -220,7 +272,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.shortest) match {
+  protected def componentDisconnect(componentPackage: String, processID: Int, connectionID: Int): Boolean = get(DTimeout.short) match {
     case Some(service) =>
       service.disconnect(componentPackage, processID, connectionID)
     case None =>
@@ -228,7 +280,7 @@ protected class AppService private () extends Actor with Logging {
       false
   }
   @Loggable
-  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.shortest) match {
+  def componentActiveInterfaces(componentPackage: String): Option[Seq[String]] = get(DTimeout.short) match {
     case Some(service) =>
       service.interfaces(componentPackage) match {
         case null =>
@@ -241,7 +293,7 @@ protected class AppService private () extends Actor with Logging {
       None
   }
   @Loggable
-  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(DTimeout.shortest) match {
+  def componentPendingConnections(componentPackage: String): Option[Seq[Intent]] = get(DTimeout.short) match {
     case Some(service) =>
       service.pending_connections(componentPackage) match {
         case null =>
@@ -424,11 +476,12 @@ object AppService extends Logging {
   }
   object Message {
     object Ping
+    case class ListDirectories(componentPackage: String, onCompleteCallback: (Option[(String, String)]) => Unit)
     case class Start(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
     case class Status(componentPackage: String, onCompleteCallback: (Either[String, ComponentState]) => Unit)
     case class Stop(componentPackage: String, onCompleteCallback: (Boolean) => Unit = null)
     case class Disconnect(componentPackage: String, processID: Int, connectionID: Int, onCompleteCallback: (Boolean) => Unit = null)
-    case class ListInterfaces(componentPackage: String, onCompleteCallback: (Option[Seq[String]]) => Unit = null)
-    case class ListPendingConnections(componentPackage: String, onCompleteCallback: (Option[Seq[Intent]]) => Unit = null)
+    case class ListInterfaces(componentPackage: String, onCompleteCallback: (Option[Seq[String]]) => Unit)
+    case class ListPendingConnections(componentPackage: String, onCompleteCallback: (Option[Seq[Intent]]) => Unit)
   }
 }

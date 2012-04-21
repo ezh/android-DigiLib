@@ -24,7 +24,9 @@ import android.os.Parcel
 
 case class ComponentState(val componentPackage: String,
   val executableState: List[ExecutableState],
-  val state: DState.Value) extends Parcelable {
+  val state: DState.Value,
+  val execPath: String,
+  val dataPath: String) extends Parcelable {
   def this(in: Parcel) = this(componentPackage = in.readString,
     executableState =
       in.readParcelableArray(null) match {
@@ -33,12 +35,16 @@ case class ComponentState(val componentPackage: String,
         case p =>
           p.map(_.asInstanceOf[ExecutableState]).toList
       },
-    state = DState(in.readInt))
+    state = DState(in.readInt),
+    execPath = in.readString,
+    dataPath = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
     ComponentState.log.debug("writeToParcel ComponentState with flags " + flags)
     out.writeString(componentPackage)
     out.writeParcelableArray(executableState.toArray, 0)
     out.writeInt(state.id)
+    out.writeString(execPath)
+    out.writeString(dataPath)
   }
   def describeContents() = 0
 }
