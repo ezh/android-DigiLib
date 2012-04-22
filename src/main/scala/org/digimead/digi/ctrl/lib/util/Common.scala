@@ -16,16 +16,13 @@
 
 package org.digimead.digi.ctrl.lib.util
 
-import java.io.BufferedReader
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FileWriter
-import java.io.IOException
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.OutputStream
@@ -70,7 +67,6 @@ import android.widget.Toast
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
-  @volatile private var busybox: Option[File] = null
   log.debug("alive")
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
@@ -159,7 +155,7 @@ object Common extends Logging {
       }
     }
     if (directory != None && isNew && !isExternal)
-      try { Common.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
+      try { Android.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
     directory
   }
   @Loggable
@@ -210,7 +206,13 @@ object Common extends Logging {
   def existsInConnectionFilter(service: ICtrlComponent, connection: DConnection, isAllowACL: Boolean): Boolean = try {
     AppActivity.Context.map {
       context =>
-        val ip = InetAddress.getByAddress(BigInt(connection.remoteIP).toByteArray).getHostAddress
+        val ip = try {
+          InetAddress.getByAddress(BigInt(connection.remoteIP).toByteArray).getHostAddress
+        } catch {
+          case e =>
+            log.warn(e.getMessage)
+            return false
+        }
         log.debug("check connection with remote IP " + ip + " against " + (if (isAllowACL) "allow ACL" else "deny ACL"))
         val acl = ip.split("""\.""") match {
           case Array(ip1, ip2, ip3, ip4) =>
@@ -253,71 +255,6 @@ object Common extends Logging {
         getOrElse("There are no files to copy to clipboard")
     }
     Toast.makeText(context, text, DConstant.toastTimeout).show()
-  }
-  @Loggable
-  def findBusyBox(): Option[File] = {
-    val names = Seq("busybox", "toolbox")
-    if (busybox != null)
-      busybox
-    for (name <- names) {
-      var f: File = null
-      f = new File("/sbin/ext/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-      f = new File("/system/bin/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-      f = new File("/system/xbin/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-      f = new File("/bin/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-      f = new File("/sbin/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-      f = new File("/xbin/" + name)
-      if (f.exists) {
-        busybox = Some(f)
-        return busybox
-      }
-    }
-    busybox = None
-    busybox
-  }
-  @Loggable
-  def execChmod(permission: Int, file: File, recursive: Boolean = false): Boolean = {
-    val busybox = findBusyBox
-    if (busybox == None)
-      return false
-    val args = if (recursive)
-      Array(busybox.get.getAbsolutePath, "chmod", "-R", permission.toString, file.getAbsolutePath)
-    else
-      Array(busybox.get.getAbsolutePath, "chmod", permission.toString, file.getAbsolutePath)
-    log.debug(args.tail.mkString(" "))
-    val p = Runtime.getRuntime().exec(args)
-    val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
-    p.waitFor()
-    val retcode = p.exitValue()
-    if (retcode != 0) {
-      var error = err.readLine()
-      while (error != null) {
-        throw new IOException("chmod '" + args.mkString(" ") + "' error: " + error)
-        error = err.readLine()
-      }
-      false
-    } else
-      true
   }
   @Loggable
   def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppActivity.Context foreach {

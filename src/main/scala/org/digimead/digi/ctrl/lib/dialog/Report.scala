@@ -71,6 +71,17 @@ object Report extends Logging {
                 AppActivity.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
                 try {
+                  val myUID = android.os.Process.myUid
+                  Android.withProcess({
+                    case (uid, gid, pid, path) =>
+                      val cmd = new File(path, "cmdline")
+                      if (uid == myUID && cmd.exists) {
+                        if (scala.io.Source.fromFile(cmd).getLines.exists(_.contains("armeabi/bridge"))) {
+                          log.debug("send HUP signal to bridge with PID " + pid)
+                          android.os.Process.sendSignal(pid, 1)
+                        }
+                      }
+                  })
                   val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
                   file.createNewFile()
                   writer = new PrintWriter(file)
@@ -83,6 +94,9 @@ object Report extends Logging {
                   writer.println("description: " + summary.getText.toString)
                   writer.println("generation time: " + date)
                   writer.println("generation time (long): " + time)
+                  writer.println("ps: \n" + Android.collectCommandOutput("ps"))
+                  writer.println("\nnetstat: \n" + Android.collectCommandOutput("netstat"))
+                  Thread.sleep(1000)
                 } catch {
                   case e =>
                     log.error(e.getMessage, e)

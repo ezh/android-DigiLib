@@ -25,7 +25,6 @@ import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
-import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.storage.GoogleCloud
 import org.digimead.digi.ctrl.lib.util.Common
@@ -78,6 +77,7 @@ object Report extends Logging {
       context match {
         case activity: Activity =>
           activity.sendBroadcast(new Intent(DIntent.FlushReport))
+          Thread.sleep(500) // waiting for no reason ;-)
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {

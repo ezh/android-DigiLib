@@ -16,8 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.File
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -324,7 +323,7 @@ object AppService extends Logging {
       log.info("reinitialize AppService core subsystem for " + root.getPackageName())
     } else {
       log.info("initialize AppService for " + root.getPackageName())
-      resetNatives(root)
+      resetNatives()
     }
     if (_inner != null)
       inner = _inner
@@ -371,37 +370,33 @@ object AppService extends Logging {
       log.info("AppService hold last context. Clear.")
       AppActivity.deinitRoutine(packageName)
     }
-    AnyBase.getContext.foreach(resetNatives)
+    resetNatives
   }
   def Inner = inner
   def ICtrlHost = inner.get()
-  //  def initialized() = synchronized {
-  //    while (inner != null)
-  //      wait()
-  //  }
   @Loggable
-  private def resetNatives(context: Context) = future {
-    /*    val myUID = Process.myUid
-    val actvityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
-    val processes = actvityManager.getRunningAppProcesses()
-    for (i <- 0 until processes.size() if processes.get(i).uid == myUID) {
-      val processInfo = processes.get(i)
-    }*/
-    val args = Array("pkill", "-9", "-P", "1") // children of init
-    log.debug("exec " + args.mkString(" "))
-    val p = Runtime.getRuntime().exec(args)
-    val err = new BufferedReader(new InputStreamReader(p.getErrorStream()))
-    p.waitFor()
-    val retcode = p.exitValue()
-    if (retcode != 0) {
-      var error = err.readLine()
-      while (error != null) {
-        log.fatal("pkill error: " + error)
-        error = err.readLine()
+  private def resetNatives() = future {
+    val myUID = android.os.Process.myUid
+    Android.withProcess({
+      case (uid, gid, pid, path) => try {
+        val cmd = new File(path, "cmdline")
+        val stat = new File(path, "stat")
+        if (uid == myUID && cmd.exists && stat.exists) {
+          if (scala.io.Source.fromFile(cmd).getLines.exists(_.contains("armeabi/bridge"))) {
+            val statParts = scala.io.Source.fromFile(stat).getLines.next.split("""\s+""")
+            val ppid = statParts(3).toInt
+            if (ppid <= 1) {
+              log.warn("kill bridge with PID " + pid + " and PPID " + ppid)
+              android.os.Process.sendSignal(pid, android.os.Process.SIGNAL_KILL)
+            } else
+              log.debug("detect bridge with PID " + pid + " and PPID " + ppid)
+          }
+        }
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
       }
-      false
-    } else
-      true
+    })
   }
   private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[ICtrlHost]): Option[ICtrlHost] = synchronized {
     if (timeout == -1) {

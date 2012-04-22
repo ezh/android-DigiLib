@@ -16,7 +16,14 @@
 
 package org.digimead.digi.ctrl.lib.util
 
+import java.io.BufferedReader
+import java.io.File
+import java.io.IOException
+import java.io.InputStreamReader
+
+import scala.Array.canBuildFrom
 import scala.ref.WeakReference
+import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
@@ -29,6 +36,7 @@ import android.os.Build
 import android.view.Surface
 
 object Android extends Logging {
+  @volatile private var busybox: Option[File] = null
   def getString(context: WeakReference[Context], name: String): Option[String] =
     context.get.flatMap(ctx => getString(ctx, name))
   def getString(context: Context, name: String): Option[String] =
@@ -95,4 +103,141 @@ object Android extends Logging {
   @Loggable
   def enableRotation(activity: Activity) =
     activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
+  @Loggable
+  def findBusyBox(): Option[File] = {
+    val names = Seq("busybox", "toolbox")
+    if (busybox != null)
+      busybox
+    for (name <- names) {
+      var f: File = null
+      f = new File("/sbin/ext/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/system/bin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/system/xbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/bin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/sbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+      f = new File("/xbin/" + name)
+      if (f.exists) {
+        busybox = Some(f)
+        return busybox
+      }
+    }
+    busybox = None
+    busybox
+  }
+  @Loggable
+  def execChmod(permission: Int, file: File, recursive: Boolean = false): Boolean = {
+    val busybox = findBusyBox
+    if (busybox == None)
+      return false
+    val args = if (recursive)
+      Array(busybox.get.getAbsolutePath, "chmod", "-R", permission.toString, file.getAbsolutePath)
+    else
+      Array(busybox.get.getAbsolutePath, "chmod", permission.toString, file.getAbsolutePath)
+    log.debug(args.tail.mkString(" "))
+    val p = Runtime.getRuntime().exec(args)
+    val err = new BufferedReader(new InputStreamReader(p.getErrorStream))
+    p.waitFor()
+    val retcode = p.exitValue()
+    if (retcode != 0) {
+      var error = err.readLine()
+      while (error != null) {
+        throw new IOException("chmod '" + args.mkString(" ") + "' error: " + error)
+        error = err.readLine()
+      }
+      false
+    } else
+      true
+  }
+  // UID, GID, PID, Path
+  @Loggable
+  def withProcess(func: (Int, Int, Int, File) => Unit): Boolean = try {
+    val busybox = findBusyBox
+    if (busybox == None)
+      return false
+    val args = Array(busybox.get.getAbsolutePath, "ls", "-l", "/proc")
+    log.debug(args.tail.mkString(" "))
+    val p = Runtime.getRuntime().exec(args)
+    val out = new BufferedReader(new InputStreamReader(p.getInputStream))
+    val err = new BufferedReader(new InputStreamReader(p.getErrorStream))
+    // read output
+    var output = out.readLine()
+    while (output != null) {
+      if (output.startsWith("dr")) {
+        val parts = output.trim.split("""\s+""")
+        if (parts.last.matches("[0-9]+"))
+          func(parts(2).toInt, parts(3).toInt, parts.last.toInt, new File("/proc/" + parts.last))
+      }
+      output = out.readLine()
+    }
+    p.waitFor()
+    val retcode = p.exitValue()
+    if (retcode != 0) {
+      var error = err.readLine()
+      while (error != null) {
+        throw new IOException("ls '" + args.mkString(" ") + "' error: " + error)
+        error = err.readLine()
+      }
+      return false
+    }
+    true
+  } catch {
+    case ce: ControlThrowable => throw ce // propagate
+    case e =>
+      log.error(e.getMessage, e)
+      false
+  }
+  @Loggable(result = false)
+  def collectCommandOutput(commandArgs: String*): Option[String] = try {
+    var buffer: Seq[String] = Seq()
+    val busybox = findBusyBox
+    if (busybox == None)
+      return None
+    val args = Array(busybox.get.getAbsolutePath) ++ commandArgs
+    log.debug(args.tail.mkString(" "))
+    val p = Runtime.getRuntime().exec(args)
+    val out = new BufferedReader(new InputStreamReader(p.getInputStream))
+    val err = new BufferedReader(new InputStreamReader(p.getErrorStream))
+    // read output
+    var output = out.readLine()
+    while (output != null) {
+      buffer = buffer :+ output
+      output = out.readLine()
+    }
+    p.waitFor()
+    val retcode = p.exitValue()
+    if (retcode != 0) {
+      var error = err.readLine()
+      while (error != null) {
+        throw new IOException("ls '" + args.mkString(" ") + "' error: " + error)
+        error = err.readLine()
+      }
+      return None
+    }
+    Some(buffer.mkString("\n"))
+  } catch {
+    case ce: ControlThrowable => throw ce // propagate
+    case e =>
+      log.error(e.getMessage, e)
+      None
+  }
 }
