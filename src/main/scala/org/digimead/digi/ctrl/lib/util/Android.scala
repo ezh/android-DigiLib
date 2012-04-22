@@ -168,37 +168,39 @@ object Android extends Logging {
     } else
       true
   }
-  // UID, GID, PID, Path
+  // _NAME IN UPPER CASE_, UID, GID, PID, PPID, Path
   @Loggable
-  def withProcess(func: (Int, Int, Int, File) => Unit): Boolean = try {
-    val busybox = findBusyBox
-    if (busybox == None)
-      return false
-    val args = Array(busybox.get.getAbsolutePath, "ls", "-l", "/proc")
-    log.debug(args.tail.mkString(" "))
-    val p = Runtime.getRuntime().exec(args)
-    val out = new BufferedReader(new InputStreamReader(p.getInputStream))
-    val err = new BufferedReader(new InputStreamReader(p.getErrorStream))
-    // read output
-    var output = out.readLine()
-    while (output != null) {
-      if (output.startsWith("dr")) {
-        val parts = output.trim.split("""\s+""")
-        if (parts.last.matches("[0-9]+"))
-          func(parts(2).toInt, parts(3).toInt, parts.last.toInt, new File("/proc/" + parts.last))
+  def withProcess(func: (String, Int, Int, Int, Int, File) => Unit): Boolean = try {
+    new File("/proc").listFiles.foreach(file => {
+      val status = new File(file, "status")
+      if (file.isDirectory && status.exists && status.canRead) {
+        var name: Option[String] = None
+        var uid: Option[Int] = None
+        var gid: Option[Int] = None
+        var pid: Option[Int] = None
+        var ppid: Option[Int] = None
+        scala.io.Source.fromFile(status).getLines.foreach(_.toUpperCase.split("""[:\s]+""") match {
+          case Array("NAME", n) =>
+            name = Some(n)
+          case Array("PID", n) =>
+            pid = Some(n.toInt)
+          case Array("PPID", n) =>
+            ppid = Some(n.toInt)
+          case Array("UID", n1, n2, n3, n4) =>
+            uid = Some(n1.toInt)
+          case Array("GID", n1, n2, n3, n4) =>
+            gid = Some(n1.toInt)
+          case _ =>
+        })
+        for {
+          name <- name
+          uid <- uid
+          gid <- gid
+          pid <- pid
+          ppid <- ppid
+        } func(name, uid, gid, pid, ppid, file)
       }
-      output = out.readLine()
-    }
-    p.waitFor()
-    val retcode = p.exitValue()
-    if (retcode != 0) {
-      var error = err.readLine()
-      while (error != null) {
-        throw new IOException("ls '" + args.mkString(" ") + "' error: " + error)
-        error = err.readLine()
-      }
-      return false
-    }
+    })
     true
   } catch {
     case ce: ControlThrowable => throw ce // propagate

@@ -378,20 +378,13 @@ object AppService extends Logging {
   private def resetNatives() = future {
     val myUID = android.os.Process.myUid
     Android.withProcess({
-      case (uid, gid, pid, path) => try {
-        val cmd = new File(path, "cmdline")
-        val stat = new File(path, "stat")
-        if (uid == myUID && cmd.exists && stat.exists) {
-          if (scala.io.Source.fromFile(cmd).getLines.exists(_.contains("armeabi/bridge"))) {
-            val statParts = scala.io.Source.fromFile(stat).getLines.next.split("""\s+""")
-            val ppid = statParts(3).toInt
-            if (ppid <= 1) {
-              log.warn("kill bridge with PID " + pid + " and PPID " + ppid)
-              android.os.Process.sendSignal(pid, android.os.Process.SIGNAL_KILL)
-            } else
-              log.debug("detect bridge with PID " + pid + " and PPID " + ppid)
-          }
-        }
+      case (name, uid, gid, pid, ppid, path) => try {
+        if (uid == myUID && name == "BRIDGE")
+          if (ppid <= 1) {
+            log.warn("kill bridge with PID " + pid + " and PPID " + ppid)
+            android.os.Process.sendSignal(pid, android.os.Process.SIGNAL_KILL)
+          } else
+            log.debug("detect bridge with PID " + pid + " and PPID " + ppid)
       } catch {
         case e =>
           log.error(e.getMessage, e)

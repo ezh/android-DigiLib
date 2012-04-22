@@ -73,13 +73,10 @@ object Report extends Logging {
                 try {
                   val myUID = android.os.Process.myUid
                   Android.withProcess({
-                    case (uid, gid, pid, path) =>
-                      val cmd = new File(path, "cmdline")
-                      if (uid == myUID && cmd.exists) {
-                        if (scala.io.Source.fromFile(cmd).getLines.exists(_.contains("armeabi/bridge"))) {
-                          log.debug("send HUP signal to bridge with PID " + pid)
-                          android.os.Process.sendSignal(pid, 1)
-                        }
+                    case (name, uid, gid, pid, ppid, path) =>
+                      if (uid == myUID && name == "BRIDGE") {
+                        log.debug("send HUP signal to bridge with PID " + pid)
+                        android.os.Process.sendSignal(pid, 1)
                       }
                   })
                   val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
