@@ -22,6 +22,7 @@ import java.io.FileWriter
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.Report
+import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.AnyBase
 
 import android.content.Context
@@ -50,7 +51,17 @@ object FileLogger extends Logger with Logging {
     val logname = Report.reportPrefix + ".log"
     deinit
     // open new
-    file = AnyBase.info.get.map(info => new File(info.reportPath, logname))
+    file = AnyBase.info.get.flatMap(info => {
+      val file = new File(info.reportPath, logname)
+      if (file.createNewFile) {
+        // -rw-r--r--
+        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
+        Some(file)
+      } else {
+        log.error("unable to create log file " + file)
+        None
+      }
+    })
     log.debug("open new log file " + file)
     output = file.map(f => new BufferedWriter(new FileWriter(f)))
     // write header

@@ -31,6 +31,7 @@ import scala.actors.Futures.awaitAll
 import scala.actors.Actor
 import scala.annotation.elidable
 import scala.annotation.implicitNotFound
+import scala.collection.mutable.Publisher
 import scala.collection.JavaConversions._
 import scala.collection.immutable.LongMap
 import scala.collection.mutable.SynchronizedMap
@@ -71,44 +72,7 @@ import annotation.elidable.ASSERTION
 
 protected class AppActivity private () extends Actor with Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
-  lazy val state = new SyncVar[AppActivity.State]() with Logging {
-    private var lastNonBusyState: AppActivity.State = null
-    private var busyCounter = 0
-    set(AppActivity.State(DState.Unknown))
-    override def set(newState: AppActivity.State, signalAll: Boolean = true): Unit = synchronized {
-      if (newState.code == DState.Busy) {
-        busyCounter += 1
-        log.debug("increase status busy counter to " + busyCounter)
-        if (isSet && get.code != DState.Busy)
-          lastNonBusyState = get
-        super.set(newState, signalAll)
-      } else if (busyCounter != 0) {
-        lastNonBusyState = newState
-      } else
-        super.set(newState, signalAll)
-      log.debug("set status to " + newState)
-      AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
-    }
-    @Loggable
-    def freeBusy() = synchronized {
-      if (busyCounter > 1) {
-        busyCounter -= 1
-        log.debug("decrease status busy counter to " + busyCounter)
-      } else if (busyCounter == 1) {
-        busyCounter -= 1
-        log.debug("reset status busy counter")
-        lastNonBusyState match {
-          case state: AppActivity.State =>
-            lastNonBusyState = null
-            set(state)
-          case state =>
-            log.warn("unknown lastNonBusyState condition " + state)
-        }
-      } else {
-        log.fatal("illegal busyCounter")
-      }
-    }
-  }
+  lazy val state = new AppActivity.StateContainer
   lazy val internalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getFilesDir()))
   // -rwx--x--x 711
   lazy val externalStorage = AppActivity.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
@@ -367,7 +331,7 @@ protected class AppActivity private () extends Actor with Logging {
    *  false - we need some work
    */
   @Loggable
-  def synchronizeStateWithICtrlHost() = AppActivity.Context.foreach {
+  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null) = AppActivity.Context.foreach {
     activity =>
       AppService.Inner ! AppService.Message.Status(activity.getPackageName, {
         case Right(componentState) =>
@@ -380,9 +344,11 @@ protected class AppActivity private () extends Actor with Logging {
               AppActivity.State(DState.Passive)
           }
           AppActivity.Inner.state.set(appState)
+          if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
           val appState = AppActivity.State(DState.Broken, error)
           AppActivity.Inner.state.set(appState)
+          if (onFinish != null) onFinish(DState.Broken)
       })
   }
   /*protected def listInterfaces(): Either[String, java.util.List[String]] =
@@ -514,7 +480,7 @@ object AppActivity extends Logging {
       inner = new AppActivity()
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect() = deinitializationInProgressLock.synchronized {
+  private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
     deinitializationLock.set(false) // try to cancel
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, waiting...")
@@ -524,11 +490,8 @@ object AppActivity extends Logging {
       }
     }
     log.info("resurrect AppActivity core subsystem")
-    AppActivity.Inner match {
-      case activity: AppActivity =>
-        activity.activitySafeDialog.unset()
-      case null =>
-    }
+    if (caller.isInstanceOf[AppActivity])
+      caller.asInstanceOf[AppActivity].activitySafeDialog.unset()
   }
   private[lib] def deinit(): Unit = future {
     if (deinitializationInProgressLock.compareAndSet(false, true))
@@ -712,5 +675,44 @@ object AppActivity extends Logging {
     log.g_a_s_e("default onClick callback for " + getClass().getName())
   }) extends Logging {
     log.debugWhere("create new state " + code, 3)
+  }
+  class StateContainer extends SyncVar[AppActivity.State] with Publisher[AppActivity.State] with Logging {
+    private var lastNonBusyState: AppActivity.State = null
+    private var busyCounter = 0
+    set(AppActivity.State(DState.Unknown))
+    override def set(newState: AppActivity.State, signalAll: Boolean = true): Unit = synchronized {
+      if (newState.code == DState.Busy) {
+        busyCounter += 1
+        log.debug("increase status busy counter to " + busyCounter)
+        if (isSet && get.code != DState.Busy)
+          lastNonBusyState = get
+        super.set(newState, signalAll)
+      } else if (busyCounter != 0) {
+        lastNonBusyState = newState
+      } else
+        super.set(newState, signalAll)
+      log.debug("set status to " + newState)
+      publish(newState)
+      AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
+    }
+    @Loggable
+    def freeBusy() = synchronized {
+      if (busyCounter > 1) {
+        busyCounter -= 1
+        log.debug("decrease status busy counter to " + busyCounter)
+      } else if (busyCounter == 1) {
+        busyCounter -= 1
+        log.debug("reset status busy counter")
+        lastNonBusyState match {
+          case state: AppActivity.State =>
+            lastNonBusyState = null
+            set(state)
+          case state =>
+            log.warn("unknown lastNonBusyState condition " + state)
+        }
+      } else {
+        log.fatal("illegal busyCounter")
+      }
+    }
   }
 }

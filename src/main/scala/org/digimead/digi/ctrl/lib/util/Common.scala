@@ -91,14 +91,21 @@ object Common extends Logging {
       try {
         directory = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
           val isMounted = Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED
-          val baseDigiApps = new File(preBase, "DigiApps")
-          val basePackage = new File(baseDigiApps, context.getPackageName)
+          val baseAndroid = new File(preBase, "Android")
+          val baseAndroidData = new File(baseAndroid, "data")
+          val basePackage = new File(baseAndroidData, context.getPackageName)
           log.debug("try SD storage directory " + basePackage + ", SD storage is mounted: " + isMounted)
           if (isMounted) {
             var baseReady = true
-            if (baseReady && !baseDigiApps.exists) {
-              if (!baseDigiApps.mkdir) {
-                log.error("mkdir '" + baseDigiApps + "' failed")
+            if (baseReady && !baseAndroid.exists) {
+              if (!baseAndroid.mkdir) {
+                log.error("mkdir '" + baseAndroid + "' failed")
+                baseReady = false
+              }
+            }
+            if (baseReady && !baseAndroidData.exists) {
+              if (!baseAndroidData.mkdir) {
+                log.error("mkdir '" + baseAndroidData + "' failed")
                 baseReady = false
               }
             }
@@ -263,8 +270,16 @@ object Common extends Logging {
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
       if (AppActivity.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
         log.debug("reuse service connection")
-        f(AppActivity.Inner.bindedICtrlPool(componentPackage)._3)
-        return
+        val (context, connection, service) = AppActivity.Inner.bindedICtrlPool(componentPackage)
+        if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
+          log.debug("binder alive")
+          f(service)
+          return
+        } else {
+          log.warn("try to unbind dead service")
+          context.unbindService(connection)
+          AppActivity.Inner.bindedICtrlPool.remove(componentPackage)
+        }
       }
       // lock for bindService
       val lock = new Lock

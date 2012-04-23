@@ -40,24 +40,22 @@ object Report extends Logging {
   def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateFile(new Date())
   private[lib] def init(context: Context): Unit = synchronized {
     try {
-      AnyBase.info.get foreach {
-        info =>
-          AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
-            // move reports from internal to external storage
-            Common.getDirectory(context, AnyBase.reportDirectory, true).foreach {
-              internal =>
-                if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
-                  log.debug("move reports from " + internal + " to " + info.reportPath)
-                  internal.listFiles.foreach {
-                    fileFrom =>
-                      log.debug("move " + fileFrom.getName)
-                      val fileTo = new File(info.reportPath, fileFrom.getName)
-                      Common.copyFile(fileFrom, fileTo)
-                      fileFrom.delete
-                  }
-                }
-            }
+      // create report directory in Common.getDirectory and add LazyInit
+      for {
+        info <- AnyBase.info.get
+        internal <- Common.getDirectory(context, info.reportPath.getName, true, 755)
+      } AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+        // move reports from internal to external storage
+        if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
+          log.debug("move reports from " + internal + " to " + info.reportPath)
+          internal.listFiles.foreach {
+            fileFrom =>
+              log.debug("move " + fileFrom.getName)
+              val fileTo = new File(info.reportPath, fileFrom.getName)
+              Common.copyFile(fileFrom, fileTo)
+              fileFrom.delete
           }
+        }
       }
     } catch {
       case e => log.error(e.getMessage, e)

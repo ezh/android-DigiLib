@@ -65,6 +65,8 @@ object ExceptionHandler extends Logging {
         bos.flush()
         // Close up everything
         bos.close()
+        // -rw-r--r--
+        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
         AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Error))) // try to notify user, if it is possible
       } catch {
         // Nothing much we can do about this - the game is over

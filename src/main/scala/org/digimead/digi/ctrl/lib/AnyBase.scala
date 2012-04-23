@@ -52,7 +52,7 @@ object AnyBase extends Logging {
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
-  @volatile var reportDirectory = "report"
+  @volatile private var reportDirectory = "report"
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -64,8 +64,8 @@ object AnyBase extends Logging {
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true) = synchronized {
     log.debug("initialize AnyBase context " + context.getClass.getName)
-    AppActivity.resurrect
-    AppService.resurrect
+    AppActivity.resurrect(context)
+    AppService.resurrect()
     context match {
       case activity: Activity =>
         if (!contextPool.exists(_.get == context)) {
@@ -164,7 +164,7 @@ object AnyBase extends Logging {
         val pi = pm.getPackageInfo(context.getPackageName(), 0)
         val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
         val writeReport = pref.getBoolean(pi.packageName, true)
-        val info = new AnyBase.Info(reportPath = Common.getDirectory(context, reportDirectory).get,
+        val info = new AnyBase.Info(reportPath = Common.getDirectory(context, reportDirectory, false, 755).get,
           appVersion = pi.versionName,
           appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,
