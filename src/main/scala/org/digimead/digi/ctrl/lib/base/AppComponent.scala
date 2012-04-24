@@ -70,33 +70,33 @@ import android.net.Uri
 
 import annotation.elidable.ASSERTION
 
-protected class AppActivity private () extends Actor with Logging {
+protected class AppComponent private () extends Actor with Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
-  lazy val state = new AppActivity.StateContainer
-  lazy val internalStorage = AppActivity.Context.flatMap(ctx => Option(ctx.getFilesDir()))
+  lazy val state = new AppComponent.StateContainer
+  lazy val internalStorage = AppComponent.Context.flatMap(ctx => Option(ctx.getFilesDir()))
   // -rwx--x--x 711
-  lazy val externalStorage = AppActivity.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
-  lazy val appNativePath = AppActivity.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, 700))
+  lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
+  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, 700))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
-    AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
+    AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
   lazy val applicationManifest = try {
-    AppActivity.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
+    AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
   } catch {
     case e => log.error(e.getMessage, e); None
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
   private[lib] val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicBoolean(false)
-  private val activitySafeDialog = new AppActivity.SafeDialog
+  private val activitySafeDialog = new AppComponent.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
       loop {
         react {
-          case AppActivity.Message.ShowDialog(activity, dialog, onDismiss) =>
+          case AppComponent.Message.ShowDialog(activity, dialog, onDismiss) =>
             val s = sender
             log.info("receive message ShowDialog " + dialog)
             // wait for previous dialog
@@ -114,7 +114,7 @@ protected class AppActivity private () extends Actor with Logging {
             log.debug("return from message ShowDialog with result " + result)
             if (s.receiver.getState == Actor.State.Blocked)
               s ! result // only for ShowDialogSafeWait
-          case AppActivity.Message.ShowDialogResource(activity, dialog, args, onDismiss) =>
+          case AppComponent.Message.ShowDialogResource(activity, dialog, args, onDismiss) =>
             val s = sender
             log.info("receive message ShowDialogResource " + dialog)
             // wait for previous dialog
@@ -162,7 +162,7 @@ protected class AppActivity private () extends Actor with Logging {
   def showDialogSafe(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit) {
     log.trace("Activity::showDialogSafe id " + id)
     assert(id != 0)
-    activitySafeDialogActor ! AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
+    activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
   }
   def showDialogSafeWait(activity: Activity, id: Int): Option[Dialog] =
     showDialogSafeWait(activity, id, null)
@@ -172,7 +172,7 @@ protected class AppActivity private () extends Actor with Logging {
   def showDialogSafeWait(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit): Option[Dialog] = try {
     log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
     assert(uiThreadID != Thread.currentThread.getId && id != 0)
-    (activitySafeDialogActor !? AppActivity.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
+    (activitySafeDialogActor !? AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
   } catch {
     case e =>
       log.error(e.getMessage, e)
@@ -183,7 +183,7 @@ protected class AppActivity private () extends Actor with Logging {
   @Loggable
   def showDialogSafe[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]) {
     log.trace("Activity::showDialogSafe " + m.erasure.getName)
-    activitySafeDialogActor ! AppActivity.Message.ShowDialog(activity, dialog, Option(onDismiss))
+    activitySafeDialogActor ! AppComponent.Message.ShowDialog(activity, dialog, Option(onDismiss))
   }
   def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Option[T] =
     showDialogSafeWait[T](activity, dialog, null)
@@ -191,7 +191,7 @@ protected class AppActivity private () extends Actor with Logging {
   def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
     log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + currentThread.getId + " and ui " + uiThreadID)
     assert(uiThreadID != Thread.currentThread.getId)
-    (activitySafeDialogActor !? AppActivity.Message.ShowDialog(activity, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
+    (activitySafeDialogActor !? AppComponent.Message.ShowDialog(activity, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
   } catch {
     case e =>
       log.error(e.getMessage, e)
@@ -225,7 +225,7 @@ protected class AppActivity private () extends Actor with Logging {
     }
   }
   @Loggable
-  def disableRotation() = AppActivity.Context match {
+  def disableRotation() = AppComponent.Context match {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       if (lockRotationCounter.getAndIncrement == 0)
         Android.disableRotation(activity.asInstanceOf[Activity])
@@ -234,7 +234,7 @@ protected class AppActivity private () extends Actor with Logging {
       log.warn("unable to disable rotation, invalid context " + context)
   }
   @Loggable
-  def enableRotation() = AppActivity.Context match {
+  def enableRotation() = AppComponent.Context match {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       lockRotationCounter.compareAndSet(0, 1)
       if (lockRotationCounter.decrementAndGet == 0)
@@ -261,16 +261,18 @@ protected class AppActivity private () extends Actor with Logging {
               None
           }
       }
-    }): Option[ComponentInfo] = applicationManifest.flatMap {
-    appManifest =>
-      AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
-        case Some(info) =>
-          Some(info.asInstanceOf[ComponentInfo])
-        case None =>
-          val result = getComponentInfo(locale, localeLanguage, iconExtractor)
-          result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
-          result
-      }
+    }): Option[ComponentInfo] = AppComponent.synchronized {
+    applicationManifest.flatMap {
+      appManifest =>
+        AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
+          case Some(info) =>
+            Some(info.asInstanceOf[ComponentInfo])
+          case None =>
+            val result = getComponentInfo(locale, localeLanguage, iconExtractor)
+            result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
+            result
+        }
+    }
   }
   @Loggable
   def getComponentInfo(locale: String, localeLanguage: String,
@@ -305,21 +307,21 @@ protected class AppActivity private () extends Actor with Logging {
     }
   } getOrElse None
   @Loggable
-  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
+  def sendPrivateBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppComponent.Context foreach {
     context =>
       intent.putExtra("__private__", true)
       flags.foreach(intent.addFlags)
       context.sendBroadcast(intent, DPermission.Base)
   }
   @Loggable
-  def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppActivity.Context foreach {
+  def sendPrivateOrderedBroadcast(intent: Intent, flags: Seq[Int] = Seq()) = AppComponent.Context foreach {
     context =>
       intent.putExtra("__private__", true)
       flags.foreach(intent.addFlags)
       context.sendOrderedBroadcast(intent, DPermission.Base)
   }
   @Loggable
-  def giveTheSign(key: Uri, data: Bundle): Unit = AppActivity.Context foreach {
+  def giveTheSign(key: Uri, data: Bundle): Unit = AppComponent.Context foreach {
     context =>
       log.debug("send the " + key)
       val intent = new Intent(DIntent.SignResponse, key)
@@ -331,28 +333,28 @@ protected class AppActivity private () extends Actor with Logging {
    *  false - we need some work
    */
   @Loggable
-  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null) = AppActivity.Context.foreach {
+  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null) = AppComponent.Context.foreach {
     activity =>
-      AppService.Inner ! AppService.Message.Status(activity.getPackageName, {
+      AppControl.Inner.callStatus(activity.getPackageName)() match {
         case Right(componentState) =>
           val appState = componentState.state match {
             case DState.Active =>
-              AppActivity.State(DState.Active)
+              AppComponent.State(DState.Active)
             case DState.Broken =>
-              AppActivity.State(DState.Broken, "service failed")
+              AppComponent.State(DState.Broken, "service failed")
             case _ =>
-              AppActivity.State(DState.Passive)
+              AppComponent.State(DState.Passive)
           }
-          AppActivity.Inner.state.set(appState)
+          AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
-          val appState = AppActivity.State(DState.Broken, error)
-          AppActivity.Inner.state.set(appState)
+          val appState = AppComponent.State(DState.Broken, error)
+          AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Broken)
-      })
+      }
   }
   /*protected def listInterfaces(): Either[String, java.util.List[String]] =
-    AppService().get() match {
+    AppControl().get() match {
       case Some(service) =>
         try {
           Right(service.listInterfaces())
@@ -373,7 +375,7 @@ protected class AppActivity private () extends Actor with Logging {
     activity.runOnUiThread(new Runnable {
       def run = activitySafeDialog.set((dialog(), () => {
         log.trace("safe dialog dismiss callback")
-        AppActivity.Inner.enableRotation()
+        AppComponent.Inner.enableRotation()
         onDismiss.foreach(_())
       }))
     })
@@ -381,7 +383,7 @@ protected class AppActivity private () extends Actor with Logging {
     (activitySafeDialog.get(DTimeout.longest) match {
       case Some((d, c)) =>
         log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
-        AppActivity.Inner.disableRotation()
+        AppComponent.Inner.disableRotation()
         Option(d)
       case None =>
         log.error("unable to show safe dialog for " + m.erasure.getName)
@@ -421,10 +423,10 @@ protected class AppActivity private () extends Actor with Logging {
           log.debug("show new safe dialog " + d + " for id " + id)
           activitySafeDialog.updateDismissCallback(() => {
             log.trace("safe dialog dismiss callback")
-            AppActivity.Inner.enableRotation()
+            AppComponent.Inner.enableRotation()
             onDismiss.foreach(_())
           })
-          AppActivity.Inner.disableRotation()
+          AppComponent.Inner.disableRotation()
           Option(d)
         } else {
           log.error("unable to show safe dialog for id " + id)
@@ -445,23 +447,23 @@ protected class AppActivity private () extends Actor with Logging {
     !activity.isFinishing && activity.getWindow != null
 }
 
-object AppActivity extends Logging {
-  @volatile private var inner: AppActivity = null
+object AppComponent extends Logging {
+  @volatile private var inner: AppComponent = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
   private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
   @Loggable
-  private[lib] def init(root: Context, _inner: AppActivity = null) = {
+  private[lib] def init(root: Context, _inner: AppComponent = null) = {
     deinitializationLock.set(false)
     initRoutine(root, _inner)
   }
-  private[lib] def initRoutine(root: Context, _inner: AppActivity) = synchronized {
+  private[lib] def initRoutine(root: Context, _inner: AppComponent) = synchronized {
     // cancel deinitialization sequence if any
     LazyInit("initialize AppCache") { AppCache.init(root) }
     if (inner != null) {
-      log.info("reinitialize AppActivity core subsystem for " + root.getPackageName())
+      log.info("reinitialize AppComponent core subsystem for " + root.getPackageName())
       // unbind services from bindedICtrlPool
       AnyBase.getContext.foreach {
         context =>
@@ -473,11 +475,11 @@ object AppActivity extends Logging {
           })
       }
     } else
-      log.info("initialize AppActivity for " + root.getPackageName())
+      log.info("initialize AppComponent for " + root.getPackageName())
     if (_inner != null)
       inner = _inner
     else
-      inner = new AppActivity()
+      inner = new AppComponent()
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
@@ -489,20 +491,20 @@ object AppActivity extends Logging {
           deinitializationInProgressLock.wait
       }
     }
-    log.info("resurrect AppActivity core subsystem")
-    if (caller.isInstanceOf[AppActivity])
-      caller.asInstanceOf[AppActivity].activitySafeDialog.unset()
+    log.info("resurrect AppComponent core subsystem")
+    if (caller.isInstanceOf[AppComponent])
+      caller.asInstanceOf[AppComponent].activitySafeDialog.unset()
   }
   private[lib] def deinit(): Unit = future {
     if (deinitializationInProgressLock.compareAndSet(false, true))
       try {
         val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-        log.info("deinitializing AppActivity for " + packageName)
+        log.info("deinitializing AppComponent for " + packageName)
         if (deinitializationLock.isSet)
           deinitializationLock.unset()
         deinitializationLock.get(deinitializationTimeout) match {
           case Some(false) =>
-            log.info("deinitialization AppActivity for " + packageName + " canceled")
+            log.info("deinitialization AppComponent for " + packageName + " canceled")
           case _ =>
             deinitRoutine(packageName)
         }
@@ -514,13 +516,13 @@ object AppActivity extends Logging {
       }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
-    log.info("deinitialize AppActivity for " + packageName)
+    log.info("deinitialize AppComponent for " + packageName)
     assert(inner != null)
     val savedInner = inner
     inner = null
-    if (AnyBase.isLastContext && AppService.Inner != null) {
-      log.info("AppActivity hold last context. Clear.")
-      AppService.deinitRoutine(packageName)
+    if (AnyBase.isLastContext && AppControl.Inner != null) {
+      log.info("AppComponent hold last context. Clear.")
+      AppControl.deinitRoutine(packageName)
     }
     // unbind services from bindedICtrlPool
     AnyBase.getContext.foreach {
@@ -676,11 +678,11 @@ object AppActivity extends Logging {
   }) extends Logging {
     log.debugWhere("create new state " + code, 3)
   }
-  class StateContainer extends SyncVar[AppActivity.State] with Publisher[AppActivity.State] with Logging {
-    private var lastNonBusyState: AppActivity.State = null
+  class StateContainer extends SyncVar[AppComponent.State] with Publisher[AppComponent.State] with Logging {
+    private var lastNonBusyState: AppComponent.State = null
     private var busyCounter = 0
-    set(AppActivity.State(DState.Unknown))
-    override def set(newState: AppActivity.State, signalAll: Boolean = true): Unit = synchronized {
+    set(AppComponent.State(DState.Unknown))
+    override def set(newState: AppComponent.State, signalAll: Boolean = true): Unit = synchronized {
       if (newState.code == DState.Busy) {
         busyCounter += 1
         log.debug("increase status busy counter to " + busyCounter)
@@ -693,7 +695,7 @@ object AppActivity extends Logging {
         super.set(newState, signalAll)
       log.debug("set status to " + newState)
       publish(newState)
-      AppActivity.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
+      AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     @Loggable
     def freeBusy() = synchronized {
@@ -704,7 +706,7 @@ object AppActivity extends Logging {
         busyCounter -= 1
         log.debug("reset status busy counter")
         lastNonBusyState match {
-          case state: AppActivity.State =>
+          case state: AppComponent.State =>
             lastNonBusyState = null
             set(state)
           case state =>

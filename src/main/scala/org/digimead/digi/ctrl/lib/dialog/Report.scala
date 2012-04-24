@@ -26,7 +26,7 @@ import scala.Option.option2Iterable
 import scala.actors.Futures.future
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
@@ -66,9 +66,9 @@ object Report extends Logging {
         def onClick(dialog: DialogInterface, which: Int) = {
           AnyBase.info.get.foreach {
             info =>
-              AppActivity.Inner.resetDialogSafe
+              AppComponent.Inner.resetDialogSafe
               future {
-                AppActivity.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
@@ -103,7 +103,7 @@ object Report extends Logging {
                 }
                 val i = new AtomicInteger()
                 org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
-                  AppActivity.Inner.getDialogSafe(0) match {
+                  AppComponent.Inner.getDialogSafe(0) match {
                     case Some(dialog) =>
                       activity.runOnUiThread(new Runnable {
                         def run = dialog.asInstanceOf[AlertDialog].setMessage("uploading " + i.incrementAndGet + "/" + n)
@@ -111,7 +111,7 @@ object Report extends Logging {
                     case _ =>
                   }
                 }))
-                AppActivity.Inner.resetDialogSafe
+                AppComponent.Inner.resetDialogSafe
                 org.digimead.digi.ctrl.lib.base.Report.clean()
               }
           }
@@ -120,7 +120,7 @@ object Report extends Logging {
       setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          AppActivity.Inner.resetDialogSafe
+          AppComponent.Inner.resetDialogSafe
           org.digimead.digi.ctrl.lib.base.Report.clean()
         }
       }).
@@ -132,12 +132,12 @@ object Report extends Logging {
     if (activity != null) {
       takeScreenshot(activity)
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-      AppActivity.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+      AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
     } else {
-      AppActivity.Context.foreach {
+      AppComponent.Context.foreach {
         case activity: Activity =>
           description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-          AppActivity.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+          AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
         case context =>
           log.fatal("unable to launch report dialog from illegal context")
       }

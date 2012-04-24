@@ -44,7 +44,7 @@ object Report extends Logging {
       for {
         info <- AnyBase.info.get
         internal <- Common.getDirectory(context, info.reportPath.getName, true, 755)
-      } AppActivity.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+      } AppComponent.LazyInit("try to submit reports if there any stack traces, clean outdated") {
         // move reports from internal to external storage
         if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
           log.debug("move reports from " + internal + " to " + info.reportPath)
@@ -65,7 +65,7 @@ object Report extends Logging {
   def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Unit = synchronized {
     for {
       info <- AnyBase.info.get
-      context <- AppActivity.Context
+      context <- AppComponent.Context
     } {
       log.debug("looking for error reports in: " + info.reportPath)
       val dir = new File(info.reportPath + "/")
@@ -125,7 +125,7 @@ object Report extends Logging {
   def clean(): Unit = synchronized {
     for {
       info <- AnyBase.info.get
-      context <- AppActivity.Context
+      context <- AppComponent.Context
     } {
       val dir = new File(info.reportPath + "/")
       val reports = Option(dir.list()).flatten

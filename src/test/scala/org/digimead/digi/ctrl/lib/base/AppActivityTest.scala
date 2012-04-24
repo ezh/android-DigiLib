@@ -24,7 +24,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
 import org.scalatest.matchers.ShouldMatchers._
 
-class AppActivityTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
+class AppComponentTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
   lazy val roboClassLoader = RobotEsTrick.classLoader
   lazy val roboDelegateLoadingClasses = RobotEsTrick.delegateLoadingClasses
@@ -68,7 +68,7 @@ class AppActivityTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAfte
                                       <origin>Copyright © 2011-2012 Alexey B. Aksenov/Ezh. All rights reserved.</origin>
                                     </application>
                                   </manifest>
-    //AppActivity.Inner.checkEnvironmentVersion(Some(nativeManifest), Some(nativeManifestInstalled)) should be(true)
+    //AppComponent.Inner.checkEnvironmentVersion(Some(nativeManifest), Some(nativeManifestInstalled)) should be(true)
     Logging.flush
   }
 }

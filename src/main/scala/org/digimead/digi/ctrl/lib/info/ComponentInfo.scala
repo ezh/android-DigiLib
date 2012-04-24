@@ -22,12 +22,15 @@ import java.net.URL
 import java.util.regex.Pattern
 
 import scala.Option.option2Iterable
+import scala.actors.Futures.awaitAll
+import scala.actors.Futures.future
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Version
 
@@ -204,37 +207,39 @@ object ComponentInfo extends Logging {
   @Loggable
   def apply(xml: Elem, locale: String, localeLanguage: String, iconExtractor: (Seq[(IconType, String)]) => Seq[Option[Array[Byte]]]): Option[ComponentInfo] = try {
     log.debug("check XML content")
-    val id = check(Check.Text("id"), xml \\ "id" headOption)
-    val name = check(Check.Text("name"), suitable(xml \\ "name", locale, localeLanguage))
-    val version = check(Check.Version("version"), xml \\ "version" headOption)
-    val description = check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage))
-    val project = check(Check.URL("project"), xml \\ "project" headOption)
-    val thumb = check(Check.URL("thumb"), xml \\ "thumb" headOption)
-    val origin = check(Check.Text("origin"), xml \\ "origin" headOption)
-    val license = check(Check.Text("license"), xml \\ "license" headOption)
-    val email = check(Check.EMail("email"), xml \\ "email" headOption)
-    val icon_hdpi = check(Check.URL("icon-hdpi"), xml \\ "icon-hdpi" headOption)
-    val icon_ldpi = check(Check.URL("icon-ldpi"), xml \\ "icon-ldpi" headOption)
-    val icon_mdpi = check(Check.URL("icon-mdpi"), xml \\ "icon-mdpi" headOption)
-    val icon_xhdpi = check(Check.URL("icon-xhdpi"), xml \\ "icon-xhdpi" headOption)
-    val market = check(Check.MarketURL("market"), xml \\ "market" headOption)
-    val packageName = check(Check.PackageName("package-name"), xml \\ "package-name" headOption)
+    val id = future { check(Check.Text("id"), xml \\ "id" headOption) }
+    val name = future { check(Check.Text("name"), suitable(xml \\ "name", locale, localeLanguage)) }
+    val version = future { check(Check.Version("version"), xml \\ "version" headOption) }
+    val description = future { check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage)) }
+    val project = future { check(Check.URL("project"), xml \\ "project" headOption) }
+    val thumb = future { check(Check.URL("thumb"), xml \\ "thumb" headOption) }
+    val origin = future { check(Check.Text("origin"), xml \\ "origin" headOption) }
+    val license = future { check(Check.Text("license"), xml \\ "license" headOption) }
+    val email = future { check(Check.EMail("email"), xml \\ "email" headOption) }
+    val icon_hdpi = future { check(Check.URL("icon-hdpi"), xml \\ "icon-hdpi" headOption) }
+    val icon_ldpi = future { check(Check.URL("icon-ldpi"), xml \\ "icon-ldpi" headOption) }
+    val icon_mdpi = future { check(Check.URL("icon-mdpi"), xml \\ "icon-mdpi" headOption) }
+    val icon_xhdpi = future { check(Check.URL("icon-xhdpi"), xml \\ "icon-xhdpi" headOption) }
+    val market = future { check(Check.MarketURL("market"), xml \\ "market" headOption) }
+    val packageName = future { check(Check.PackageName("package-name"), xml \\ "package-name" headOption) }
+    awaitAll(DTimeout.normal, id, name, version, description, project, thumb, origin, license,
+      email, icon_hdpi, icon_ldpi, icon_mdpi, icon_xhdpi, market, packageName)
     val artifact: Option[ComponentInfo] = (for {
-      id <- id
-      name <- name
-      version <- version
-      description <- description
-      project <- project
-      thumb <- thumb
-      origin <- origin
-      license <- license
-      email <- email
-      icon_hdpi <- icon_hdpi
-      icon_ldpi <- icon_ldpi
-      icon_mdpi <- icon_mdpi
-      icon_xhdpi <- icon_xhdpi
-      market <- market
-      packageName <- packageName
+      id <- id()
+      name <- name()
+      version <- version()
+      description <- description()
+      project <- project()
+      thumb <- thumb()
+      origin <- origin()
+      license <- license()
+      email <- email()
+      icon_hdpi <- icon_hdpi()
+      icon_ldpi <- icon_ldpi()
+      icon_mdpi <- icon_mdpi()
+      icon_xhdpi <- icon_xhdpi()
+      market <- market()
+      packageName <- packageName()
     } yield {
       log.debug("create FetchedItem from descriptor")
       val Seq(thumbIcon, iconLDPI, iconMDPI, iconHDPI, iconXHDPI) =

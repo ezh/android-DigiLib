@@ -89,20 +89,30 @@ object Android extends Logging {
       SCREEN_ORIENTATION_REVERSE_PORTRAIT = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
     if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_90) {
-      if (orientation == Configuration.ORIENTATION_PORTRAIT)
+      if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+        log.debug("lock orientation PORTRAIT with r:" + rotation + " and o:" + orientation)
         activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-      else if (orientation == Configuration.ORIENTATION_LANDSCAPE)
+      } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        log.debug("lock orientation LANDSCAPE with r:" + rotation + " and o:" + orientation)
         activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+      } else {
+        log.debug("skip orientation UNKNOWN with r:" + rotation + " and o:" + orientation)
+      }
     } else if (rotation == Surface.ROTATION_180 || rotation == Surface.ROTATION_270) {
-      if (orientation == Configuration.ORIENTATION_PORTRAIT)
+      if (orientation == Configuration.ORIENTATION_PORTRAIT) {
+        log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and o:" + orientation)
         activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_PORTRAIT)
-      else if (orientation == Configuration.ORIENTATION_LANDSCAPE)
+      } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+        log.debug("lock orientation REVERSE_LANDSCAPE with r:" + rotation + " and o:" + orientation)
         activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
+      } else {
+        log.debug("skip orientation PORTRAIT with r:" + rotation + " and o:" + orientation)
+      }
     }
   }
   @Loggable
   def enableRotation(activity: Activity) =
-    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
+    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
   @Loggable
   def findBusyBox(): Option[File] = {
     val names = Seq("busybox", "toolbox")
@@ -179,19 +189,24 @@ object Android extends Logging {
         var gid: Option[Int] = None
         var pid: Option[Int] = None
         var ppid: Option[Int] = None
-        scala.io.Source.fromFile(status).getLines.foreach(_.toUpperCase.split("""[:\s]+""") match {
-          case Array("NAME", n) =>
-            name = Some(n)
-          case Array("PID", n) =>
-            pid = Some(n.toInt)
-          case Array("PPID", n) =>
-            ppid = Some(n.toInt)
-          case Array("UID", n1, n2, n3, n4) =>
-            uid = Some(n1.toInt)
-          case Array("GID", n1, n2, n3, n4) =>
-            gid = Some(n1.toInt)
-          case _ =>
-        })
+        try {
+          scala.io.Source.fromFile(status).getLines.foreach(_.toUpperCase.split("""[:\s]+""") match {
+            case Array("NAME", n) =>
+              name = Some(n)
+            case Array("PID", n) =>
+              pid = Some(n.toInt)
+            case Array("PPID", n) =>
+              ppid = Some(n.toInt)
+            case Array("UID", n1, n2, n3, n4) =>
+              uid = Some(n1.toInt)
+            case Array("GID", n1, n2, n3, n4) =>
+              gid = Some(n1.toInt)
+            case _ =>
+          })
+        } catch {
+          case e =>
+            log.warn(e.getMessage)
+        }
         for {
           name <- name
           uid <- uid

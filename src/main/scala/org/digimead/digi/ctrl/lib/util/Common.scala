@@ -44,7 +44,7 @@ import scala.concurrent.Lock
 import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConnection
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -211,7 +211,7 @@ object Common extends Logging {
   }
   @Loggable
   def existsInConnectionFilter(service: ICtrlComponent, connection: DConnection, isAllowACL: Boolean): Boolean = try {
-    AppActivity.Context.map {
+    AppComponent.Context.map {
       context =>
         val ip = try {
           InetAddress.getByAddress(BigInt(connection.remoteIP).toByteArray).getHostAddress
@@ -246,7 +246,7 @@ object Common extends Logging {
   }
   @Loggable
   def listPreparedFiles(context: Context): Option[Seq[File]] = for {
-    appNativePath <- AppActivity.Inner.appNativePath
+    appNativePath <- AppComponent.Inner.appNativePath
   } yield context.getAssets.list(DConstant.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)
   @Loggable
   def copyPreparedFilesToClipboard(context: Context) = {
@@ -264,13 +264,13 @@ object Common extends Logging {
     Toast.makeText(context, text, DConstant.toastTimeout).show()
   }
   @Loggable
-  def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppActivity.Context foreach {
+  def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppComponent.Context foreach {
     context =>
       log.debug("start doComponentService with timeout " + operationTimeout)
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
-      if (AppActivity.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
+      if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
         log.debug("reuse service connection")
-        val (context, connection, service) = AppActivity.Inner.bindedICtrlPool(componentPackage)
+        val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
         if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
           log.debug("binder alive")
           f(service)
@@ -278,7 +278,7 @@ object Common extends Logging {
         } else {
           log.warn("try to unbind dead service")
           context.unbindService(connection)
-          AppActivity.Inner.bindedICtrlPool.remove(componentPackage)
+          AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
         }
       }
       // lock for bindService
@@ -308,7 +308,7 @@ object Common extends Logging {
             if (service != null) {
               if (reuse) {
                 log.debug("add service connection to bindedICtrlPool")
-                AppActivity.Inner.bindedICtrlPool(componentPackage) = (context, connection, service)
+                AppComponent.Inner.bindedICtrlPool(componentPackage) = (context, connection, service)
               }
               f(service)
             }

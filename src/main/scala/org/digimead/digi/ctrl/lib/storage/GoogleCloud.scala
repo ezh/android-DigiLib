@@ -36,7 +36,7 @@ import org.apache.http.util.EntityUtils
 import org.apache.http.HttpHost
 import org.apache.http.HttpVersion
 import org.apache.http.NameValuePair
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
@@ -64,7 +64,7 @@ object GoogleCloud extends Logging {
   private lazy val accessToken = new AtomicReference[Option[AccessToken]](None)
   val tokenURL = "https://accounts.google.com/o/oauth2/token"
   val uploadURL = "http://commondatastorage.googleapis.com"
-  protected lazy val httpclient = AppActivity.Context.map {
+  protected lazy val httpclient = AppComponent.Context.map {
     context =>
       val client = AndroidHttpClient.newInstance("Android")
       client.getParams().setParameter(CoreProtocolPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_1)
@@ -88,7 +88,7 @@ object GoogleCloud extends Logging {
       client
   }
   val upload: (File, String) => Unit = uploadViaApache
-  def uploadViaApache(file: File, prefix: String = "") = AppActivity.Context.foreach {
+  def uploadViaApache(file: File, prefix: String = "") = AppComponent.Context.foreach {
     context =>
       log.debug("upload via Apache client " + file.getName + " with default credentials")
       val result = for {
@@ -141,7 +141,7 @@ object GoogleCloud extends Logging {
       if (result == None)
         log.warn("unable to upload " + file)
   }
-  def uploadViaNetty(file: File, prefix: String = "") = AppActivity.Context.foreach {
+  def uploadViaNetty(file: File, prefix: String = "") = AppComponent.Context.foreach {
     context =>
       log.debug("upload via Netty client " + file.getName + " with default credentials")
       val result = for {

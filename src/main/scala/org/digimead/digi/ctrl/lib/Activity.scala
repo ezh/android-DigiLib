@@ -23,7 +23,7 @@ import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.dialog.Report
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
@@ -57,23 +57,23 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def onResume() = {
     log.trace("Activity::onResume")
-    AppActivity.Inner.lockRotationCounter.set(0)
-    AppActivity.Inner.resetDialogSafe
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.resetDialogSafe
     Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
     Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
-    AppActivity.Inner.lockRotationCounter.set(0)
-    AppActivity.Inner.disableSafeDialogs
-    AppActivity.Inner.resetDialogSafe
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.disableSafeDialogs
+    AppComponent.Inner.resetDialogSafe
     Android.enableRotation(this)
     super.onPause()
   }
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
-   * in fact AppActivity.deinit is a sporadic event
+   * in fact AppComponent.deinit is a sporadic event
    */
   override def onDestroy() = {
     log.trace("Activity::onDestroy")
@@ -81,7 +81,7 @@ trait Activity extends AActivity with AnyBase with Logging {
     super.onDestroy()
     onDestroyBase(this, {
       if (AnyBase.isLastContext)
-        AppActivity.deinit()
+        AppComponent.deinit()
       else
         log.debug("skip onDestroy deinitialization, because there is another context coexists")
       Activity.super.onDestroy()
@@ -101,7 +101,7 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def onPrepareDialog(id: Int, dialog: Dialog, args: Bundle): Unit = {
     super.onPrepareDialog(id, dialog, args)
     log.trace("Activity::onPrepareDialog")
-    AppActivity.Inner.setDialogSafe(dialog)
+    AppComponent.Inner.setDialogSafe(dialog)
     id match {
       case id if id == Report.getId(this) =>
         log.debug("prepare Report dialog with id " + id)

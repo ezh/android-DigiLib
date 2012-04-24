@@ -18,7 +18,7 @@ package org.digimead.digi.ctrl.lib.log
 
 import java.util.Date
 
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.RobotEsTrick
@@ -170,9 +170,9 @@ class LoggingTestFileLogger_j1 extends FunSuite with BeforeAndAfter with RobotEs
 
   test("file location") {
     AnyBase.info.get should not be (None)
-    AppActivity.Context should not be (None)
-    AppActivity.Inner.internalStorage should not be (None)
-    AppActivity.Inner.externalStorage should be(None)
+    AppComponent.Context should not be (None)
+    AppComponent.Inner.internalStorage should not be (None)
+    AppComponent.Inner.externalStorage should be(None)
     Logging.logger.head should equal(FileLogger)
     FileLogger.file should not be (None)
     FileLogger.output should not be (None)

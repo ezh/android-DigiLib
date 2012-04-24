@@ -16,7 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.message
 
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 
@@ -49,5 +49,5 @@ object Origin extends Logging {
     }
     def newArray(size: Int): Array[Origin] = new Array[Origin](size)
   }
-  def packageName = AppActivity.Context.map(_.getPackageName).getOrElse("unknown")
+  def packageName = AppComponent.Context.map(_.getPackageName).getOrElse("unknown")
 }

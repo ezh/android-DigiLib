@@ -17,7 +17,7 @@
 package org.digimead.digi.ctrl.lib.dialog
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.base.AppActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
@@ -63,7 +63,7 @@ object InstallControl extends Logging {
             intent.addCategory(Intent.CATEGORY_BROWSABLE)
             activity.startActivity(intent)
           } catch {
-            case _ => AppActivity.Inner.showDialogSafe(activity, FailedMarket.getId(activity))
+            case _ => AppComponent.Inner.showDialogSafe(activity, FailedMarket.getId(activity))
           }
         }
       }).
@@ -71,7 +71,7 @@ object InstallControl extends Logging {
         @Loggable
         def onClick(dialog: DialogInterface, whichButton: Int) {
           log.info("copy path of prepared files to clipboard")
-          AppActivity.Context.foreach(ctx => Common.copyPreparedFilesToClipboard(ctx))
+          AppComponent.Context.foreach(ctx => Common.copyPreparedFilesToClipboard(ctx))
         }
       }).
       create()

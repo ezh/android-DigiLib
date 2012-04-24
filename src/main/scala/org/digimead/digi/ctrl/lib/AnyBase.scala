@@ -25,8 +25,8 @@ import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.base.AppActivity
-import org.digimead.digi.ctrl.lib.base.AppService
+import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.base.AppControl
 import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.util.Common
@@ -64,22 +64,22 @@ object AnyBase extends Logging {
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true) = synchronized {
     log.debug("initialize AnyBase context " + context.getClass.getName)
-    AppActivity.resurrect(context)
-    AppService.resurrect()
+    AppComponent.resurrect(context)
+    AppControl.resurrect()
     context match {
       case activity: Activity =>
         if (!contextPool.exists(_.get == context)) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
           if (contextPool.isEmpty)
-            AppActivity.init(context)
+            AppComponent.init(context)
         }
       case service: Service =>
         if (!contextPool.exists(_.get == context)) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
           if (contextPool.isEmpty)
-            AppService.init(context)
+            AppControl.init(context)
         }
       case context =>
         // all other contexts are temporary, look at isLastContext
@@ -88,35 +88,35 @@ object AnyBase extends Logging {
         if (stackTraceOnUnknownContext)
           log.fatal("init from unknown context " + context)
     }
-    if (AppActivity.Inner == null)
-      AppActivity.init(context)
-    if (AppService.Inner == null)
-      AppService.init(context)
+    if (AppComponent.Inner == null)
+      AppComponent.init(context)
+    if (AppControl.Inner == null)
+      AppControl.init(context)
     if (AnyBase.info.get == None) {
       Info.init(context)
       Logging.init(context)
       Report.init(context)
       uncaughtExceptionHandler.register(context)
-      log.debug("start AppActivity singleton actor")
-      AppActivity.Inner.start
+      log.debug("start AppComponent singleton actor")
+      AppComponent.Inner.start
     }
   }
   def deinit(context: Context) = synchronized {
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
     // unbind bindedICtrlPool entities for context
-    if (AppActivity.Inner != null)
-      AppActivity.Inner.bindedICtrlPool.foreach(t => {
+    if (AppComponent.Inner != null)
+      AppComponent.Inner.bindedICtrlPool.foreach(t => {
         val key = t._1
         val (bindContext, connection, component) = t._2
         if (bindContext == context)
-          AppActivity.Inner.bindedICtrlPool.remove(key).map(record => {
+          AppComponent.Inner.bindedICtrlPool.remove(key).map(record => {
             log.debug("remove service connection to " + key + " from bindedICtrlPool")
             record._1.unbindService(record._2)
           })
       })
     // unbind bindedICtrlPool entities for context
-    if (AppService.Inner != null && AppService.Inner.ctrlBindContext.get == context)
-      AppService.Inner.unbind
+    if (AppControl.Inner != null && AppControl.Inner.ctrlBindContext.get == context)
+      AppControl.Inner.unbind
     // update contextPool
     contextPool = contextPool.filter(_.get != context)
     updateContext()

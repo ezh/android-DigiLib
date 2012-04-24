@@ -20,6 +20,7 @@ object DTimeout {
   val shortest = 1000
   val short = 5000
   val normal = 10000
-  val long = 60000
+  val long = 20000
+  val longer = 60000
   val longest = 5 * 60000
 }

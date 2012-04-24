@@ -53,8 +53,12 @@ object FileLogger extends Logger with Logging {
     // open new
     file = AnyBase.info.get.flatMap(info => {
       val file = new File(info.reportPath, logname)
-      if (file.createNewFile) {
+      if (file.exists) {
+        log.warn("log file " + file + " already exists")
+        Some(file)
+      } else if (file.createNewFile) {
         // -rw-r--r--
+        log.info("create new log file " + file)
         try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
         Some(file)
       } else {

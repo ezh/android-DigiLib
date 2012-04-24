@@ -32,6 +32,7 @@ import org.digimead.digi.ctrl.lib.log.Logging
 
 object HackDoggyCode extends Logging {
   log.debug("alive")
+
   def getCurrentThreadPoolCoreSize = ThreadPoolConfig.corePoolSize
   def getCurrentThreadPoolMaxSize = ThreadPoolConfig.maxPoolSize
   def getResizableThreadPoolSchedulerCoreSize(pool: ResizableThreadPoolScheduler): Int =

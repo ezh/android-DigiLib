@@ -93,7 +93,12 @@ object Logging {
     var count = 0
     var records: Seq[Record] = Seq()
     while (count < n && !queue.isEmpty()) {
-      records = records :+ queue.poll()
+      queue.poll() match {
+        case record: Record =>
+          records = records :+ record
+        case other =>
+          records = records :+ Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, "__LOGGER__", "unknown record '" + other + "'")
+      }
       count += 1;
     }
     logger.foreach(_(records))
