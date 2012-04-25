@@ -386,6 +386,7 @@ object Common extends Logging {
   def unparcelFromList[T <: android.os.Parcelable](s: java.util.List[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] =
     if (s == null) None else unparcelFromArray[T](s.toList.toArray, loader)
   def unparcelFromArray[T <: android.os.Parcelable](s: Array[Byte], loader: ClassLoader = null)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
+    if (s == null) return None
     assert(m.erasure.getName != "java.lang.Object")
     val p = android.os.Parcel.obtain()
     p.unmarshall(s, 0, s.length)

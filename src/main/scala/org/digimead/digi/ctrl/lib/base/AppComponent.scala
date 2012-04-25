@@ -587,7 +587,7 @@ object AppComponent extends Logging {
       get(0) match {
         case Some((previousDialog, dismissCallback)) if previousDialog != null =>
           if (d._1 == previousDialog) {
-            log.fatal("overwrite the same dialog '" + d + "'")
+            log.fatal("overwrite the same dialog '" + d._1 + "'")
             return
           }
           log.info("replace safe dialog '" + previousDialog + "' with new one '" + d._1 + "'")
@@ -610,7 +610,7 @@ object AppComponent extends Logging {
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {
           def run() = {
-            log.fatal("dismiss stalled dialog " + d._1.getClass.getName)
+            log.fatal("dismiss stalled dialog " + d._1)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
@@ -622,7 +622,7 @@ object AppComponent extends Logging {
         d._1.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
           @Loggable
           override def onDismiss(dialog: DialogInterface) = SafeDialog.this.synchronized {
-            log.info("dismiss safe dialog " + d._1.getClass.getName)
+            log.info("dismiss safe dialog " + d._1)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
