@@ -40,9 +40,11 @@ import scala.collection.mutable.HashMap
 import scala.ref.SoftReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.declaration.DOption.OptVal.value2string_id
+import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DOption
 import org.digimead.digi.ctrl.lib.declaration.DPreference
+import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.content.Context
 import annotation.elidable.ASSERTION
@@ -199,7 +201,7 @@ object AppCache extends Actor with Logging {
   @volatile private var contextPackageName = ""
   private var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
-  private var cacheClass = "org.digimead.digi.ctrl.lib.base.AppCache"
+  private var cacheClass = DConstant.prefix + "lib.base.AppCache"
   private var cachePath = "."
   private lazy val cacheFolder = new File(cachePath)
   // key -> (timestamp, data)

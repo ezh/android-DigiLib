@@ -35,8 +35,8 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.Date
 
-import scala.Array.canBuildFrom
-import scala.Option.option2Iterable
+import scala.annotation.elidable
+import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
@@ -46,12 +46,13 @@ import scala.util.control.ControlThrowable
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConnection
-import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.log.RichLogger
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.Activity
 import org.digimead.digi.ctrl.ICtrlComponent
 
@@ -62,8 +63,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Environment
 import android.os.IBinder
-import android.text.ClipboardManager
-import android.widget.Toast
+import annotation.elidable.ASSERTION
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
@@ -71,9 +71,9 @@ object Common extends Logging {
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
   @Loggable
-  def onCreateDialog(id: Int, activity: Activity) = id match {
+  def onCreateDialog(id: Int, activity: Activity)(implicit logger: RichLogger, dispatcher: Dispatcher) = id match {
     case id if id == InstallControl.getId(activity) =>
-      InstallControl.createDialog(activity)
+      InstallControl.createDialog(activity)(logger, dispatcher)
     case id if id == FailedMarket.getId(activity) =>
       FailedMarket.createDialog(activity)
     case _ =>
@@ -243,25 +243,6 @@ object Common extends Logging {
     case e =>
       log.error(e.getMessage, e)
       false
-  }
-  @Loggable
-  def listPreparedFiles(context: Context): Option[Seq[File]] = for {
-    appNativePath <- AppComponent.Inner.appNativePath
-  } yield context.getAssets.list(DConstant.apkNativePath).map(name => new File(appNativePath, name)).filter(_.exists)
-  @Loggable
-  def copyPreparedFilesToClipboard(context: Context) = {
-    val files = Common.listPreparedFiles(context).mkString("\n")
-    val text = if (files.nonEmpty) {
-      val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-      // TODO
-      clipboard.setText(files)
-      Android.getString(context, "notify_n_files_copy_to_clipboard").map(_.format(files.size)).
-        getOrElse("Copy files to clipboard")
-    } else {
-      Android.getString(context, "notify_no_files_copy_to_clipboard").
-        getOrElse("There are no files to copy to clipboard")
-    }
-    Toast.makeText(context, text, DConstant.toastTimeout).show()
   }
   @Loggable
   def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppComponent.Context foreach {

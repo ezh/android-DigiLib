@@ -18,6 +18,7 @@ package org.digimead.digi.ctrl.lib
 
 import scala.Array.canBuildFrom
 import scala.annotation.elidable
+import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
@@ -25,7 +26,9 @@ import scala.collection.mutable.HashMap
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.dialog.Report
+import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 
@@ -46,6 +49,7 @@ import annotation.elidable.ASSERTION
  * trait hasn't ability to use @Loggable
  */
 trait Activity extends AActivity with AnyBase with Logging {
+  implicit val dispatcher: Dispatcher
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
@@ -94,7 +98,7 @@ trait Activity extends AActivity with AnyBase with Logging {
         log.debug("show Report dialog")
         Report.createDialog(this)
       case id =>
-        Option(Common.onCreateDialog(id, this)).foreach(dialog => return dialog)
+        Option(Common.onCreateDialog(id, this)(log, dispatcher)).foreach(dialog => return dialog)
         super.onCreateDialog(id)
     }
   }

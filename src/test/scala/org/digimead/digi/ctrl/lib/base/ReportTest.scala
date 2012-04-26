@@ -36,7 +36,7 @@ class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   }
 
   test("logging before initialization") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Logging.addLogger(ConsoleLogger)

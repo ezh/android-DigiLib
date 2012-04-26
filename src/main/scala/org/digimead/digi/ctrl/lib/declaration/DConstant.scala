@@ -18,10 +18,10 @@ package org.digimead.digi.ctrl.lib.declaration
 
 object DConstant {
   final val toastTimeout = 5
-  final val marketPackage = "org.digimead.digi.ctrl"
-  final val prefix = "org.digimead.digi.ctrl."
+  final val controlPackage = "org.digimead.digi.ctrl"
+  final val prefix = controlPackage + "."
   final val serviceContentProviderSuffix = ".data"
   final val apkNativePath = "armeabi"
-  final val SessionAuthority = "org.digimead.digi.ctrl.Session"
-  final val ComponentAuthority = "org.digimead.digi.ctrl.Component"
+  final val SessionAuthority = prefix + "Session"
+  final val ComponentAuthority = prefix + "Component"
 }

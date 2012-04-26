@@ -43,7 +43,7 @@ import android.os.IBinder
 import scala.actors.Future
 
 protected class AppControl private () extends Logging {
-  protected lazy val ready = new SyncVar[ICtrlHost]()
+  protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   private val ctrlBindTimeout = DTimeout.long
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
   protected lazy val ctrlBindCounter = new AtomicInteger()
@@ -53,7 +53,7 @@ protected class AppControl private () extends Logging {
       log.info("connected to DigiControl service")
       val service = ICtrlHost.Stub.asInterface(iservice)
       if (service != null)
-        ready.set(service)
+        ready.set(Some(service))
     }
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
@@ -65,6 +65,19 @@ protected class AppControl private () extends Logging {
   private val actorSecondLevelLock: AnyRef = new Object
   log.debug("alive")
 
+  /*
+   * None - unknown
+   * Some(true) - yes
+   * Some(false) - no
+   */
+  def isAvailable(): Option[Boolean] =
+    if (ready.isSet) {
+      if (ready.get != None)
+        Some(true)
+      else
+        Some(false)
+    } else
+      None
   def get(): Option[ICtrlHost] =
     get(true)
   def get(timeout: Long): Option[ICtrlHost] =
@@ -86,7 +99,7 @@ protected class AppControl private () extends Logging {
     AppControl.unbind(ctrlBindContext, ctrlBindCounter, ready, ctrlConnection)
   @Loggable
   protected def rebind(timeout: Long): Option[ICtrlHost] = {
-    if (rebindInProgressLock.compareAndSet(false, true)) {
+    if (ready.isSet && ready.get != None && rebindInProgressLock.compareAndSet(false, true)) {
       var result: Option[ICtrlHost] = None
       while (result == None && AppControl.Inner != null) {
         AppComponent.Context.foreach(_ match {
@@ -147,8 +160,25 @@ protected class AppControl private () extends Logging {
             Left(e.getMessage)
         }
       case None =>
-        future { rebind(ctrlBindTimeout) }
-        Left(componentPackage + " service unreachable")
+        val text = if (ready.isSet && ready == None) {
+          future { rebind(ctrlBindTimeout) }
+          AppComponent.Context match {
+            case Some(context) =>
+              Android.getString(context, "error_component_status_unavailable").
+                getOrElse("%1$s component status unavailable").format(componentPackage)
+            case None =>
+              componentPackage + "component status unavailable"
+          }
+        } else {
+          AppComponent.Context match {
+            case Some(context) =>
+              Android.getString(context, "error_digicontrol_not_found").
+                getOrElse("DigiControl not found")
+            case None =>
+              "DigiControl not found"
+          }
+        }
+        Left(text)
     }
   }
   @Loggable
@@ -288,18 +318,19 @@ object AppControl extends Logging {
       }
     })
   }
-  private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[ICtrlHost]): Option[ICtrlHost] = {
+  private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]]): Option[ICtrlHost] = {
     if (timeout == -1) {
       if (!throwError)
-        Some(serviceInstance.get)
+        Option(serviceInstance.get)
       else
         serviceInstance.get match {
-          case service: ICtrlHost => Some(service)
+          case Some(service) => Some(Some(service))
+          case None => None
           case null =>
             val t = new Throwable("Intospecting stack frame")
             t.fillInStackTrace()
             log.error("uninitialized ICtrlHost at AppControl: " + t.getStackTraceString)
-            Some(null)
+            None
         }
     } else {
       assert(timeout >= 0)
@@ -307,7 +338,7 @@ object AppControl extends Logging {
         serviceInstance.get(timeout)
       else
         serviceInstance.get(timeout) match {
-          case result @ Some(service) => result
+          case Some(service) => Some(service)
           case None =>
             val t = new Throwable("Intospecting stack frame")
             t.fillInStackTrace()
@@ -315,46 +346,47 @@ object AppControl extends Logging {
             None
         }
     }
-  }
+  } getOrElse None
   private def bind(caller: Context, ctrlBindContext: AtomicReference[Context], ctrlBindCounter: AtomicInteger,
-    serviceInstance: SyncVar[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
-    if (ctrlBindCounter.incrementAndGet() == 1)
-      if (!serviceInstance.isSet && ctrlBindContext.compareAndSet(null, caller)) {
-        val intent = new Intent(DIntent.HostService)
-        intent.putExtra("packageName", caller.getPackageName())
-        val successful = new SyncVar[Boolean]
-        if (isICtrlHostInstalled(caller)) {
-          log.info("bind to service " + DIntent.HostService)
-          successful.set(caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE))
-        } else {
-          log.warn(DIntent.HostService + " not installed")
-          successful.set(false)
-        }
-        if (!successful.get)
-          AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Android.getString(caller, "error_control_notfound").
-            getOrElse("Bind failed, DigiControl application not found")))
-        // () => caller.showDialog(InstallControl.getId(caller))
-      } else
-        log.fatal("service " + DIntent.HostService + " already binding/binded")
-    else
+    serviceInstance: SyncVar[Option[ICtrlHost]], ctrlConnection: ServiceConnection) = synchronized {
+    if (ctrlBindCounter.incrementAndGet() == 1 || (serviceInstance.isSet && serviceInstance.get == None)) {
+      serviceInstance.unset()
+      val intent = new Intent(DIntent.HostService)
+      intent.putExtra("packageName", caller.getPackageName())
+      log.info("bind to service " + DIntent.HostService)
+      if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) &&
+        !isICtrlHostInstalled(caller)) {
+        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Android.getString(caller, "error_digicontrol_not_found").
+          getOrElse("Bind failed, DigiControl application not found")))
+        serviceInstance.set(None)
+      }
+      //      } else
+      //        log.fatal("service " + DIntent.HostService + " already binding/binded")
+    } else
       log.debug("service " + DIntent.HostService + " already binding/binded")
+    log.debug("increment bind counter to " + ctrlBindCounter.get)
   }
   private def unbind(ctrlBindContext: AtomicReference[Context], ctrlBindCounter: AtomicInteger,
-    serviceInstance: SyncVar[ICtrlHost], ctrlConnection: ServiceConnection) = synchronized {
+    serviceInstance: SyncVar[Option[ICtrlHost]], ctrlConnection: ServiceConnection) = synchronized {
     if (ctrlBindCounter.decrementAndGet() == 0)
-      if (serviceInstance.isSet) {
-        if (serviceInstance.get != null && ctrlBindContext.get != null) {
-          log.info("unbind from service " + DIntent.HostService)
-          val caller = ctrlBindContext.getAndSet(null)
-          caller.unbindService(ctrlConnection)
-          serviceInstance.unset()
-        } else
-          log.warn("service already unbinded")
+      if (serviceInstance.isSet && ctrlBindContext.get != null) {
+        serviceInstance.get match {
+          case Some(service) =>
+            log.info("unbind from service " + DIntent.HostService)
+            val caller = ctrlBindContext.getAndSet(null)
+            caller.unbindService(ctrlConnection)
+            serviceInstance.unset()
+          case None =>
+            log.info("unbind from unexists service " + DIntent.HostService)
+          case null =>
+            log.warn("service already unbinded")
+        }
       } else {
         ctrlBindContext.set(null)
         serviceInstance.unset()
         log.warn("service lost")
       }
+    log.debug("decrement bind counter to " + ctrlBindCounter.get)
   }
   @Loggable
   def isICtrlHostInstalled(ctx: Context): Boolean = {

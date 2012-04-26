@@ -348,23 +348,14 @@ protected class AppComponent private () extends Actor with Logging {
           AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
-          val appState = AppComponent.State(DState.Broken, error)
+          val appState = if (AppControl.Inner.isAvailable == Some(false))
+            AppComponent.State(DState.Broken, error, (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a)) })
+          else
+            AppComponent.State(DState.Broken, error)
           AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Broken)
       }
   }
-  /*protected def listInterfaces(): Either[String, java.util.List[String]] =
-    AppControl().get() match {
-      case Some(service) =>
-        try {
-          Right(service.listInterfaces())
-        } catch {
-          case e: RemoteException =>
-            Left(e.getMessage)
-        }
-      case None =>
-        Left("service unreachable")
-    }*/
   @Loggable
   private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
     assert(!activitySafeDialog.isSet)
@@ -673,8 +664,8 @@ object AppComponent extends Logging {
     case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
     case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
   }
-  case class State(val code: DState.Value, val data: String = null, val onClickCallback: () => Any = () => {
-    log.g_a_s_e("default onClick callback for " + getClass().getName())
+  case class State(val code: DState.Value, val data: String = null, val onClickCallback: (Activity) => Any = (a) => {
+    log.warn("onClick callback unimplemented for " + this)
   }) extends Logging {
     log.debugWhere("create new state " + code, 3)
   }

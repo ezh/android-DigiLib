@@ -40,7 +40,7 @@ class InstallControlTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTri
   test("test InstallControl dialog") {
     val activity = new Activity()
     InstallControl.getId(activity) should (not equal (null) and not be (0) and not be (-1))
-    val dialog = InstallControl.createDialog(activity)
+    val dialog = InstallControl.createDialog(activity)(null, null)
     dialog.show()
     val lastDialog = ShadowAlertDialog.getLatestAlertDialog()
     lastDialog should be === dialog

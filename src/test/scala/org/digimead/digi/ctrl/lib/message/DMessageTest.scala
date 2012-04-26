@@ -36,7 +36,7 @@ class DMessageTest_IAmMumble_j1 extends FunSuite with BeforeAndAfter with RobotE
 
   // :-(
   test("test parcelable") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     activity.onCreate(null)
     Logging.init(activity)
     Logging.addLogger(ConsoleLogger)

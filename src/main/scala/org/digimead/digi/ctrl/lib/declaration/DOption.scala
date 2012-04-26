@@ -23,7 +23,7 @@ import scala.runtime.Boxed
 object DOption extends Enumeration {
   val CachePeriod: OptVal = Value("cache_period", classOf[Int], (1000 * 60 * 10): java.lang.Integer) // 10 minutes
   val CacheFolder: OptVal = Value("cache_dir", classOf[String], ".")
-  val CacheClass: OptVal = Value("cache_class", classOf[String], "org.digimead.digi.ctrl.lib.base.AppCache")
+  val CacheClass: OptVal = Value("cache_class", classOf[String], DConstant.prefix + "lib.base.AppCache")
   val ConfirmConn: OptVal = Value("confirm_connection", classOf[Boolean], true: java.lang.Boolean)
   val WriteConnLog: OptVal = Value("write_connection_log", classOf[Boolean], false: java.lang.Boolean)
   val ACLConnection: OptVal = Value("acl_connection_allow", classOf[Boolean], true: java.lang.Boolean)

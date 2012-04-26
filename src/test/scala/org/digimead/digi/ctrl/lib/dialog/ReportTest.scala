@@ -37,7 +37,7 @@ class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   }
 
   test("test Report dialog") {
-    val activity = new android.app.Activity() with Activity
+    val activity = new android.app.Activity() with Activity { val dispatcher = null }
     Report.getId(activity) should (not equal (null) and not be (0) and not be (-1))
     val dialog = Report.createDialog(activity)
     dialog.show()

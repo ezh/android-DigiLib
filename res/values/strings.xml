@@ -15,24 +15,25 @@
 -->
 <resources>
 
-    <string name="error_control_notfound">DigiControl not found</string>
-    <string name="error_control_notfound_title">DigiControl not found</string>
-    <string name="error_control_notfound_content">Install from market? It is possible to use service right from the console. Path to executable files of service will be copied to clipboard if you choose Cancel.</string>
-    <string name="install">install</string>
-    <string name="reinstall">reinstall</string>
+    <string name="error_digicontrol_not_found">DigiControl not found</string>
+    <string name="error_digicontrol_not_found_title">DigiControl not found</string>
+    <string name="error_digicontrol_not_found_content">Do you want to install it? DigiControl have a lot of things under the hood that allow to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.</string>
     <string name="error_market_failed_title">Market failed</string>
     <string name="error_market_failed_content">Market application not found on the device</string>
-    <string name="notify_n_files_copy_to_clipboard">notify_n_files_copy_to_clipboard</string>
-    <string name="notify_no_files_copy_to_clipboard">notify_no_files_copy_to_clipboard</string>
     <string name="error_prepare_chmod">error_prepare_chmod</string>
     <string name="error_prepare_unknown">error_prepare_unknown</string>
     <string name="error_prepare_description">error_prepare_description</string>
+    <string name="error_component_status_unavailable">%1$s component status unavailable</string>
+    <string name="install">install</string>
+    <string name="reinstall">reinstall</string>
+    <string name="notify_n_files_copy_to_clipboard">There are component files that were copied to the device clipboard</string>
+    <string name="notify_no_files_copy_to_clipboard">There are no component files to copy to the device clipboard</string>
     <string name="ask_control_newconnection_title">ask_control_newconnection_title</string>
     <string name="ask_control_newconnection_content">ask_control_newconnection_content</string>
     <string name="status_initializing">Initializing…</string>
     <string name="status_ready">Ready</string>
     <string name="status_active">Active</string>
-    <string name="status_error">Error: %1$s</string>
+    <string name="status_error">Error %1$s</string>
     <string name="status_busy">Busy</string>
     <string name="state_Initializing">&lt;font color="white">&lt;i>Initializing&lt;/i>&lt;/font></string>
     <string name="state_Broken">&lt;font color="red">Broken&lt;/font></string>

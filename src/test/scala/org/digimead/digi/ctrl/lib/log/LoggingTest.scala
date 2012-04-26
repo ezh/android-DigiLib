@@ -67,7 +67,7 @@ class LoggingTestAfterInit_j1 extends FunSuite with BeforeAndAfter with RobotEsT
   }
 
   test("logging after initialization") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     Logging.init(activity)
     assert(!Logging.queue.isEmpty)
     Logging.queue.peek.isInstanceOf[Logging.Record] should be(true)
@@ -87,7 +87,7 @@ class LoggingTestConsoleLogger_j1 extends FunSuite with BeforeAndAfter with Robo
   }
 
   test("logging console") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)
@@ -116,7 +116,7 @@ class LoggingTestAndroidLogger_j1 extends FunSuite with BeforeAndAfter with Robo
   }
 
   test("logging android") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)
@@ -150,7 +150,7 @@ class LoggingTestFileLogger_j1 extends FunSuite with BeforeAndAfter with RobotEs
   }
 
   test("logging file") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)

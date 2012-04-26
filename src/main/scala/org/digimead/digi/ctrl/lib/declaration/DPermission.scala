@@ -17,5 +17,5 @@
 package org.digimead.digi.ctrl.lib.declaration
 
 object DPermission {
-  val Base = "org.digimead.digi.ctrl"
+  val Base = DConstant.controlPackage
 }

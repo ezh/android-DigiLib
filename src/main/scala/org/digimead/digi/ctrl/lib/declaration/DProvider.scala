@@ -17,7 +17,7 @@
 package org.digimead.digi.ctrl.lib.declaration
 
 object DProvider {
-  val authority = "org.digimead.digi.ctrl"
+  val authority = DConstant.controlPackage
   case class Row(val session_id: Int,
     val process_id: Int,
     val component: Array[Byte],

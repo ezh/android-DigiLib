@@ -35,7 +35,7 @@ class AppComponentTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAft
   }
 
   test("check environment version") {
-    val activity = new android.app.Activity with Activity
+    val activity = new android.app.Activity with Activity { val dispatcher = null }
     Logging.addLogger(ConsoleLogger)
     activity.onCreate(null)
     val nativeManifest = <manifest>
