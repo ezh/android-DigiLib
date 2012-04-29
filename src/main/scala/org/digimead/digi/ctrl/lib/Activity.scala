@@ -17,23 +17,22 @@
 package org.digimead.digi.ctrl.lib
 
 import scala.Array.canBuildFrom
-import scala.annotation.elidable
-import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
+import scala.collection.mutable.HashSet
 import scala.collection.mutable.SynchronizedMap
+import scala.collection.mutable.SynchronizedSet
 import scala.collection.mutable.HashMap
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.dialog.Report
-import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 
 import android.accounts.AccountManager
-import android.app.{Activity => AActivity}
+import android.app.{ Activity => AActivity }
 import android.app.Dialog
 import android.content.BroadcastReceiver
 import android.content.Intent
@@ -43,7 +42,6 @@ import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
-import annotation.elidable.ASSERTION
 
 /*
  * trait hasn't ability to use @Loggable
@@ -57,21 +55,42 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def onCreate(savedInstanceState: Bundle): Unit = {
     log.trace("Activity::onCreate")
     onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
-    Activity.registeredReceiver.clear // sometimes onDestroy skipped, there is no harm to drop garbage
+    // sometimes onDestroy skipped, there is no harm to drop garbage
+    Activity.registeredReceivers.clear
+    Activity.activeReceivers.clear
   }
   override def onResume() = {
     log.trace("Activity::onResume")
+    Report.searchAndSubmitLock.set(false)
     AppComponent.Inner.lockRotationCounter.set(0)
     AppComponent.Inner.resetDialogSafe
-    Activity.registeredReceiver.foreach(t => super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3))
+    Activity.registeredReceivers.foreach(t => {
+      if (Activity.activeReceivers(t._1)) {
+        log.trace("onResume skip registerReceiver " + t._1)
+      } else {
+        log.trace("onResume registerReceiver " + t._1)
+        Activity.activeReceivers(t._1) = true
+        super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3)
+      }
+    })
     super.onResume()
   }
   override def onPause() {
     log.trace("Activity::onPause")
-    Activity.registeredReceiver.keys.foreach(super.unregisterReceiver(_))
-    AppComponent.Inner.lockRotationCounter.set(0)
-    AppComponent.Inner.disableSafeDialogs
-    AppComponent.Inner.resetDialogSafe
+    Activity.registeredReceivers.foreach(t => {
+      if (Activity.activeReceivers(t._1)) {
+        log.trace("onResume unregisterReceiver " + t._1)
+        Activity.activeReceivers(t._1) = false
+        super.unregisterReceiver(t._1)
+      } else {
+        log.trace("onPause skip unregisterReceiver " + t._1)
+      }
+    })
+    if (AppComponent.Inner != null) {
+      AppComponent.Inner.lockRotationCounter.set(0)
+      AppComponent.Inner.disableSafeDialogs
+      AppComponent.Inner.resetDialogSafe
+    }
     Android.enableRotation(this)
     super.onPause()
   }
@@ -81,7 +100,8 @@ trait Activity extends AActivity with AnyBase with Logging {
    */
   override def onDestroy() = {
     log.trace("Activity::onDestroy")
-    Activity.registeredReceiver.clear
+    Activity.registeredReceivers.clear
+    Activity.activeReceivers.clear
     super.onDestroy()
     onDestroyBase(this, {
       if (AnyBase.isLastContext)
@@ -126,8 +146,9 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
     log.trace("Activity::registerReceiver " + receiver)
-    assert(!Activity.registeredReceiver.isDefinedAt(receiver))
-    Activity.registeredReceiver(receiver) = (filter, null, null)
+    assert(!Activity.registeredReceivers.isDefinedAt(receiver))
+    Activity.registeredReceivers(receiver) = (filter, null, null)
+    Activity.activeReceivers(receiver) = true
     super.registerReceiver(receiver, filter)
   } catch {
     case e =>
@@ -136,8 +157,9 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
     log.trace("Activity::registerReceiver " + receiver)
-    assert(!Activity.registeredReceiver.isDefinedAt(receiver))
-    Activity.registeredReceiver(receiver) = (filter, broadcastPermission, scheduler)
+    assert(!Activity.registeredReceivers.isDefinedAt(receiver))
+    Activity.registeredReceivers(receiver) = (filter, broadcastPermission, scheduler)
+    Activity.activeReceivers(receiver) = true
     super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
   } catch {
     case e =>
@@ -146,13 +168,15 @@ trait Activity extends AActivity with AnyBase with Logging {
   }
   override def unregisterReceiver(receiver: BroadcastReceiver) {
     log.trace("Activity::unregisterReceiver " + receiver)
-    Activity.registeredReceiver.remove(receiver)
+    Activity.registeredReceivers.remove(receiver)
+    Activity.activeReceivers.remove(receiver)
     super.unregisterReceiver(receiver)
   }
 }
 
 object Activity extends Logging {
   /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
-  private val registeredReceiver = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
+  private val registeredReceivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
+  private val activeReceivers = new HashSet[BroadcastReceiver] with SynchronizedSet[BroadcastReceiver]
   log.debug("alive")
 }

@@ -597,7 +597,7 @@ object AppComponent extends Logging {
           }
         case _ =>
       }
-      if (d != null) {
+      if (d._1 != null) {
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {
           def run() = {
@@ -706,6 +706,9 @@ object AppComponent extends Logging {
       } else {
         log.fatal("illegal busyCounter")
       }
+    }
+    def isBusy(): Boolean = synchronized {
+      busyCounter != 0
     }
   }
 }

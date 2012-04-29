@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib.dialog
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintWriter
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.Date
 
@@ -52,6 +53,7 @@ import android.widget.TextView
  * report life cycle available only within main activity
  */
 object Report extends Logging {
+  val searchAndSubmitLock = new AtomicBoolean(false)
   def getId(context: Context) = Android.getId(context, "report")
   @Loggable
   def createDialog(activity: Activity): Dialog = {
@@ -74,9 +76,25 @@ object Report extends Logging {
                   val myUID = android.os.Process.myUid
                   Android.withProcess({
                     case (name, uid, gid, pid, ppid, path) =>
-                      if (uid == myUID && name == "BRIDGE") {
-                        log.debug("send HUP signal to bridge with PID " + pid)
-                        android.os.Process.sendSignal(pid, 1)
+                      val cmdLine = new File(path, "cmdline")
+                      if (name == "bridge" && cmdLine.exists && cmdLine.canRead) {
+                        try {
+                          val cmd = scala.io.Source.fromFile(cmdLine).getLines.mkString.trim
+                          if (cmd.startsWith("/data/data/org.digimead.digi.ctrl/files/armeabi/bridge")) {
+                            log.debug("found bridge with UID " + uid + " and PID " + pid)
+                            if (uid == 0) {
+                              log.debug("send INT signal to root bridge with PID " + pid)
+                              val p = Runtime.getRuntime.exec(Array("su", "-c", "kill -INT " + pid))
+                              p.waitFor
+                            } else {
+                              log.debug("send INT signal to bridge with PID " + pid)
+                              android.os.Process.sendSignal(pid, 2)
+                            }
+                          }
+                        } catch {
+                          case e =>
+                            log.error(e.getMessage, e)
+                        }
                       }
                   })
                   val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
@@ -91,8 +109,14 @@ object Report extends Logging {
                   writer.println("description: " + summary.getText.toString)
                   writer.println("generation time: " + date)
                   writer.println("generation time (long): " + time)
-                  writer.println("ps: \n" + Android.collectCommandOutput("ps"))
-                  writer.println("\nnetstat: \n" + Android.collectCommandOutput("netstat"))
+                  writer.println("ps: \n" + (Android.collectCommandOutput("ps") match {
+                    case result: Some[_] => result
+                    case None => Android.collectCommandOutputWithBusyBox("ps")
+                  }))
+                  writer.println("\nnetstat: \n" + (Android.collectCommandOutput("netstat") match {
+                    case result: Some[_] => result
+                    case None => Android.collectCommandOutputWithBusyBox("netstat")
+                  }))
                   Thread.sleep(1000)
                 } catch {
                   case e =>
@@ -104,15 +128,17 @@ object Report extends Logging {
                 val i = new AtomicInteger()
                 org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
                   AppComponent.Inner.getDialogSafe(0) match {
-                    case Some(dialog) =>
+                    case Some(dialog) if dialog != null =>
                       activity.runOnUiThread(new Runnable {
                         def run = dialog.asInstanceOf[AlertDialog].setMessage("uploading " + i.incrementAndGet + "/" + n)
                       })
-                    case _ =>
+                    case dialog =>
+                      log.warn("lost uploading dialog, got " + dialog)
                   }
                 }))
                 AppComponent.Inner.resetDialogSafe
-                org.digimead.digi.ctrl.lib.base.Report.clean()
+                searchAndSubmitLock.set(false)
+                org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
               }
           }
         }
@@ -121,7 +147,8 @@ object Report extends Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
           AppComponent.Inner.resetDialogSafe
-          org.digimead.digi.ctrl.lib.base.Report.clean()
+          searchAndSubmitLock.set(false)
+          org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
         }
       }).
       create()
@@ -168,13 +195,13 @@ object Report extends Logging {
   @Loggable // try to submit reports if there any stack traces
   def searchAndSubmit(activity: Activity) = AnyBase.info.get.map {
     info =>
-      Thread.sleep(DTimeout.normal) // take it gently ;-)
-      log.info("looking for stack trace reports in: " + info.reportPath)
-      val dir = new File(info.reportPath + "/")
-      val reports = Option(dir.list()).flatten
-      if (reports.exists(_.endsWith(".trc")))
-        org.digimead.digi.ctrl.lib.dialog.Report.submit(activity, Some("stack trace detected"))
-      else
-        org.digimead.digi.ctrl.lib.base.Report.clean()
+      if (searchAndSubmitLock.compareAndSet(false, true)) {
+        Thread.sleep(DTimeout.short) // take it gently ;-)
+        log.info("looking for stack trace reports in: " + info.reportPath)
+        val dir = new File(info.reportPath + "/")
+        val reports = Option(dir.list()).flatten
+        if (reports.exists(_.endsWith(".trc")))
+          submit(activity, Some("stack trace detected"))
+      }
   } getOrElse ({ "skip searchAndSubmit - uninitialized AnyBase.info" })
 }

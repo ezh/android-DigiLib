@@ -66,6 +66,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
       if (dataLength == -1) {
         None
       } else {
+        ComponentInfo.log.trace("set thumb array size to " + dataLength)
         val data = new Array[Byte](dataLength)
         in.readByteArray(data)
         Some(data)
@@ -79,6 +80,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
       if (dataLength == -1) {
         None
       } else {
+        ComponentInfo.log.trace("set iconHDPI array size to " + dataLength)
         val data = new Array[Byte](dataLength)
         in.readByteArray(data)
         Some(data)
@@ -89,6 +91,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
       if (dataLength == -1) {
         None
       } else {
+        ComponentInfo.log.trace("set iconLDPI array size to " + dataLength)
         val data = new Array[Byte](dataLength)
         in.readByteArray(data)
         Some(data)
@@ -99,6 +102,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
       if (dataLength == -1) {
         None
       } else {
+        ComponentInfo.log.trace("set iconMDPI array size to " + dataLength)
         val data = new Array[Byte](dataLength)
         in.readByteArray(data)
         Some(data)
@@ -109,6 +113,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
       if (dataLength == -1) {
         None
       } else {
+        ComponentInfo.log.trace("set iconXHDPI array size to " + dataLength)
         val data = new Array[Byte](dataLength)
         in.readByteArray(data)
         Some(data)

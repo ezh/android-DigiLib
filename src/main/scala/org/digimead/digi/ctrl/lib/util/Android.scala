@@ -190,9 +190,9 @@ object Android extends Logging {
         var pid: Option[Int] = None
         var ppid: Option[Int] = None
         try {
-          scala.io.Source.fromFile(status).getLines.foreach(_.toUpperCase.split("""[:\s]+""") match {
+          scala.io.Source.fromFile(status).getLines.foreach(l => l.trim.toUpperCase.split("""[:\s]+""") match {
             case Array("NAME", n) =>
-              name = Some(n)
+              name = Some(l.trim.split("""[:\s]+""").last)
             case Array("PID", n) =>
               pid = Some(n.toInt)
             case Array("PPID", n) =>
@@ -226,11 +226,8 @@ object Android extends Logging {
   @Loggable(result = false)
   def collectCommandOutput(commandArgs: String*): Option[String] = try {
     var buffer: Seq[String] = Seq()
-    val busybox = findBusyBox
-    if (busybox == None)
-      return None
-    val args = Array(busybox.get.getAbsolutePath) ++ commandArgs
-    log.debug(args.tail.mkString(" "))
+    val args = commandArgs.toArray
+    log.debug("process arguments: " + args.mkString(" "))
     val p = Runtime.getRuntime().exec(args)
     val out = new BufferedReader(new InputStreamReader(p.getInputStream))
     val err = new BufferedReader(new InputStreamReader(p.getErrorStream))
@@ -256,5 +253,14 @@ object Android extends Logging {
     case e =>
       log.error(e.getMessage, e)
       None
+  }
+  @Loggable(result = false)
+  def collectCommandOutputWithBusyBox(commandArgs: String*): Option[String] = {
+    var buffer: Seq[String] = Seq()
+    val busybox = findBusyBox
+    if (busybox == None)
+      return None
+    val args = Array(busybox.get.getAbsolutePath) ++ commandArgs
+    collectCommandOutput(args: _*)
   }
 }

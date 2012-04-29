@@ -17,6 +17,7 @@
 package org.digimead.digi.ctrl.lib.base
 
 import java.io.File
+import java.io.FilenameFilter
 import java.util.Date
 import java.util.UUID
 
@@ -37,6 +38,8 @@ import android.content.Context
 import android.content.Intent
 
 object Report extends Logging {
+  val keepLogFiles = 4
+  val keepTrcFiles = 8
   def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateFile(new Date())
   private[lib] def init(context: Context): Unit = synchronized {
     try {
@@ -57,6 +60,7 @@ object Report extends Logging {
           }
         }
       }
+      clean()
     } catch {
       case e => log.error(e.getMessage, e)
     }
@@ -123,6 +127,47 @@ object Report extends Logging {
   }
   @Loggable
   def clean(): Unit = synchronized {
+    for {
+      info <- AnyBase.info.get
+      context <- AppComponent.Context
+    } {
+      val dir = new File(info.reportPath + "/")
+      try {
+        // delete png files
+        Option(dir.list(new FilenameFilter {
+          def accept(dir: File, name: String) =
+            name.toLowerCase.endsWith(".png")
+        })).flatten.foreach(name => {
+          val report = new File(info.reportPath, name)
+          log.info("delete outdated png file " + report.getName)
+          report.delete
+        })
+        // delete log files
+        Option(dir.list(new FilenameFilter {
+          def accept(dir: File, name: String) =
+            name.toLowerCase.endsWith(".log")
+        })).flatten.toSeq.sorted.reverse.drop(keepLogFiles).foreach(name => {
+          val report = new File(info.reportPath, name)
+          log.info("delete outdated log file " + report.getName)
+          report.delete
+        })
+        // delete trc files
+        Option(dir.list(new FilenameFilter {
+          def accept(dir: File, name: String) =
+            name.toLowerCase.endsWith(".trc")
+        })).flatten.toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
+          val trace = new File(info.reportPath, name)
+          log.info("delete outdated stacktrace file " + trace.getName)
+          trace.delete
+        })
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+      }
+    }
+  }
+  @Loggable
+  def cleanAfterReview() {
     for {
       info <- AnyBase.info.get
       context <- AppComponent.Context

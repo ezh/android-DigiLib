@@ -37,7 +37,7 @@ object DOption extends Enumeration {
   object OptVal {
     implicit def value2string_id(v: OptVal): String = v.r
   }
-  protected final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
+  final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
     val name = if (_name != null) _name else "option_" + id + "_name"
     val description = if (_description != null) _description else "option_" + id + "_description"
     new OptVal(id, kind, default, name, description)

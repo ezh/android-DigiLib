@@ -16,18 +16,17 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.io.File
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
 import scala.actors.Futures.future
-import scala.actors.Actor
+import scala.actors.Future
 import scala.collection.JavaConversions._
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
-import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
@@ -40,13 +39,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import scala.actors.Future
+import android.os.Looper
 
 protected class AppControl private () extends Logging {
   protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
-  private val ctrlBindTimeout = DTimeout.long
+  private val ctrlBindTimeout = DTimeout.short
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
-  protected lazy val ctrlBindCounter = new AtomicInteger()
   protected lazy val ctrlConnection = new ServiceConnection() with Logging {
     @Loggable
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
@@ -63,6 +61,7 @@ protected class AppControl private () extends Logging {
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
   private val actorSecondLevelLock: AnyRef = new Object
+  private val uiThreadID = Looper.getMainLooper.getThread.getId
   log.debug("alive")
 
   /*
@@ -92,143 +91,179 @@ protected class AppControl private () extends Logging {
   def getWait(throwError: Boolean): ICtrlHost =
     AppControl.get(-1, throwError, ready).get
   @Loggable
-  def bind(caller: Context): Unit =
-    AppControl.bind(caller, ctrlBindContext, ctrlBindCounter, ready, ctrlConnection)
-  @Loggable
-  def unbind(): Unit =
-    AppControl.unbind(ctrlBindContext, ctrlBindCounter, ready, ctrlConnection)
-  @Loggable
-  protected def rebind(timeout: Long): Option[ICtrlHost] = {
-    if (ready.isSet && ready.get != None && rebindInProgressLock.compareAndSet(false, true)) {
-      var result: Option[ICtrlHost] = None
-      while (result == None && AppControl.Inner != null) {
-        AppComponent.Context.foreach(_ match {
-          case activity: Activity =>
-            log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
-            bind(activity)
-          case _ =>
-            log.warn("rebind ICtrlHost service failed")
-            None
-        })
-        result = get(timeout)
-      }
-      log.warn("rebind ICtrlHost service finished, result: " + result)
-      rebindInProgressLock.set(false)
-      result
-    } else
-      get(0)
+  def bind(caller: Context, allowCallFromUI: Boolean = false): Unit = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    AppControl.bind(caller, ctrlBindContext, ready, ctrlConnection)
   }
   @Loggable
-  def callListDirectories(componentPackage: String): Future[Option[(String, String)]] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.directories(componentPackage) match {
-          case null =>
-            None
-          case list =>
-            Some(list.head, list.last)
-        }
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        None
-    }
+  def unbind(): Unit = {
+    AppControl.unbind(ctrlBindContext, ready, ctrlConnection)
   }
   @Loggable
-  def callStart(componentPackage: String): Future[Boolean] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.start(componentPackage)
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        false
-    }
-  }
-  @Loggable
-  def callStatus(componentPackage: String): Future[Either[String, ComponentState]] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        try {
-          service.status(componentPackage) match {
-            case status: ComponentState =>
-              Right(status)
-            case null =>
-              log.debug("service return null instread of DComponentStatus")
-              Left("status failed")
+  protected def rebind(timeout: Long, allowCallFromUI: Boolean = false): Option[ICtrlHost] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    // rebind only in we already have connection to ICtrlHost
+    if (ctrlBindContext.get != null && AppControl.isICtrlHostInstalled(ctrlBindContext.get)) {
+      future {
+        if (rebindInProgressLock.compareAndSet(false, true)) {
+          unbind()
+          var result: Option[ICtrlHost] = None
+          while (result == None && AppControl.Inner != null) {
+            AppComponent.Context.foreach(_ match {
+              case activity: Activity =>
+                log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
+                bind(activity)
+              case _ =>
+                log.warn("rebind ICtrlHost service failed")
+                None
+            })
+            result = get(DTimeout.long)
           }
-        } catch {
-          case e =>
-            Left(e.getMessage)
-        }
-      case None =>
-        val text = if (ready.isSet && ready == None) {
-          future { rebind(ctrlBindTimeout) }
-          AppComponent.Context match {
-            case Some(context) =>
-              Android.getString(context, "error_component_status_unavailable").
-                getOrElse("%1$s component status unavailable").format(componentPackage)
-            case None =>
-              componentPackage + "component status unavailable"
-          }
+          log.warn("rebind ICtrlHost service finished, result: " + result)
+          rebindInProgressLock.set(false)
         } else {
-          AppComponent.Context match {
-            case Some(context) =>
-              Android.getString(context, "error_digicontrol_not_found").
-                getOrElse("DigiControl not found")
-            case None =>
-              "DigiControl not found"
+          log.warn("rebind ICtrlHost service already in progress, skip")
+          None
+        }
+      }
+      get(timeout)
+    } else
+      None
+  }
+  @Loggable
+  def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.directories(componentPackage) match {
+            case null =>
+              None
+            case list =>
+              Some(list.head, list.last)
           }
-        }
-        Left(text)
+        case None =>
+          None
+      }
     }
   }
   @Loggable
-  def callStop(componentPackage: String): Future[Boolean] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.stop(componentPackage)
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        false
+  def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.start(componentPackage)
+        case None =>
+          false
+      }
     }
   }
   @Loggable
-  def callDisconnect(componentPackage: String, processID: Int, connectionID: Int): Future[Boolean] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.disconnect(componentPackage, processID, connectionID)
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        false
+  def callStatus(componentPackage: String, allowCallFromUI: Boolean = false): Future[Either[String, ComponentState]] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          try {
+            service.status(componentPackage) match {
+              case status: ComponentState =>
+                Right(status)
+              case null =>
+                log.debug("service return null instread of DComponentStatus")
+                Left("status failed")
+            }
+          } catch {
+            case e =>
+              Left(e.getMessage)
+          }
+        case None =>
+          val text = if (ready.isSet && ready == None) {
+            AppComponent.Context match {
+              case Some(context) =>
+                Android.getString(context, "error_component_status_unavailable").
+                  getOrElse("%1$s component status unavailable").format(componentPackage)
+              case None =>
+                componentPackage + "component status unavailable"
+            }
+          } else {
+            AppComponent.Context match {
+              case Some(context) =>
+                Android.getString(context, "error_digicontrol_not_found").
+                  getOrElse("DigiControl not found")
+              case None =>
+                "DigiControl not found"
+            }
+          }
+          Left(text)
+      }
     }
   }
   @Loggable
-  def callListActiveInterfaces(componentPackage: String): Future[Option[Seq[String]]] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.interfaces(componentPackage) match {
-          case null =>
-            None
-          case list =>
-            Some(list)
-        }
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        None
+  def callStop(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.stop(componentPackage)
+        case None =>
+          false
+      }
     }
   }
   @Loggable
-  def callListPendingConnections(componentPackage: String): Future[Option[Seq[Intent]]] = future {
-    get(ctrlBindTimeout) match {
-      case Some(service) =>
-        service.pending_connections(componentPackage) match {
-          case null =>
-            None
-          case list =>
-            Some(list)
-        }
-      case None =>
-        future { rebind(ctrlBindTimeout) }
-        None
+  def callDisconnect(componentPackage: String, processID: Int, connectionID: Int, allowCallFromUI: Boolean = false): Future[Boolean] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.disconnect(componentPackage, processID, connectionID)
+        case None =>
+          false
+      }
+    }
+  }
+  @Loggable
+  def callListActiveInterfaces(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[String]]] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.interfaces(componentPackage) match {
+            case null =>
+              None
+            case list =>
+              Some(list)
+          }
+        case None =>
+          None
+      }
+    }
+  }
+  @Loggable
+  def callListPendingConnections(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[Intent]]] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("call AppControl function from UI thread")
+    future {
+      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.pending_connections(componentPackage) match {
+            case null =>
+              None
+            case list =>
+              Some(list)
+          }
+        case None =>
+          None
+      }
     }
   }
 }
@@ -248,14 +283,11 @@ object AppControl extends Logging {
   private[lib] def initRoutine(root: Context, _inner: AppControl) = synchronized {
     if (inner != null) {
       log.info("reinitialize AppControl core subsystem for " + root.getPackageName())
+      inner = _inner
     } else {
       log.info("initialize AppControl for " + root.getPackageName())
-      resetNatives()
-    }
-    if (_inner != null)
-      inner = _inner
-    else
       inner = new AppControl()
+    }
   }
   private[lib] def resurrect() = {
     deinitializationLock.set(false)
@@ -297,27 +329,9 @@ object AppControl extends Logging {
       log.info("AppControl hold last context. Clear.")
       AppComponent.deinitRoutine(packageName)
     }
-    resetNatives
   }
   def Inner = inner
   def ICtrlHost = inner.get()
-  @Loggable
-  private def resetNatives() = future {
-    val myUID = android.os.Process.myUid
-    Android.withProcess({
-      case (name, uid, gid, pid, ppid, path) => try {
-        if (uid == myUID && name == "BRIDGE")
-          if (ppid <= 1) {
-            log.warn("kill bridge with PID " + pid + " and PPID " + ppid)
-            android.os.Process.sendSignal(pid, android.os.Process.SIGNAL_KILL)
-          } else
-            log.debug("detect bridge with PID " + pid + " and PPID " + ppid)
-      } catch {
-        case e =>
-          log.error(e.getMessage, e)
-      }
-    })
-  }
   private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]]): Option[ICtrlHost] = {
     if (timeout == -1) {
       if (!throwError)
@@ -347,46 +361,36 @@ object AppControl extends Logging {
         }
     }
   } getOrElse None
-  private def bind(caller: Context, ctrlBindContext: AtomicReference[Context], ctrlBindCounter: AtomicInteger,
-    serviceInstance: SyncVar[Option[ICtrlHost]], ctrlConnection: ServiceConnection) = synchronized {
-    if (ctrlBindCounter.incrementAndGet() == 1 || (serviceInstance.isSet && serviceInstance.get == None)) {
+  private def bind(caller: Context, ctrlBindContext: AtomicReference[Context], serviceInstance: SyncVar[Option[ICtrlHost]],
+    ctrlConnection: ServiceConnection) = synchronized {
+    if (!serviceInstance.isSet || (serviceInstance.isSet && serviceInstance.get == None)) {
       serviceInstance.unset()
       val intent = new Intent(DIntent.HostService)
       intent.putExtra("packageName", caller.getPackageName())
       log.info("bind to service " + DIntent.HostService)
-      if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) &&
-        !isICtrlHostInstalled(caller)) {
+      if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Android.getString(caller, "error_digicontrol_not_found").
           getOrElse("Bind failed, DigiControl application not found")))
         serviceInstance.set(None)
       }
-      //      } else
-      //        log.fatal("service " + DIntent.HostService + " already binding/binded")
+      ctrlBindContext.set(caller)
     } else
       log.debug("service " + DIntent.HostService + " already binding/binded")
-    log.debug("increment bind counter to " + ctrlBindCounter.get)
   }
-  private def unbind(ctrlBindContext: AtomicReference[Context], ctrlBindCounter: AtomicInteger,
-    serviceInstance: SyncVar[Option[ICtrlHost]], ctrlConnection: ServiceConnection) = synchronized {
-    if (ctrlBindCounter.decrementAndGet() == 0)
-      if (serviceInstance.isSet && ctrlBindContext.get != null) {
-        serviceInstance.get match {
-          case Some(service) =>
-            log.info("unbind from service " + DIntent.HostService)
-            val caller = ctrlBindContext.getAndSet(null)
-            caller.unbindService(ctrlConnection)
-            serviceInstance.unset()
-          case None =>
-            log.info("unbind from unexists service " + DIntent.HostService)
-          case null =>
-            log.warn("service already unbinded")
-        }
-      } else {
-        ctrlBindContext.set(null)
-        serviceInstance.unset()
-        log.warn("service lost")
+  private def unbind(ctrlBindContext: AtomicReference[Context], serviceInstance: SyncVar[Option[ICtrlHost]],
+    ctrlConnection: ServiceConnection) = synchronized {
+    if (serviceInstance.isSet && ctrlBindContext.get != null) {
+      val caller = ctrlBindContext.getAndSet(null)
+      serviceInstance.get match {
+        case Some(service) =>
+          log.info("unbind from service " + DIntent.HostService)
+          caller.unbindService(ctrlConnection)
+        case None =>
+          log.info("unbind from unexists service " + DIntent.HostService)
       }
-    log.debug("decrement bind counter to " + ctrlBindCounter.get)
+      serviceInstance.unset()
+    } else
+      log.warn("service " + DIntent.HostService + " already unbinded")
   }
   @Loggable
   def isICtrlHostInstalled(ctx: Context): Boolean = {
