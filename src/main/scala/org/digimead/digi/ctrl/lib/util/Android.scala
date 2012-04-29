@@ -34,6 +34,8 @@ import android.content.res.Configuration
 import android.content.Context
 import android.os.Build
 import android.view.Surface
+import android.view.Display
+import android.view.WindowManager
 
 object Android extends Logging {
   @volatile private var busybox: Option[File] = null
@@ -78,9 +80,24 @@ object Android extends Logging {
   def getId(context: Context, name: String, scope: String): Int =
     context.getResources().getIdentifier(name, scope, context.getPackageName())
   @Loggable
+  def getScreenOrientation(display: Display): Int = if (display.getWidth() == display.getHeight()) {
+    log.debug("get screen ORIENTATION_SQUARE/" + Configuration.ORIENTATION_SQUARE)
+    Configuration.ORIENTATION_SQUARE
+  } else { //if width is less than height than it is portrait
+    if (display.getWidth() < display.getHeight()) {
+      log.debug("get screen ORIENTATION_PORTRAIT/" + Configuration.ORIENTATION_PORTRAIT)
+      Configuration.ORIENTATION_PORTRAIT
+    } else { // if it is not any of the above it will definitely be landscape
+      log.debug("get screen ORIENTATION_LANDSCAPE/" + Configuration.ORIENTATION_LANDSCAPE)
+      Configuration.ORIENTATION_LANDSCAPE
+    }
+  }
+  @Loggable
   def disableRotation(activity: Activity) {
-    val orientation = activity.getResources().getConfiguration().orientation
-    val rotation = activity.getWindowManager().getDefaultDisplay().getOrientation()
+    val display = activity.getWindowManager.getDefaultDisplay()
+    val orientation = getScreenOrientation(display)
+    val rotation = display.getRotation();
+
     // Copied from Android docs, since we don't have these values in Froyo 2.2
     var SCREEN_ORIENTATION_REVERSE_LANDSCAPE = 8
     var SCREEN_ORIENTATION_REVERSE_PORTRAIT = 9
@@ -88,26 +105,33 @@ object Android extends Logging {
       SCREEN_ORIENTATION_REVERSE_LANDSCAPE = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
       SCREEN_ORIENTATION_REVERSE_PORTRAIT = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
-    if (rotation == Surface.ROTATION_0 || rotation == Surface.ROTATION_90) {
-      if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-        log.debug("lock orientation PORTRAIT with r:" + rotation + " and o:" + orientation)
-        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-      } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        log.debug("lock orientation LANDSCAPE with r:" + rotation + " and o:" + orientation)
-        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
-      } else {
-        log.debug("skip orientation UNKNOWN with r:" + rotation + " and o:" + orientation)
-      }
-    } else if (rotation == Surface.ROTATION_180 || rotation == Surface.ROTATION_270) {
-      if (orientation == Configuration.ORIENTATION_PORTRAIT) {
-        log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and o:" + orientation)
-        activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_PORTRAIT)
-      } else if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        log.debug("lock orientation REVERSE_LANDSCAPE with r:" + rotation + " and o:" + orientation)
-        activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
-      } else {
-        log.debug("skip orientation PORTRAIT with r:" + rotation + " and o:" + orientation)
-      }
+    orientation match {
+      case Configuration.ORIENTATION_PORTRAIT =>
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.FROYO) {
+          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        } else {
+          if (rotation == android.view.Surface.ROTATION_90 || rotation == android.view.Surface.ROTATION_180) {
+            log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and ORIENTATION_REVERSE_PORTRAIT")
+            activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_PORTRAIT)
+          } else {
+            log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and ORIENTATION_PORTRAIT")
+            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+          }
+        }
+      case Configuration.ORIENTATION_LANDSCAPE =>
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.FROYO) {
+          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+        } else {
+          if (rotation == android.view.Surface.ROTATION_0 || rotation == android.view.Surface.ROTATION_90) {
+            log.debug("lock orientation LANDSCAPE with r:" + rotation + " and ORIENTATION_LANDSCAPE")
+            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
+          } else {
+            log.debug("lock orientation LANDSCAPE with r:" + rotation + " and ORIENTATION_REVERSE_LANDSCAPE")
+            activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
+          }
+        }
+      case n =>
+        log.warn("don't know what to do with orientation " + n)
     }
   }
   @Loggable

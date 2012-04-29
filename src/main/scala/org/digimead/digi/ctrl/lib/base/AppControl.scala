@@ -67,7 +67,7 @@ protected class AppControl private () extends Logging {
   /*
    * None - unknown
    * Some(true) - yes
-   * Some(false) - no
+   * Some(false) - no / DigiControl unavailable
    */
   def isAvailable(): Option[Boolean] =
     if (ready.isSet) {
@@ -83,8 +83,8 @@ protected class AppControl private () extends Logging {
     get(timeout, true)
   def get(throwError: Boolean): Option[ICtrlHost] =
     get(0, true)
-  def get(timeout: Long, throwError: Boolean): Option[ICtrlHost] =
-    AppControl.get(timeout, throwError, ready)
+  def get(timeout: Long, throwError: Boolean, stackTrace: Throwable = null): Option[ICtrlHost] =
+    AppControl.get(timeout, throwError, ready, stackTrace)
   def getWait(): ICtrlHost =
     getWait(true)
   @Loggable
@@ -135,9 +135,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callListDirectories AppControl function from UI thread")
+    val t = new Throwable("Intospecting callListDirectories")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.directories(componentPackage) match {
             case null =>
@@ -153,9 +155,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callStart AppControl function from UI thread")
+    val t = new Throwable("Intospecting callStart")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.start(componentPackage)
         case None =>
@@ -166,9 +170,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callStatus(componentPackage: String, allowCallFromUI: Boolean = false): Future[Either[String, ComponentState]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callStatus AppControl function from UI thread")
+    val t = new Throwable("Intospecting callStatus")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           try {
             service.status(componentPackage) match {
@@ -207,9 +213,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callStop(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callStop AppControl function from UI thread")
+    val t = new Throwable("Intospecting callStop")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.stop(componentPackage)
         case None =>
@@ -220,9 +228,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callDisconnect(componentPackage: String, processID: Int, connectionID: Int, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callDisconnect AppControl function from UI thread")
+    val t = new Throwable("Intospecting callDisconnect")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.disconnect(componentPackage, processID, connectionID)
         case None =>
@@ -233,9 +243,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callListActiveInterfaces(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[String]]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callListActiveInterfaces AppControl function from UI thread")
+    val t = new Throwable("Intospecting callListActiveInterfaces")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.interfaces(componentPackage) match {
             case null =>
@@ -251,9 +263,11 @@ protected class AppControl private () extends Logging {
   @Loggable
   def callListPendingConnections(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[Intent]]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
-      log.fatal("call AppControl function from UI thread")
+      log.fatal("callListPendingConnections AppControl function from UI thread")
+    val t = new Throwable("Intospecting callListPendingConnections")
+    t.fillInStackTrace()
     future {
-      get(ctrlBindTimeout) orElse rebind(ctrlBindTimeout) match {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.pending_connections(componentPackage) match {
             case null =>
@@ -332,7 +346,7 @@ object AppControl extends Logging {
   }
   def Inner = inner
   def ICtrlHost = inner.get()
-  private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]]): Option[ICtrlHost] = {
+  private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]], stackTrace: Throwable = null): Option[ICtrlHost] = {
     if (timeout == -1) {
       if (!throwError)
         Option(serviceInstance.get)
@@ -341,9 +355,12 @@ object AppControl extends Logging {
           case Some(service) => Some(Some(service))
           case None => None
           case null =>
-            val t = new Throwable("Intospecting stack frame")
-            t.fillInStackTrace()
-            log.error("uninitialized ICtrlHost at AppControl: " + t.getStackTraceString)
+            val stack = if (stackTrace == null) {
+              val t = new Throwable("Intospecting stack frame")
+              t.fillInStackTrace()
+            } else
+              stackTrace
+            log.error("uninitialized ICtrlHost at AppControl: " + stack.getStackTraceString)
             None
         }
     } else {
@@ -354,9 +371,12 @@ object AppControl extends Logging {
         serviceInstance.get(timeout) match {
           case Some(service) => Some(service)
           case None =>
-            val t = new Throwable("Intospecting stack frame")
-            t.fillInStackTrace()
-            log.error("uninitialized ICtrlHost at AppControl: " + t.getStackTraceString)
+            val stack = if (stackTrace == null) {
+              val t = new Throwable("Intospecting stack frame")
+              t.fillInStackTrace()
+            } else
+              stackTrace
+            log.error("uninitialized ICtrlHost at AppControl: " + stack.getStackTraceString)
             None
         }
     }
