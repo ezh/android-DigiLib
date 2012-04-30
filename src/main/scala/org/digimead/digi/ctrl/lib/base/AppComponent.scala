@@ -538,9 +538,10 @@ object AppComponent extends Logging {
       pool = pool + (priority -> (storedFunc :+ (() => {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
+        val tsBegin = System.currentTimeMillis
         log.debug("begin LazyInit block \"" + description + "\"")
         f
-        log.debug("end LazyInit block \"" + description + "\"")
+        log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat/1000) + "s")
         scheduler.shutdownNow
       })))
     }

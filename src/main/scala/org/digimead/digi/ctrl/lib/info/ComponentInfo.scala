@@ -212,39 +212,38 @@ object ComponentInfo extends Logging {
   @Loggable
   def apply(xml: Elem, locale: String, localeLanguage: String, iconExtractor: (Seq[(IconType, String)]) => Seq[Option[Array[Byte]]]): Option[ComponentInfo] = try {
     log.debug("check XML content")
-    val id = future { check(Check.Text("id"), xml \\ "id" headOption) }
-    val name = future { check(Check.Text("name"), suitable(xml \\ "name", locale, localeLanguage)) }
-    val version = future { check(Check.Version("version"), xml \\ "version" headOption) }
-    val description = future { check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage)) }
+    val id = check(Check.Text("id"), xml \\ "id" headOption)
+    val name = check(Check.Text("name"), suitable(xml \\ "name", locale, localeLanguage))
+    val version = check(Check.Version("version"), xml \\ "version" headOption)
+    val description = check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage))
     val project = future { check(Check.URL("project"), xml \\ "project" headOption) }
     val thumb = future { check(Check.URL("thumb"), xml \\ "thumb" headOption) }
-    val origin = future { check(Check.Text("origin"), xml \\ "origin" headOption) }
-    val license = future { check(Check.Text("license"), xml \\ "license" headOption) }
-    val email = future { check(Check.EMail("email"), xml \\ "email" headOption) }
+    val origin = check(Check.Text("origin"), xml \\ "origin" headOption)
+    val license = check(Check.Text("license"), xml \\ "license" headOption)
+    val email = check(Check.EMail("email"), xml \\ "email" headOption)
     val icon_hdpi = future { check(Check.URL("icon-hdpi"), xml \\ "icon-hdpi" headOption) }
     val icon_ldpi = future { check(Check.URL("icon-ldpi"), xml \\ "icon-ldpi" headOption) }
     val icon_mdpi = future { check(Check.URL("icon-mdpi"), xml \\ "icon-mdpi" headOption) }
     val icon_xhdpi = future { check(Check.URL("icon-xhdpi"), xml \\ "icon-xhdpi" headOption) }
     val market = future { check(Check.MarketURL("market"), xml \\ "market" headOption) }
-    val packageName = future { check(Check.PackageName("package-name"), xml \\ "package-name" headOption) }
-    awaitAll(DTimeout.normal, id, name, version, description, project, thumb, origin, license,
-      email, icon_hdpi, icon_ldpi, icon_mdpi, icon_xhdpi, market, packageName)
+    val packageName = check(Check.PackageName("package-name"), xml \\ "package-name" headOption)
+    awaitAll(DTimeout.normal, project, thumb, icon_hdpi, icon_ldpi, icon_mdpi, icon_xhdpi, market)
     val artifact: Option[ComponentInfo] = (for {
-      id <- id()
-      name <- name()
-      version <- version()
-      description <- description()
+      id <- id
+      name <- name
+      version <- version
+      description <- description
       project <- project()
       thumb <- thumb()
-      origin <- origin()
-      license <- license()
-      email <- email()
+      origin <- origin
+      license <- license
+      email <- email
       icon_hdpi <- icon_hdpi()
       icon_ldpi <- icon_ldpi()
       icon_mdpi <- icon_mdpi()
       icon_xhdpi <- icon_xhdpi()
       market <- market()
-      packageName <- packageName()
+      packageName <- packageName
     } yield {
       log.debug("create FetchedItem from descriptor")
       val Seq(thumbIcon, iconLDPI, iconMDPI, iconHDPI, iconXHDPI) =
@@ -286,26 +285,25 @@ object ComponentInfo extends Logging {
       Some(in)
     case Check.EMail(field) =>
       if (!emailPattern.matcher(in).matches()) {
-        log.warn("descriptor field \"" + kind.field + "\" contain broken email")
+        log.warn("descriptor field \"" + kind.field + "\" contain broken email " + in)
         return None
       }
       Some(in)
     case Check.URL(field) =>
       try {
         val url = new URL(in)
-        val conn = url.openConnection()
-        conn.connect()
+        url.openConnection()
       } catch {
         case e: MalformedURLException =>
-          log.warn("descriptor field \"" + kind.field + "\" contain the URL is not in a valid form")
+          log.warn("descriptor field \"" + kind.field + "\" contain the URL is not in a valid form " + in)
           return None
         case e: IOException =>
-          log.trace("descriptor field \"" + kind.field + "\" contain valid URL but the connection to target couldn't be established")
+          log.trace("descriptor field \"" + kind.field + "\" contain valid URL but the connection to target couldn't be established " + in)
       }
       Some(in)
     case Check.MarketURL(field) =>
       if (!in.startsWith("market://details")) {
-        log.warn("descriptor field \"" + kind.field + "\" contain invalid market URL")
+        log.warn("descriptor field \"" + kind.field + "\" contain invalid market URL " + in)
         return None
       }
       check(Check.URL(field), in.replaceFirst("market://details", "https://market.android.com/details")).map(replaced => in)

@@ -40,14 +40,14 @@ import android.content.Intent
 object Report extends Logging {
   val keepLogFiles = 4
   val keepTrcFiles = 8
-  def reportPrefix = "U" + android.os.Process.myUid + "-P" + android.os.Process.myPid + "-" + Common.dateFile(new Date())
+  def reportPrefix = "U" + android.os.Process.myUid + "-" + Common.dateFile(new Date()) + "-P" + android.os.Process.myPid
   private[lib] def init(context: Context): Unit = synchronized {
     try {
       // create report directory in Common.getDirectory and add LazyInit
       for {
         info <- AnyBase.info.get
         internal <- Common.getDirectory(context, info.reportPath.getName, true, 755)
-      } AppComponent.LazyInit("try to submit reports if there any stack traces, clean outdated") {
+      } AppComponent.LazyInit("move report to SD, clean outdated") {
         // move reports from internal to external storage
         if (info.reportPath.getAbsolutePath != internal.getAbsolutePath) {
           log.debug("move reports from " + internal + " to " + info.reportPath)
@@ -59,8 +59,8 @@ object Report extends Logging {
               fileFrom.delete
           }
         }
+        clean()
       }
-      clean()
     } catch {
       case e => log.error(e.getMessage, e)
     }
@@ -183,7 +183,7 @@ object Report extends Logging {
           val report = new File(info.reportPath, name)
           val active = try {
             val name = report.getName
-            val pid = Integer.parseInt(name.split('-')(1).drop(1))
+            val pid = Integer.parseInt(name.split("""[-\.]""")(4).drop(1))
             processList.exists(_.pid == pid)
           } catch {
             case _ =>

@@ -81,7 +81,12 @@ trait Activity extends AActivity with AnyBase with Logging {
       if (Activity.activeReceivers(t._1)) {
         log.trace("onResume unregisterReceiver " + t._1)
         Activity.activeReceivers(t._1) = false
-        super.unregisterReceiver(t._1)
+        try {
+          super.unregisterReceiver(t._1)
+        } catch {
+          case e =>
+            log.error(e.getMessage)
+        }
       } else {
         log.trace("onPause skip unregisterReceiver " + t._1)
       }

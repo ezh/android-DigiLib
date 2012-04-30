@@ -40,128 +40,127 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   }
   // trace
   /* @see org.slf4j.Logger#isTraceEnabled() */
-  def isTraceEnabled(): Boolean = true
-  def trace(msg: String) =
+  def isTraceEnabled(): Boolean = Logging.isTraceEnabled
+  def trace(msg: String) = if (Logging.isTraceEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg))
 
-  def trace(format: String, arg: Object) {
+  def trace(format: String, arg: Object) = if (Logging.isTraceEnabled) {
     val msg = format.format(arg)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg))
   }
-  def trace(format: String, arg1: Object, arg2: Object) {
+  def trace(format: String, arg1: Object, arg2: Object) = if (Logging.isTraceEnabled) {
     val msg = format.format(arg1, arg2)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg))
   }
-  def trace(format: String, argArray: Array[AnyRef]) {
+  def trace(format: String, argArray: Array[AnyRef]) = if (Logging.isTraceEnabled) {
     val msg = format.format(argArray: _*)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg))
   }
-  def trace(msg: String, t: Throwable) =
+  def trace(msg: String, t: Throwable) = if (Logging.isTraceEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg, Some(t)))
-  def traceWhere(msg: String): Unit =
+  def traceWhere(msg: String): Unit = if (Logging.isTraceEnabled)
     logWhere(msg, trace, trace)(-2)
-  def traceWhere(msg: String, stackLine: Int): Unit =
+  def traceWhere(msg: String, stackLine: Int): Unit = if (Logging.isTraceEnabled)
     logWhere(msg, trace, trace)(stackLine)
 
   // debug
   /* @see org.slf4j.Logger#isDebugEnabled() */
-  def isDebugEnabled(): Boolean = true
-  def debug(msg: String) =
+  def isDebugEnabled(): Boolean = Logging.isDebugEnabled
+  def debug(msg: String) = if (Logging.isDebugEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg))
-  def debug(format: String, arg: Object) {
+  def debug(format: String, arg: Object) = if (Logging.isDebugEnabled) {
     val msg = format.format(arg)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg))
   }
-  def debug(format: String, arg1: Object, arg2: Object) {
+  def debug(format: String, arg1: Object, arg2: Object) = if (Logging.isDebugEnabled) {
     val msg = format.format(arg1, arg2)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg))
   }
-  def debug(format: String, argArray: Array[AnyRef]) {
+  def debug(format: String, argArray: Array[AnyRef]) = if (Logging.isDebugEnabled) {
     val msg = format.format(argArray: _*)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg))
   }
-  def debug(msg: String, t: Throwable) =
+  def debug(msg: String, t: Throwable) = if (Logging.isDebugEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg, Some(t)))
-  def debugWhere(msg: String): Unit =
+  def debugWhere(msg: String): Unit = if (Logging.isDebugEnabled)
     logWhere(msg, debug, debug)(-2)
-  def debugWhere(msg: String, stackLine: Int): Unit =
+  def debugWhere(msg: String, stackLine: Int): Unit = if (Logging.isDebugEnabled)
     logWhere(msg, debug, debug)(stackLine)
 
   // info
   /* @see org.slf4j.Logger#isInfoEnabled() */
-  def isInfoEnabled: Boolean = true
-  def info(msg: String) {
+  def isInfoEnabled: Boolean = Logging.isInfoEnabled
+  def info(msg: String) = if (Logging.isInfoEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg))
-  }
-  def info(format: String, arg: Object) {
+  def info(format: String, arg: Object) = if (Logging.isInfoEnabled) {
     val msg = format.format(arg)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg))
   }
-  def info(format: String, arg1: Object, arg2: Object) {
+  def info(format: String, arg1: Object, arg2: Object) = if (Logging.isInfoEnabled) {
     val msg = format.format(arg1, arg2)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg))
   }
-  def info(format: String, argArray: Array[AnyRef]) {
+  def info(format: String, argArray: Array[AnyRef]) = if (Logging.isInfoEnabled) {
     val msg = format.format(argArray: _*)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg))
   }
-  def info(msg: String, t: Throwable) =
+  def info(msg: String, t: Throwable) = if (Logging.isInfoEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg, Some(t)))
-  def infoWhere(msg: String): Unit =
+  def infoWhere(msg: String): Unit = if (Logging.isInfoEnabled)
     logWhere(msg, info, info)(-2)
-  def infoWhere(msg: String, stackLine: Int = 4): Unit =
+  def infoWhere(msg: String, stackLine: Int = 4): Unit = if (Logging.isInfoEnabled)
     logWhere(msg, info, info)(stackLine)
 
   // warn
   /* @see org.slf4j.Logger#isWarnEnabled() */
-  def isWarnEnabled: Boolean = true
-  def warn(msg: String) {
+  def isWarnEnabled: Boolean = Logging.isWarnEnabled
+  def warn(msg: String) = if (Logging.isWarnEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg))
-  }
-  def warn(format: String, arg: Object) {
+  def warn(format: String, arg: Object) = if (Logging.isWarnEnabled) {
     val msg = format.format(arg)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg))
   }
-  def warn(format: String, arg1: Object, arg2: Object) {
+  def warn(format: String, arg1: Object, arg2: Object) = if (Logging.isWarnEnabled) {
     val msg = format.format(arg1, arg2)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg))
   }
-  def warn(format: String, argArray: Array[AnyRef]) {
+  def warn(format: String, argArray: Array[AnyRef]) = if (Logging.isWarnEnabled) {
     val msg = format.format(argArray: _*)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg))
   }
-  def warn(msg: String, t: Throwable) =
+  def warn(msg: String, t: Throwable) = if (Logging.isWarnEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg, Some(t)))
-  def warnWhere(msg: String): Unit =
+  def warnWhere(msg: String): Unit = if (Logging.isWarnEnabled)
     logWhere(msg, warn, warn)(-2)
-  def warnWhere(msg: String, stackLine: Int = 4): Unit =
+  def warnWhere(msg: String, stackLine: Int = 4): Unit = if (Logging.isWarnEnabled)
     logWhere(msg, warn, warn)(stackLine)
 
   // error
   /* @see org.slf4j.Logger#isErrorEnabled() */
-  def isErrorEnabled: Boolean = true
-  def error(msg: String) =
+  def isErrorEnabled: Boolean = Logging.isErrorEnabled
+  def error(msg: String) = if (Logging.isErrorEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg))
-  def error(format: String, arg: Object) {
+  def error(format: String, arg: Object) = if (Logging.isErrorEnabled) {
     val msg = format.format(arg)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg))
   }
-  def error(format: String, arg1: Object, arg2: Object) {
+  def error(format: String, arg1: Object, arg2: Object) = if (Logging.isErrorEnabled) {
     val msg = format.format(arg1, arg2)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg))
   }
-  def error(format: String, argArray: Array[AnyRef]) {
+  def error(format: String, argArray: Array[AnyRef]) = if (Logging.isErrorEnabled) {
     val msg = format.format(argArray: _*)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg))
   }
-  def error(msg: String, t: Throwable) = {
+  // always enabled
+  def error(msg: String, t: Throwable) {
     if (ExceptionHandler.allowGenerateStackTrace)
       ExceptionHandler.generateStackTrace(Thread.currentThread, t)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg, Some(t)))
   }
-  def errorWhere(msg: String): Unit =
+  def errorWhere(msg: String): Unit = if (Logging.isErrorEnabled)
     logWhere(msg, error, error)(-2)
-  def errorWhere(msg: String, stackLine: Int): Unit =
+  def errorWhere(msg: String, stackLine: Int): Unit = if (Logging.isErrorEnabled)
     logWhere(msg, error, error)(stackLine)
 
   private def logWhere(msg: String, f1: (String, Throwable) => Unit, f2: (String => Unit))(stackLine: Int) {

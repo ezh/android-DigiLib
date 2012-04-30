@@ -36,6 +36,11 @@ trait Logging {
 
 object Logging {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
+  @volatile var isTraceEnabled = true
+  @volatile var isDebugEnabled = true
+  @volatile var isInfoEnabled = true
+  @volatile var isWarnEnabled = true
+  @volatile var isErrorEnabled = true
   private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
   private[log] val queue = new ConcurrentLinkedQueue[Record]
   private[log] var logger = new HashSet[Logger]()
