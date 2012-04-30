@@ -360,7 +360,7 @@ object AppControl extends Logging {
               t.fillInStackTrace()
             } else
               stackTrace
-            log.error("uninitialized ICtrlHost at AppControl: " + stack.getStackTraceString)
+            log.error("uninitialized ICtrlHost at AppControl", stack)
             None
         }
     } else {
@@ -376,7 +376,7 @@ object AppControl extends Logging {
               t.fillInStackTrace()
             } else
               stackTrace
-            log.error("uninitialized ICtrlHost at AppControl: " + stack.getStackTraceString)
+            log.error("uninitialized ICtrlHost at AppControl", stack)
             None
         }
     }

@@ -36,11 +36,11 @@ trait Logging {
 
 object Logging {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  @volatile var isTraceEnabled = true
-  @volatile var isDebugEnabled = true
-  @volatile var isInfoEnabled = true
-  @volatile var isWarnEnabled = true
-  @volatile var isErrorEnabled = true
+  @volatile private[log] var isTraceEnabled = true
+  @volatile private[log] var isDebugEnabled = true
+  @volatile private[log] var isInfoEnabled = true
+  @volatile private[log] var isWarnEnabled = true
+  @volatile private[log] var isErrorEnabled = true
   private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
   private[log] val queue = new ConcurrentLinkedQueue[Record]
   private[log] var logger = new HashSet[Logger]()
@@ -48,6 +48,42 @@ object Logging {
   private[log] var loggingThread = getWorker
   private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
+
+  def setTraceEnabled(t: Boolean) {
+    Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
+      "enable TRACE log level"
+    else
+      "disable TRACE log level"))
+    isTraceEnabled = t
+  }
+  def setDebugEnabled(t: Boolean) {
+    Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
+      "enable DEBUG log level"
+    else
+      "disable DEBUG log level"))
+    isDebugEnabled = t
+  }
+  def setInfoEnabled(t: Boolean) {
+    Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
+      "enable INFO log level"
+    else
+      "disable INFO log level"))
+    isInfoEnabled = t
+  }
+  def setWarnEnabled(t: Boolean) {
+    Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
+      "enable WARN log level"
+    else
+      "disable WARN log level"))
+    isWarnEnabled = t
+  }
+  def setErrorEnabled(t: Boolean) {
+    Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
+      "enable ERROR log level"
+    else
+      "disable ERROR log level"))
+    isErrorEnabled = t
+  }
   def offer(record: Record) = queue.offer(record)
   private[lib] def init(context: Context): Unit = synchronized {
     try {

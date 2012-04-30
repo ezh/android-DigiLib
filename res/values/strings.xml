@@ -62,5 +62,11 @@
     <string name="menu_gplay">Google Play</string>
     <string name="menu_report">Report</string>
     <string name="menu_control">DigiControl</string>
+    <string name="menu_options">Options</string>
+    <string name="preference_debug_level">Debug Level</string>
+    <string name="preference_debug_level_description">Changing the debug levels</string>
+    <string name="preference_debug_android">Android Logging</string>
+    <string name="preference_debug_android_on">Built-in facility to log information to the android console. Enabled</string>
+    <string name="preference_debug_android_off">Built-in facility to log information to the android console. Disabled</string>
 
 </resources>
