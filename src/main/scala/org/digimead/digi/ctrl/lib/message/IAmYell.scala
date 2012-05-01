@@ -25,8 +25,8 @@ import org.digimead.digi.ctrl.lib.message.Origin.richLoggerToOrigin
 import android.os.Parcelable
 import android.os.Parcel
 
-case class IAmYell(val origin: Origin, val message: String, val stackTrace: String,
-  @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
+case class IAmYell(val origin: Origin, val message: String, val stackTrace: String, @transient val onClickCallback: Option[() => Unit],
+  val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   def this(origin: Origin, message: String, t: Throwable)(implicit logger: RichLogger, dispatcher: Dispatcher) =
     this(origin, message, t.getMessage + "\n" + t.getStackTraceString, None)(logger, dispatcher)
@@ -36,16 +36,17 @@ case class IAmYell(val origin: Origin, val message: String, val stackTrace: Stri
   def this(origin: Origin, message: String)(implicit logger: RichLogger, dispatcher: Dispatcher) =
     this(origin, message, None)(logger, dispatcher)
   if (logger != null)
-    logger.error("IAmYell " + message + "\n" + stackTrace)
+    logger.error("IAmYell " + message + " ts#" + ts + "\n" + stackTrace)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
-    message = in.readString, stackTrace = in.readString, onClickCallback = None)(logger, dispatcher)
+    message = in.readString, stackTrace = in.readString, onClickCallback = None, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmYell.log.debug("writeToParcel IAmYell with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
     out.writeString(stackTrace)
+    out.writeLong(ts)
   }
   def describeContents() = 0
 }

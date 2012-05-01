@@ -27,5 +27,6 @@ trait DMessage extends Parcelable {
   val origin: Origin
   val message: String
   val dispatcher: Dispatcher
+  val ts: Long
   var stash: Option[_] = None // hold it forever
 }

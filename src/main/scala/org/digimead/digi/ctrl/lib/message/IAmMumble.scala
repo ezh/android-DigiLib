@@ -25,22 +25,23 @@ import org.digimead.digi.ctrl.lib.message.Origin.richLoggerToOrigin
 import android.os.Parcelable
 import android.os.Parcel
 
-case class IAmMumble(val origin: Origin, val message: String,
-  @transient val onClickCallback: Option[() => Unit])(implicit @transient val logger: RichLogger,
+case class IAmMumble(val origin: Origin, val message: String, @transient val onClickCallback: Option[() => Unit],
+  val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
     if (logger.isTraceEnabled)
-      logger.infoWhere("IAmMumble " + message)
+      logger.infoWhere("IAmMumble " + message + " ts#" + ts, Logging.Where.ALL)
     else
-      logger.info("IAmMumble " + message)
+      logger.info("IAmMumble " + message + " ts#" + ts)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
-    message = in.readString, onClickCallback = None)(logger, dispatcher)
+    message = in.readString, onClickCallback = None, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmMumble.log.debug("writeToParcel IAmMumble with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
+    out.writeLong(ts)
   }
   def describeContents() = 0
 }

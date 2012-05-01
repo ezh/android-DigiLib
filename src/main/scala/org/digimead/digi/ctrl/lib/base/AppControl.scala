@@ -153,6 +153,21 @@ protected class AppControl private () extends Logging {
     }
   }
   @Loggable
+  def callEnable(componentPackage: String, flag: Boolean, allowCallFromUI: Boolean = false): Future[_] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("callStart AppControl function from UI thread")
+    val t = new Throwable("Intospecting callEnable")
+    t.fillInStackTrace()
+    future {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.enable(componentPackage, flag)
+        case None =>
+          false
+      }
+    }
+  }
+  @Loggable
   def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStart AppControl function from UI thread")

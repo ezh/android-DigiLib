@@ -26,7 +26,8 @@ case class ComponentState(val componentPackage: String,
   val executableState: List[ExecutableState],
   val state: DState.Value,
   val execPath: String,
-  val dataPath: String) extends Parcelable {
+  val dataPath: String,
+  val enabled: Boolean) extends Parcelable {
   def this(in: Parcel) = this(componentPackage = in.readString,
     executableState =
       in.readParcelableArray(null) match {
@@ -37,7 +38,8 @@ case class ComponentState(val componentPackage: String,
       },
     state = DState(in.readInt),
     execPath = in.readString,
-    dataPath = in.readString)
+    dataPath = in.readString,
+    enabled = (in.readByte == 1))
   def writeToParcel(out: Parcel, flags: Int) {
     ComponentState.log.debug("writeToParcel ComponentState with flags " + flags)
     out.writeString(componentPackage)
@@ -45,6 +47,7 @@ case class ComponentState(val componentPackage: String,
     out.writeInt(state.id)
     out.writeString(execPath)
     out.writeString(dataPath)
+    out.writeByte(if (enabled) 1 else 0)
   }
   def describeContents() = 0
 }

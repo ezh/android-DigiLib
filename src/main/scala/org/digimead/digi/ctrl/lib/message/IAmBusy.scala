@@ -24,22 +24,23 @@ import org.digimead.digi.ctrl.lib.log.RichLogger
 import android.os.Parcelable
 import android.os.Parcel
 
-case class IAmBusy(val origin: Origin,
-  val message: String)(implicit @transient val logger: RichLogger,
+case class IAmBusy(val origin: Origin, val message: String,
+  val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
     if (logger.isTraceEnabled)
-      logger.infoWhere("IAmBusy " + message, 3)
+      logger.infoWhere("IAmBusy " + message + " ts#" + ts, Logging.Where.ALL)
     else
-      logger.info("IAmBusy " + message)
+      logger.info("IAmBusy " + message + " ts#" + ts)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
-    message = in.readString)(logger, dispatcher)
+    message = in.readString, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
     IAmBusy.log.debug("writeToParcel IAmBusy with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
+    out.writeLong(ts)
   }
   def describeContents() = 0
 }

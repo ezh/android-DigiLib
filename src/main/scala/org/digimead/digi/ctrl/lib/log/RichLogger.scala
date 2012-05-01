@@ -175,5 +175,4 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
     } else
       f2(msg + " at " + t.getStackTrace.take(stackLine + 1).last)
   }
-
 }
