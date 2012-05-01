@@ -78,8 +78,12 @@ object ExceptionHandler extends Logging {
     def uncaughtException(t: Thread, e: Throwable) {
       if (allowGenerateStackTrace)
         generateStackTrace(t, e)
-      //call original handler
-      defaultExceptionHandler.uncaughtException(t, e)
+      // call original handler, handler blown up if java.lang.Throwable.getStackTrace return null :-)
+      try {
+        defaultExceptionHandler.uncaughtException(t, e)
+      } catch {
+        case e =>
+      }
     }
   }
 }

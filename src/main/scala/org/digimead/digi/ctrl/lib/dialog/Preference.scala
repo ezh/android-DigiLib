@@ -16,11 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import scala.annotation.implicitNotFound
-
+import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.log.AndroidLogger
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
 import org.digimead.digi.ctrl.lib.util.Android
@@ -31,7 +30,7 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.preference.CheckBoxPreference
 import android.preference.ListPreference
-import android.preference.{Preference => APreference}
+import android.preference.{ Preference => APreference }
 import android.preference.PreferenceActivity
 import android.preference.PreferenceCategory
 import android.preference.PreferenceManager
@@ -86,71 +85,89 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
 object Preference extends Logging {
   val debugLevelsListKey = "debug_level"
   val debugAndroidCheckBoxKey = "debug_android"
-  def setLogLevel(l: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher) = l match {
-    case "0" =>
-      Logging.setErrorEnabled(false)
-      Logging.setWarnEnabled(false)
-      Logging.setInfoEnabled(false)
-      Logging.setDebugEnabled(false)
-      Logging.setTraceEnabled(false)
-      val message = Android.getString(context, "set_loglevel_none").getOrElse("Set log level to NONE")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case "1" =>
-      Logging.setErrorEnabled(true)
-      Logging.setWarnEnabled(false)
-      Logging.setInfoEnabled(false)
-      Logging.setDebugEnabled(false)
-      Logging.setTraceEnabled(false)
-      val message = Android.getString(context, "set_loglevel_error").getOrElse("Set log level to ERROR")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case "2" =>
-      Logging.setErrorEnabled(true)
-      Logging.setWarnEnabled(true)
-      Logging.setInfoEnabled(false)
-      Logging.setDebugEnabled(false)
-      Logging.setTraceEnabled(false)
-      val message = Android.getString(context, "set_loglevel_warn").getOrElse("Set log level to WARN")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case "3" =>
-      Logging.setErrorEnabled(true)
-      Logging.setWarnEnabled(true)
-      Logging.setInfoEnabled(true)
-      Logging.setDebugEnabled(false)
-      Logging.setTraceEnabled(false)
-      val message = Android.getString(context, "set_loglevel_info").getOrElse("Set log level to INFO")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case "4" =>
-      Logging.setErrorEnabled(true)
-      Logging.setWarnEnabled(true)
-      Logging.setInfoEnabled(true)
-      Logging.setDebugEnabled(true)
-      Logging.setTraceEnabled(false)
-      val message = Android.getString(context, "set_loglevel_debug").getOrElse("Set log level to DEBUG")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case "5" =>
-      Logging.setErrorEnabled(true)
-      Logging.setWarnEnabled(true)
-      Logging.setInfoEnabled(true)
-      Logging.setDebugEnabled(true)
-      Logging.setTraceEnabled(true)
-      val message = Android.getString(context, "set_loglevel_trace").getOrElse("Set log level to TRACE")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
-    case n =>
-      log.error("unknown value " + n + " for preference " + debugLevelsListKey)
+  @volatile private var lastLogLevelLevel = ""
+  @volatile private var lastAndroidLogging = false
+  @Loggable
+  def setLogLevel(l: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
+    if (lastLogLevelLevel == l) {
+      log.info("current log level already set to " + l)
+      return
+    } else {
+      lastLogLevelLevel = l
+    }
+    l match {
+      case "0" =>
+        Logging.setErrorEnabled(false)
+        Logging.setWarnEnabled(false)
+        Logging.setInfoEnabled(false)
+        Logging.setDebugEnabled(false)
+        Logging.setTraceEnabled(false)
+        val message = Android.getString(context, "set_loglevel_none").getOrElse("Set log level to NONE")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "1" =>
+        Logging.setErrorEnabled(true)
+        Logging.setWarnEnabled(false)
+        Logging.setInfoEnabled(false)
+        Logging.setDebugEnabled(false)
+        Logging.setTraceEnabled(false)
+        val message = Android.getString(context, "set_loglevel_error").getOrElse("Set log level to ERROR")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "2" =>
+        Logging.setErrorEnabled(true)
+        Logging.setWarnEnabled(true)
+        Logging.setInfoEnabled(false)
+        Logging.setDebugEnabled(false)
+        Logging.setTraceEnabled(false)
+        val message = Android.getString(context, "set_loglevel_warn").getOrElse("Set log level to WARN")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "3" =>
+        Logging.setErrorEnabled(true)
+        Logging.setWarnEnabled(true)
+        Logging.setInfoEnabled(true)
+        Logging.setDebugEnabled(false)
+        Logging.setTraceEnabled(false)
+        val message = Android.getString(context, "set_loglevel_info").getOrElse("Set log level to INFO")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "4" =>
+        Logging.setErrorEnabled(true)
+        Logging.setWarnEnabled(true)
+        Logging.setInfoEnabled(true)
+        Logging.setDebugEnabled(true)
+        Logging.setTraceEnabled(false)
+        val message = Android.getString(context, "set_loglevel_debug").getOrElse("Set log level to DEBUG")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "5" =>
+        Logging.setErrorEnabled(true)
+        Logging.setWarnEnabled(true)
+        Logging.setInfoEnabled(true)
+        Logging.setDebugEnabled(true)
+        Logging.setTraceEnabled(true)
+        val message = Android.getString(context, "set_loglevel_trace").getOrElse("Set log level to TRACE")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case n =>
+        log.error("unknown value " + n + " for preference " + debugLevelsListKey)
+    }
   }
+  @Loggable
   def setAndroidLogger(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+    if (lastAndroidLogging == f) {
+      log.info("current android logging already set to " + f)
+      return
+    } else {
+      lastAndroidLogging = f
+    }
     val message = if (f) {
       Logging.addLogger(AndroidLogger)
       Android.getString(context, "debug_android_on_notify").getOrElse("Android logging facility enabled")
