@@ -42,7 +42,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.json.JSONObject
 
-import com.ning.http.client.AsyncHandler.STATE
+/*import com.ning.http.client.AsyncHandler.STATE
 import com.ning.http.client.providers.jdk.JDKAsyncHttpProvider
 import com.ning.http.client.AsyncHandler
 import com.ning.http.client.AsyncHttpClient
@@ -51,7 +51,7 @@ import com.ning.http.client.HttpResponseBodyPart
 import com.ning.http.client.HttpResponseHeaders
 import com.ning.http.client.HttpResponseStatus
 import com.ning.http.client.RequestBuilder
-import com.ning.http.client.Response
+import com.ning.http.client.Response*/
 
 import android.net.http.AndroidHttpClient
 import android.provider.Settings
@@ -141,7 +141,7 @@ object GoogleCloud extends Logging {
       if (result == None)
         log.warn("unable to upload " + file)
   }
-  def uploadViaNetty(file: File, prefix: String = "") = AppComponent.Context.foreach {
+/*  def uploadViaNetty(file: File, prefix: String = "") = AppComponent.Context.foreach {
     context =>
       log.debug("upload via Netty client " + file.getName + " with default credentials")
       val result = for {
@@ -207,7 +207,7 @@ object GoogleCloud extends Logging {
       }
       if (result == None)
         log.warn("unable to upload " + file)
-  }
+  }*/
   def getAccessToken(clientID: String, clientSecret: String, refreshToken: String): Option[AccessToken] = synchronized {
     accessToken.get.foreach(t => if (t.expired > System.currentTimeMillis) {
       log.debug("get cached access token " + t.access_token)
@@ -250,9 +250,9 @@ object GoogleCloud extends Logging {
       accessToken.set(result)
     result
   }
-  class AndroidAsyncHttpProvider(config: AsyncHttpClientConfig) extends JDKAsyncHttpProvider(config) {
+  /*class AndroidAsyncHttpProvider(config: AsyncHttpClientConfig) extends JDKAsyncHttpProvider(config) {
     //TODO
-  }
+  }*/
   case class AccessToken(
     val access_token: String,
     val expired: Long,

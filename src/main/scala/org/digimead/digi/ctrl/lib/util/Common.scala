@@ -300,9 +300,10 @@ object Common extends Logging {
           }
         })
         try {
-          // Execute the job with a time limit  
+          // Execute the job with a time limit
           executionFuture.get(operationTimeout, TimeUnit.MILLISECONDS)
         } catch {
+          case ce: ControlThrowable => throw ce // propagate
           case e: TimeoutException =>
             // Operation timed out, so log it and attempt to cancel the thread
             log.warn("doComponentService " + componentPackage + " timeout", e)

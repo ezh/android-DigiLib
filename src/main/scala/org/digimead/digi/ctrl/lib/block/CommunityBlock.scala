@@ -44,13 +44,16 @@ import android.widget.TextView
 // TODO ui translation help: LANG as link
 // TODO documentation translation help: LANG as link
 // TODO web page/description translation help: LANG as link
-class CommunityBlock(val context: Activity,
-  val wikiUri: Uri)(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+class CommunityBlock(val context: Activity, val xpdaUri: Option[Uri],
+  val wikiUri: Option[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+  val itemXPDA = CommunityBlock.Item(Android.getString(context, "block_community_xpda_title").getOrElse("XPDA"),
+    Android.getString(context, "block_community_xpda_description").getOrElse("XPDA forum thread"), "ic_block_community_xpda_logo")
   val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
   val itemTranslate = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
-  val items = Seq(itemWiki)
+  val items = Seq() ++ (if (xpdaUri != None) Seq(itemXPDA) else Seq()) ++
+    (if (wikiUri != None) Seq(itemWiki) else Seq())
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable
@@ -63,15 +66,25 @@ class CommunityBlock(val context: Activity,
   @Loggable
   def onListItemClick(l: ListView, v: View, item: CommunityBlock.Item) = {
     item match {
-      case this.itemWiki => // jump to project
-        log.debug("open wiki page at " + wikiUri)
+      case this.itemXPDA => // jump to XPDA
+        log.debug("open XPDA page at " + xpdaUri.get)
         try {
-          val intent = new Intent(Intent.ACTION_VIEW, wikiUri)
+          val intent = new Intent(Intent.ACTION_VIEW, xpdaUri.get)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
           context.startActivity(intent)
         } catch {
           case e =>
-            IAmYell("Unable to open wiki page: " + wikiUri, e)
+            IAmYell("Unable to open XPDA thread page: " + xpdaUri.get, e)
+        }
+      case this.itemWiki => // jump to project
+        log.debug("open wiki page at " + wikiUri.get)
+        try {
+          val intent = new Intent(Intent.ACTION_VIEW, wikiUri.get)
+          intent.addCategory(Intent.CATEGORY_BROWSABLE)
+          context.startActivity(intent)
+        } catch {
+          case e =>
+            IAmYell("Unable to open wiki page: " + wikiUri.get, e)
         }
     }
   }
@@ -86,6 +99,11 @@ class CommunityBlock(val context: Activity,
         case _ =>
       }
     item match {
+      case this.itemXPDA =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case this.itemWiki =>
         menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
           Android.getString(context, "block_link_copy").getOrElse("Copy link"))
@@ -98,12 +116,22 @@ class CommunityBlock(val context: Activity,
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: CommunityBlock.Item): Boolean = {
     item match {
+      case this.itemXPDA =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, xpdaUri.get.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, xpdaUri.get.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        }
       case this.itemWiki =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, wikiUri.toString)
+            Block.copyLink(context, item, wikiUri.get.toString)
           case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, wikiUri.toString)
+            Block.sendLink(context, item, item.name, wikiUri.get.toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false

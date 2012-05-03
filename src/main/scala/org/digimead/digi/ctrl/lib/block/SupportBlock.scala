@@ -17,10 +17,14 @@
 package org.digimead.digi.ctrl.lib.block
 
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.Calendar
+import java.util.TimeZone
 
+import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
@@ -29,8 +33,10 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.text.ClipboardManager
 import android.text.Html
 import android.view.ContextMenu
 import android.view.LayoutInflater
@@ -42,6 +48,7 @@ import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 
 class SupportBlock(val context: Activity,
   val projectUri: Uri,
@@ -56,11 +63,12 @@ class SupportBlock(val context: Activity,
     Android.getString(context, "block_support_issues_description").getOrElse("bug reports, feature requests and enhancements"), "ic_block_support_issues")
   val itemEmail = SupportBlock.Item(Android.getString(context, "block_email_title").getOrElse("send message"),
     Android.getString(context, "block_support_email_description").getOrElse("email us directly"), "ic_block_support_message")
-  val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat"),
-    Android.getString(context, "block_support_chat_description").getOrElse("let's talk via Skype, VoIP, ..."), "ic_block_support_chat")
+  val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat via Skype, VoIP, ..."),
+    Android.getString(context, "block_support_chat_description").getOrElse("please call from 08:00 to 18:00 UTC"), "ic_block_support_chat")
   val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
+  SupportBlock.block = Some(this)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -137,9 +145,9 @@ class SupportBlock(val context: Activity,
       // none
       case this.itemChat =>
         menu.add(Menu.NONE, Android.getId(context, "block_support_voice_call"), 1,
-          Android.getString(context, "block_support_voice_call").getOrElse("Voice call"))
+          Android.getString(context, "block_support_voice_call").getOrElse("Copy phone number, USA/Canada Toll Free"))
         menu.add(Menu.NONE, Android.getId(context, "block_support_skype_call"), 1,
-          Android.getString(context, "block_support_skype_call").getOrElse("Skype call"))
+          Android.getString(context, "block_support_skype_call").getOrElse("Copy skype account id"))
       case item =>
         log.fatal("unsupported context menu item " + item)
     }
@@ -170,27 +178,45 @@ class SupportBlock(val context: Activity,
       case this.itemChat =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_support_voice_call") =>
-            log.debug("start voice call to " + voicePhone)
+            log.debug("copy to clipboard phone " + voicePhone)
             try {
-              val intent = new Intent(Intent.ACTION_CALL)
-              intent.setData(Uri.parse("tel:" + voicePhone))
-              context.startActivity(intent)
+              val message = Android.getString(context, "block_support_copy_voice_call").
+                getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
+              context.runOnUiThread(new Runnable {
+                def run = try {
+                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+                  clipboard.setText(voicePhone)
+                  Toast.makeText(context, message, DConstant.toastTimeout).show()
+                } catch {
+                  case e =>
+                    IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
+                }
+              })
               true
             } catch {
               case e =>
-                IAmYell("Unable start voice call to " + voicePhone, e)
+                IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
                 false
             }
           case id if id == Android.getId(context, "block_support_skype_call") =>
-            log.debug("start skype call to " + skypeUser)
+            log.debug("copy to clipboard skype account id " + skypeUser)
             try {
-              val intent = new Intent("android.intent.action.VIEW")
-              intent.setData(Uri.parse("skype:" + skypeUser))
-              context.startActivity(intent)
+              val message = Android.getString(context, "block_support_copy_skype_call").
+                getOrElse("Copy to clipboard skype account \"" + skypeUser + "\"")
+              context.runOnUiThread(new Runnable {
+                def run = try {
+                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+                  clipboard.setText(skypeUser)
+                  Toast.makeText(context, message, DConstant.toastTimeout).show()
+                } catch {
+                  case e =>
+                    IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
+                }
+              })
               true
             } catch {
               case e =>
-                IAmYell("Unable start skype call to " + skypeUser, e)
+                IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
                 false
             }
           case id =>
@@ -205,6 +231,7 @@ class SupportBlock(val context: Activity,
 }
 
 object SupportBlock {
+  @volatile private var block: Option[SupportBlock] = None
   private val name = "name"
   private val description = "description"
   sealed case class Item(id: Int)(val name: String, val description: String, val icon: String = "") extends Block.Item
@@ -226,7 +253,16 @@ object SupportBlock {
           val icon = view.findViewById(android.R.id.icon1).asInstanceOf[ImageView]
           text2.setVisibility(View.VISIBLE)
           text1.setText(Html.fromHtml(item.name))
-          text2.setText(Html.fromHtml(item.description))
+          block match {
+            case Some(block) if item == block.itemChat =>
+              val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
+              if (hour > 7 && hour < 19)
+                text2.setText(Html.fromHtml("<font color='green'>" + item.description + "</font>"))
+              else
+                text2.setText(Html.fromHtml("<font color='red'>" + item.description + "</font>"))
+            case _ =>
+              text2.setText(Html.fromHtml(item.description))
+          }
           if (item.icon.nonEmpty)
             Android.getId(context, item.icon, "drawable") match {
               case i if i != 0 =>
