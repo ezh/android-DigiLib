@@ -65,6 +65,34 @@ class SyncVar[A] extends Logging {
   /**
    * Waits for this SyncVar to become defined at least for
    *  `timeout` milliseconds (possibly more), and gets its
+   *  value (if guard return true).
+   *
+   *  @param timeout     the amount of milliseconds to wait, 0 means forever
+   *  @return            `None` if variable is undefined after `timeout`, `Some(value)` otherwise
+   */
+  def get(timeout: Long, guard: (A) => Boolean): Option[A] = value.get match {
+    case Some(result) if (guard(result)) => Some(result)
+    case _ =>
+      var rest = timeout
+      while ((value.get match {
+        case Some(result) if (guard(result)) =>
+          return Some(result)
+        case _ => true
+      }) && rest > 0) {
+        /**
+         * Defending against the system clock going backward
+         *  by counting time elapsed directly.  Loop required
+         *  to deal with spurious wakeups.
+         */
+        val elapsed = waitMeasuringElapsed(rest)
+        rest -= elapsed
+      }
+      value.get
+  }
+
+  /**
+   * Waits for this SyncVar to become defined at least for
+   *  `timeout` milliseconds (possibly more), and gets its
    *  value.
    *
    *  @param timeout     the amount of milliseconds to wait, 0 means forever
@@ -72,11 +100,12 @@ class SyncVar[A] extends Logging {
    */
   def get(timeout: Long): Option[A] = value.get match {
     case Some(result) => Some(result)
-    case None =>
+    case _ =>
       var rest = timeout
       while ((value.get match {
-        case Some(result) => return Some(result)
-        case None => true
+        case Some(result) =>
+          return Some(result)
+        case _ => true
       }) && rest > 0) {
         /**
          * Defending against the system clock going backward

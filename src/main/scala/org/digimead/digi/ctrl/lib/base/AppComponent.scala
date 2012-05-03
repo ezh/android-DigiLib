@@ -100,12 +100,11 @@ protected class AppComponent private () extends Actor with Logging {
             val s = sender
             log.info("receive message ShowDialog " + dialog)
             // wait for previous dialog
-            log.trace("wait activitySafeDialog lock")
-            activitySafeDialog.put((null, null)) // wait
-            activitySafeDialog.unset()
+            log.debug("wait activitySafeDialog lock")
+            activitySafeDialog.put(null) // wait
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
-              log.trace("wait isSafeDialogEnabled lock")
+              log.debug("wait isSafeDialogEnabled lock")
               while (!isSafeDialogEnabled.get)
                 isSafeDialogEnabled.wait
             }
@@ -118,12 +117,11 @@ protected class AppComponent private () extends Actor with Logging {
             val s = sender
             log.info("receive message ShowDialogResource " + dialog)
             // wait for previous dialog
-            log.trace("wait activitySafeDialog lock")
-            activitySafeDialog.put((null, null)) // wait
-            activitySafeDialog.unset()
+            log.debug("wait activitySafeDialog lock")
+            activitySafeDialog.put(null) // wait
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
-              log.trace("wait isSafeDialogEnabled lock")
+              log.debug("wait isSafeDialogEnabled lock")
               while (!isSafeDialogEnabled.get)
                 isSafeDialogEnabled.wait
             }
@@ -161,7 +159,7 @@ protected class AppComponent private () extends Actor with Logging {
   @Loggable
   def showDialogSafe(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit) {
     log.trace("Activity::showDialogSafe id " + id)
-    assert(id != 0)
+    assert(id != 0, { "unexpected id value " + id })
     activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
   }
   def showDialogSafeWait(activity: Activity, id: Int): Option[Dialog] =
@@ -170,8 +168,8 @@ protected class AppComponent private () extends Actor with Logging {
     showDialogSafeWait(activity, id, args, null)
   @Loggable
   def showDialogSafeWait(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit): Option[Dialog] = try {
-    log.trace("Activity::showDialogSafe id " + id + " at thread " + currentThread.getId + " and ui " + uiThreadID)
-    assert(uiThreadID != Thread.currentThread.getId && id != 0)
+    log.trace("Activity::showDialogSafe id " + id + " at thread " + Thread.currentThread.getId + " and ui " + uiThreadID)
+    assert(uiThreadID != Thread.currentThread.getId && id != 0, { "unexpected thread == UI, " + Thread.currentThread.getId + " or id " + id })
     (activitySafeDialogActor !? AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
   } catch {
     case e =>
@@ -189,8 +187,8 @@ protected class AppComponent private () extends Actor with Logging {
     showDialogSafeWait[T](activity, dialog, null)
   @Loggable
   def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
-    log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + currentThread.getId + " and ui " + uiThreadID)
-    assert(uiThreadID != Thread.currentThread.getId)
+    log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + Thread.currentThread.getId + " and ui " + uiThreadID)
+    assert(uiThreadID != Thread.currentThread.getId, { "unexpected thread == UI, " + Thread.currentThread.getId })
     (activitySafeDialogActor !? AppComponent.Message.ShowDialog(activity, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
   } catch {
     case e =>
@@ -199,7 +197,8 @@ protected class AppComponent private () extends Actor with Logging {
   }
   @Loggable
   def setDialogSafe(dialog: Dialog) {
-    assert(!activitySafeDialog.isSet || (activitySafeDialog.isSet && activitySafeDialog.get == null))
+    assert(!activitySafeDialog.isSet || activitySafeDialog.get == null,
+      { log.error("unexpected dialog value " + activitySafeDialog.get) })
     activitySafeDialog.set((dialog, null))
   }
   @Loggable
@@ -358,7 +357,8 @@ protected class AppComponent private () extends Actor with Logging {
   }
   @Loggable
   private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
-    assert(!activitySafeDialog.isSet)
+    assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
+      { "unexpected dialog value " + activitySafeDialog.get(0) })
     if (!isActivityValid(activity)) {
       resetDialogSafe
       return None
@@ -370,13 +370,12 @@ protected class AppComponent private () extends Actor with Logging {
         onDismiss.foreach(_())
       }))
     })
-    log.debug("show new safe dialog " + activitySafeDialog.get)
-    (activitySafeDialog.get(DTimeout.longest) match {
-      case Some((d, c)) =>
+    (activitySafeDialog.get(DTimeout.longest, _ != null) match {
+      case Some((d, c)) if d != null =>
         log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
         AppComponent.Inner.disableRotation()
         Option(d)
-      case None =>
+      case _ =>
         log.error("unable to show safe dialog for " + m.erasure.getName)
         activitySafeDialog.unset()
         None
@@ -388,7 +387,8 @@ protected class AppComponent private () extends Actor with Logging {
   }
   @Loggable
   private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
-    assert(!activitySafeDialog.isSet)
+    assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
+      { "unexpected dialog value " + activitySafeDialog.get(0) })
     if (!isActivityValid(activity)) {
       resetDialogSafe
       return None
@@ -408,7 +408,7 @@ protected class AppComponent private () extends Actor with Logging {
         }
       }
     })
-    activitySafeDialog.get(DTimeout.longest) match {
+    activitySafeDialog.get(DTimeout.longest, _ != null) match {
       case Some((d, c)) =>
         if (d != null) {
           log.debug("show new safe dialog " + d + " for id " + id)
@@ -508,7 +508,7 @@ object AppComponent extends Logging {
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppComponent for " + packageName)
-    assert(inner != null)
+    assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
     if (AnyBase.isLastContext && AppControl.Inner != null) {
@@ -541,7 +541,7 @@ object AppComponent extends Logging {
         val tsBegin = System.currentTimeMillis
         log.debug("begin LazyInit block \"" + description + "\"")
         f
-        log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat/1000) + "s")
+        log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat / 1000) + "s")
         scheduler.shutdownNow
       })))
     }
@@ -565,7 +565,7 @@ object AppComponent extends Logging {
   }
   // Tuple2 [ dialog, onDismiss callback ]
   class SafeDialog extends SyncVar[(Dialog, () => Unit)] with Logging {
-    private var activityDialogGuard: ScheduledExecutorService = null
+    @volatile private var activityDialogGuard: ScheduledExecutorService = null
     private val isPrivateReplace = new AtomicBoolean(false)
     private val lock = new Object
 
@@ -641,21 +641,20 @@ object AppComponent extends Logging {
       super.set((d, f))
     }
     override def unset(signalAll: Boolean = true) = {
-      log.debug("unset safe dialog " + value)
+      log.debugWhere("unset safe dialog " + value, Logging.Where.BEFORE)
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
       }
       super.get(0).foreach {
-        case (previousDialog, dismissCallback) =>
-          if (previousDialog != null) {
-            if (previousDialog.isShowing) {
-              previousDialog.setOnDismissListener(null)
-              previousDialog.dismiss
-            }
-            if (dismissCallback != null)
-              dismissCallback()
+        case (previousDialog, dismissCallback) if previousDialog != null =>
+          if (previousDialog.isShowing) {
+            previousDialog.setOnDismissListener(null)
+            previousDialog.dismiss
           }
+          if (dismissCallback != null)
+            dismissCallback()
+        case _ =>
       }
       super.unset(signalAll)
     }
