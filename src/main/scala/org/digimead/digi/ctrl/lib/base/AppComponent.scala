@@ -340,7 +340,7 @@ protected class AppComponent private () extends Actor with Logging {
             case DState.Active =>
               AppComponent.State(DState.Active)
             case DState.Broken =>
-              AppComponent.State(DState.Broken, "service failed")
+              AppComponent.State(DState.Broken, "service_failed")
             case _ =>
               AppComponent.State(DState.Passive)
           }
@@ -664,20 +664,20 @@ object AppComponent extends Logging {
     case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
     case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
   }
-  case class State(val code: DState.Value, val data: String = null, val onClickCallback: (Activity) => Any = (a) => {
+  case class State(val value: DState.Value, val message: String = null, val onClickCallback: (Activity) => Any = (a) => {
     log.warn("onClick callback unimplemented for " + this)
   }) extends Logging {
-    log.debugWhere("create new state " + code, 3)
+    log.debugWhere("create new state " + value, 3)
   }
   class StateContainer extends SyncVar[AppComponent.State] with Publisher[AppComponent.State] with Logging {
-    private var lastNonBusyState: AppComponent.State = null
+    @volatile private var lastNonBusyState: AppComponent.State = null
     private var busyCounter = 0
     set(AppComponent.State(DState.Unknown))
     override def set(newState: AppComponent.State, signalAll: Boolean = true): Unit = synchronized {
-      if (newState.code == DState.Busy) {
+      if (newState.value == DState.Busy) {
         busyCounter += 1
         log.debug("increase status busy counter to " + busyCounter)
-        if (isSet && get.code != DState.Busy)
+        if (isSet && get.value != DState.Busy)
           lastNonBusyState = get
         super.set(newState, signalAll)
       } else if (busyCounter != 0) {
@@ -687,6 +687,12 @@ object AppComponent extends Logging {
       log.debug("set status to " + newState)
       publish(newState)
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
+    }
+    override def get() = get match {
+      case DState.Busy =>
+        lastNonBusyState
+      case state =>
+        state
     }
     @Loggable
     def freeBusy() = synchronized {

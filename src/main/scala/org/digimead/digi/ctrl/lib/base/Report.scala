@@ -23,6 +23,7 @@ import java.util.UUID
 
 import scala.Option.option2Iterable
 import scala.collection.JavaConversions._
+import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -66,16 +67,16 @@ object Report extends Logging {
     }
   }
   @Loggable
-  def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Unit = synchronized {
-    for {
+  def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Boolean = synchronized {
+    val a = for {
       info <- AnyBase.info.get
       context <- AppComponent.Context
-    } {
+    } yield {
       log.debug("looking for error reports in: " + info.reportPath)
       val dir = new File(info.reportPath + "/")
       val reports = Option(dir.list()).flatten
       if (reports.isEmpty)
-        return
+        return true
       context match {
         case activity: Activity =>
           activity.sendBroadcast(new Intent(DIntent.FlushReport))
@@ -89,7 +90,7 @@ object Report extends Logging {
                 val report = new File(info.reportPath, name)
                 val active = try {
                   val name = report.getName
-                  val pid = Integer.parseInt(name.split('-')(1).drop(1))
+                  val pid = Integer.parseInt(name.split("""[-\.]""")(4).drop(1))
                   processList.exists(_.pid == pid)
                 } catch {
                   case _ =>
@@ -97,34 +98,37 @@ object Report extends Logging {
                 }
                 Logging.flush
                 if (active) {
-                  log.debug("there is active report " + report.getName)
-                  if (force) {
-                    uploadCallback.foreach(_(report, reports.size))
-                    GoogleCloud.upload(report, sessionId)
-                  } else {
-                    uploadCallback.foreach(_(report, reports.size))
-                    None
-                  }
+                  log.debug("there is an active report " + report.getName)
+                  uploadCallback.foreach(_(report, reports.size))
+                  GoogleCloud.upload(report, sessionId)
                 } else {
-                  log.debug("there is passive report " + report.getName)
+                  log.debug("there is a passive report " + report.getName)
                   uploadCallback.foreach(_(report, reports.size))
                   GoogleCloud.upload(report, sessionId)
                 }
               })
               // IMHO there is cloud rate limit. futures are useless
               // awaitAll(DTimeout.long, futures.flatten.toSeq: _*)
+              futures.forall(_ == true)
+            } else {
+              true
             }
           } catch {
+            case ce: ControlThrowable => throw ce // propagate
             case e =>
               log.error(e.getMessage, e)
+              false
           }
         case service: Service =>
           log.info("unable to send application report from service context")
+          false
         case context =>
           log.info("unable to send application report from unknown context " + context)
+          false
       }
     }
-  }
+    a
+  } getOrElse false
   @Loggable
   def clean(): Unit = synchronized {
     for {
@@ -133,6 +137,15 @@ object Report extends Logging {
     } {
       val dir = new File(info.reportPath + "/")
       try {
+        // delete description files
+        Option(dir.list(new FilenameFilter {
+          def accept(dir: File, name: String) =
+            name.toLowerCase.endsWith(".description")
+        })).flatten.foreach(name => {
+          val report = new File(info.reportPath, name)
+          log.info("delete outdated description file " + report.getName)
+          report.delete
+        })
         // delete png files
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =

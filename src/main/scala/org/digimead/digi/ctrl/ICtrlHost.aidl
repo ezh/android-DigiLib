@@ -22,6 +22,7 @@ import org.digimead.digi.ctrl.lib.info.ComponentState;
 interface ICtrlHost {
   List<String> directories(in String componentPackage);
   void enable(in String componentPackage, in boolean flag);
+  boolean reset(in String componentPackage);
   boolean start(in String componentPackage);
   ComponentState status(in String componentPackage);
   boolean stop(in String componentPackage);

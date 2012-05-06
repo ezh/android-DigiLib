@@ -48,6 +48,7 @@ import android.text.Html
 import android.view.LayoutInflater
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 
 /*
  * report life cycle available only within main activity
@@ -126,7 +127,7 @@ object Report extends Logging {
                     writer.close()
                 }
                 val i = new AtomicInteger()
-                org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
+                val submitResult = org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
                   AppComponent.Inner.getDialogSafe(0) match {
                     case Some(dialog) if dialog != null =>
                       activity.runOnUiThread(new Runnable {
@@ -138,7 +139,15 @@ object Report extends Logging {
                 }))
                 AppComponent.Inner.resetDialogSafe
                 searchAndSubmitLock.set(false)
-                org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
+                if (submitResult)
+                  org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
+                else {
+                  log.warn("some reports submission failed, cleanAfterReview skipped")
+                  activity.runOnUiThread(new Runnable {
+                    def run = Toast.makeText(activity, Android.getString(activity, "report_upload_failed").
+                      getOrElse("Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later."), Toast.LENGTH_LONG).show()
+                  })
+                }
               }
           }
         }

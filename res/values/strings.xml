@@ -17,7 +17,7 @@
 
     <string name="error_digicontrol_not_found">DigiControl not found</string>
     <string name="error_digicontrol_not_found_title">DigiControl not found</string>
-    <string name="error_digicontrol_not_found_content">Do you want to install it? DigiControl have a lot of things under the hood that allow to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.</string>
+    <string name="error_digicontrol_not_found_content">Do you allow to install it? DigiControl have a lot of things under the hood that required to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.</string>
     <string name="error_market_failed_title">Market failed</string>
     <string name="error_market_failed_content">Market application not found on the device</string>
     <string name="error_prepare_chmod">error_prepare_chmod</string>
@@ -68,5 +68,6 @@
     <string name="preference_debug_android">Android Logging</string>
     <string name="preference_debug_android_on">Built-in facility to log information to the android console. Enabled</string>
     <string name="preference_debug_android_off">Built-in facility to log information to the android console. Disabled</string>
+    <string name="report_upload_failed">Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later.</string>
 
 </resources>

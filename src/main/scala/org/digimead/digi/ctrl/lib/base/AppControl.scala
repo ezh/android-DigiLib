@@ -168,6 +168,21 @@ protected class AppControl private () extends Logging {
     }
   }
   @Loggable
+  def callReset(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("callReset AppControl function from UI thread")
+    val t = new Throwable("Intospecting callReset")
+    t.fillInStackTrace()
+    future {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.reset(componentPackage)
+        case None =>
+          false
+      }
+    }
+  }
+  @Loggable
   def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStart AppControl function from UI thread")
@@ -375,7 +390,7 @@ object AppControl extends Logging {
               t.fillInStackTrace()
             } else
               stackTrace
-            log.error("uninitialized ICtrlHost at AppControl", stack)
+            log.warn("uninitialized ICtrlHost at AppControl", stack)
             None
         }
     } else {
@@ -391,7 +406,7 @@ object AppControl extends Logging {
               t.fillInStackTrace()
             } else
               stackTrace
-            log.error("uninitialized ICtrlHost at AppControl", stack)
+            log.warn("uninitialized ICtrlHost at AppControl", stack)
             None
         }
     }

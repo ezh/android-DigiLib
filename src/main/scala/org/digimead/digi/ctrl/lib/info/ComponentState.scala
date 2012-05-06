@@ -25,18 +25,20 @@ import android.os.Parcel
 case class ComponentState(val componentPackage: String,
   val executableState: List[ExecutableState],
   val state: DState.Value,
+  val reason: Option[String],
   val execPath: String,
   val dataPath: String,
   val enabled: Boolean) extends Parcelable {
   def this(in: Parcel) = this(componentPackage = in.readString,
     executableState =
-      in.readParcelableArray(null) match {
+      in.readParcelableArray(classOf[ExecutableState].getClassLoader) match {
         case null =>
           Nil
         case p =>
           p.map(_.asInstanceOf[ExecutableState]).toList
       },
     state = DState(in.readInt),
+    reason = in.readString match { case empty if empty.isEmpty => None case reason => Some(reason) },
     execPath = in.readString,
     dataPath = in.readString,
     enabled = (in.readByte == 1))
@@ -45,6 +47,7 @@ case class ComponentState(val componentPackage: String,
     out.writeString(componentPackage)
     out.writeParcelableArray(executableState.toArray, 0)
     out.writeInt(state.id)
+    out.writeString(reason.getOrElse(""))
     out.writeString(execPath)
     out.writeString(dataPath)
     out.writeByte(if (enabled) 1 else 0)

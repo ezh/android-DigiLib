@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib.declaration
 object DIntent {
   val DroneName = DConstant.prefix + "drone.name"
   val DronePackage = DConstant.prefix + "drone.package"
+  val DroneStash = DConstant.prefix + "drone.stash"
   val SignRequest = DConstant.prefix + "signRequest"
   val SignResponse = DConstant.prefix + "signResponse"
   val Message = DConstant.prefix + "message"

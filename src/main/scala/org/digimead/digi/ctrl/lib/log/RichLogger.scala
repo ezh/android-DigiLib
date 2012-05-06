@@ -166,8 +166,14 @@ class RichLogger(private val _name: String) extends MarkerIgnoringBase {
   private def logWhere(msg: String, f1: (String, Throwable) => Unit, f2: (String => Unit))(stackLine: Int) {
     val t = new Throwable(msg)
     t.fillInStackTrace()
-    if (stackLine == -1) {
-      f1(msg, t)
+    if (stackLine == -1) { // ALL
+      if (isTraceEnabled) {
+        f1(msg, t)
+      } else { // HERE
+        val trace = t.getStackTrace
+        val skip = trace.takeWhile(_.getFileName == "RichLogger.scala").size
+        f2(msg + " at " + trace.take(skip + (-2 * -1) - 1).last)
+      }
     } else if (stackLine <= -2) {
       val trace = t.getStackTrace
       val skip = trace.takeWhile(_.getFileName == "RichLogger.scala").size

@@ -310,8 +310,8 @@ object ComponentInfo extends Logging {
     case Check.Version(field) =>
       val version = new Version(in)
       if (in.length() > 128 || (version.getMajorVersion() == 0 && version.getMinorVersion() == 0 &&
-        version.getIncrementalVersion() == 0 && version.getBuildNumber() == 0)) {
-        log.warn("descriptor field \"" + kind.field + "\" contain invalid version")
+        version.getIncrementalVersion() == 0 && version.getBuildNumber() == 0 && version.getQualifier.isEmpty)) {
+        log.warn("descriptor field \"" + kind.field + "\" contain invalid version \"" + in + "\"")
         return None
       }
       Some(in)

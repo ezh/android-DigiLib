@@ -42,17 +42,6 @@ import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.json.JSONObject
 
-/*import com.ning.http.client.AsyncHandler.STATE
-import com.ning.http.client.providers.jdk.JDKAsyncHttpProvider
-import com.ning.http.client.AsyncHandler
-import com.ning.http.client.AsyncHttpClient
-import com.ning.http.client.AsyncHttpClientConfig
-import com.ning.http.client.HttpResponseBodyPart
-import com.ning.http.client.HttpResponseHeaders
-import com.ning.http.client.HttpResponseStatus
-import com.ning.http.client.RequestBuilder
-import com.ning.http.client.Response*/
-
 import android.net.http.AndroidHttpClient
 import android.provider.Settings
 import android.util.Base64
@@ -87,8 +76,8 @@ object GoogleCloud extends Logging {
         log.info("proxy not detected")
       client
   }
-  val upload: (File, String) => Unit = uploadViaApache
-  def uploadViaApache(file: File, prefix: String = "") = AppComponent.Context.foreach {
+  val upload: (File, String) => Boolean = uploadViaApache
+  def uploadViaApache(file: File, prefix: String = ""): Boolean = AppComponent.Context.flatMap {
     context =>
       log.debug("upload via Apache client " + file.getName + " with default credentials")
       val result = for {
@@ -123,91 +112,27 @@ object GoogleCloud extends Logging {
               response.getStatusLine().getStatusCode() match {
                 case 200 =>
                   log.info("upload " + file.getName + " successful")
+                  Some(true)
                 case _ =>
                   log.warn("upload " + file.getName + " failed")
+                  None
               }
             } catch {
               case e =>
-                log.error("unable to get access token", e)
+                log.warn("unable to upload: ", e.getMessage)
                 None
             }
           case None =>
-            log.error("access token not exists")
+            log.error("access token not available")
+            None
         }
       } catch {
         case e =>
           log.error("unable to upload", e)
+          None
       }
-      if (result == None)
-        log.warn("unable to upload " + file)
-  }
-/*  def uploadViaNetty(file: File, prefix: String = "") = AppComponent.Context.foreach {
-    context =>
-      log.debug("upload via Netty client " + file.getName + " with default credentials")
-      val result = for {
-        clientID_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_ID")
-        clientSecret_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_SECRET")
-        refreshToken_64 <- Android.getString(context, "APPLICATION_GS_TOKEN")
-        backet_64 <- Android.getString(context, "APPLICATION_GS_BUCKET")
-        httpclient <- httpclient
-      } yield try {
-        val clientID = new String(Base64.decode(clientID_64, Base64.DEFAULT), "UTF-8")
-        val clientSecret = new String(Base64.decode(clientSecret_64, Base64.DEFAULT), "UTF-8")
-        val refreshToken = new String(Base64.decode(refreshToken_64, Base64.DEFAULT), "UTF-8")
-        val bucket = new String(Base64.decode(backet_64, Base64.DEFAULT), "UTF-8")
-        getAccessToken(clientID, clientSecret, refreshToken) match {
-          case Some(token) =>
-            try {
-              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
-              log.debug("prepare " + file.getName + " for uploading to " + uri)
-              val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
-              val byteArray = source.map(_.toByte).toArray
-              source.close()
-              log.debug(file.getName + " prepared")
-              // upload byteArray
-              val builder = new RequestBuilder("PUT")
-              val request = builder.setUrl(uri.toString).
-                addHeader("x-goog-api-version", "2").
-                addHeader("Authorization", "OAuth " + token.access_token).
-                setBody(byteArray).
-                build()
-              // TODO reimplement ApacheAsyncHttpProvider
-              val client = new AsyncHttpClient(new AndroidAsyncHttpProvider(new AsyncHttpClientConfig.Builder().build()))
-              val response = client.executeRequest(request, new AsyncHandler[Response] {
-                val builder = new Response.ResponseBuilder()
-                def onThrowable(t: Throwable) =
-                  log.warn(t.getMessage, t)
-                def onBodyPartReceived(content: HttpResponseBodyPart): STATE =
-                  { builder.accumulate(content); STATE.CONTINUE }
-                def onStatusReceived(status: HttpResponseStatus): STATE =
-                  { builder.accumulate(status); STATE.CONTINUE }
-                def onHeadersReceived(headers: HttpResponseHeaders): STATE =
-                  { builder.accumulate(headers); return STATE.CONTINUE }
-                def onCompleted(): Response =
-                  builder.build()
-              }).get
-              log.debug(uri + " result: " + response.getStatusText)
-              response.getStatusCode match {
-                case 200 =>
-                  log.info("upload " + file.getName + " successful")
-                case _ =>
-                  log.warn("upload " + file.getName + " failed")
-              }
-            } catch {
-              case e =>
-                log.error("unable to get access token", e)
-                None
-            }
-          case None =>
-            log.error("access token not exists")
-        }
-      } catch {
-        case e =>
-          log.error("unable to upload", e)
-      }
-      if (result == None)
-        log.warn("unable to upload " + file)
-  }*/
+      result.getOrElse(None)
+  } getOrElse false
   def getAccessToken(clientID: String, clientSecret: String, refreshToken: String): Option[AccessToken] = synchronized {
     accessToken.get.foreach(t => if (t.expired > System.currentTimeMillis) {
       log.debug("get cached access token " + t.access_token)
@@ -242,7 +167,7 @@ object GoogleCloud extends Logging {
           }
         } catch {
           case e =>
-            log.error("unable to get access token", e)
+            log.warn("unable to get access token: ", e.getMessage)
             None
         }
     }
@@ -250,9 +175,6 @@ object GoogleCloud extends Logging {
       accessToken.set(result)
     result
   }
-  /*class AndroidAsyncHttpProvider(config: AsyncHttpClientConfig) extends JDKAsyncHttpProvider(config) {
-    //TODO
-  }*/
   case class AccessToken(
     val access_token: String,
     val expired: Long,
