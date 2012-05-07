@@ -138,7 +138,6 @@ protected class AppComponent private () extends Actor with Logging {
       }
     }
   }
-  activitySafeDialogActor.start
   log.debug("disable safe dialogs")
   log.debug("alive")
 
@@ -469,8 +468,10 @@ object AppComponent extends Logging {
       log.info("initialize AppComponent for " + root.getPackageName())
     if (_inner != null)
       inner = _inner
-    else
+    else {
       inner = new AppComponent()
+      inner.activitySafeDialogActor.start
+    }
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
@@ -688,7 +689,7 @@ object AppComponent extends Logging {
       publish(newState)
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
-    override def get() = get match {
+    override def get() = super.get match {
       case DState.Busy =>
         lastNonBusyState
       case state =>
