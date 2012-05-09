@@ -16,8 +16,9 @@
 
 package org.digimead.digi.ctrl.lib.declaration
 
-object DProvider {
-  val authority = DConstant.controlPackage
+object DControlProvider {
+  implicit def value2uri(v: Enumeration#Value): android.net.Uri = android.net.Uri.parse(v.toString)
+  val authority = DConstant.controlPackage + ".control"
   case class Row(val session_id: Int,
     val process_id: Int,
     val component: Array[Byte],

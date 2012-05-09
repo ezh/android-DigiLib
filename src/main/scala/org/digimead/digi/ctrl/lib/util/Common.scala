@@ -94,6 +94,7 @@ object Common extends Logging {
           val baseAndroid = new File(preBase, "Android")
           val baseAndroidData = new File(baseAndroid, "data")
           val basePackage = new File(baseAndroidData, context.getPackageName)
+          val baseFiles = new File(baseAndroidData, "files")
           log.debug("try SD storage directory " + basePackage + ", SD storage is mounted: " + isMounted)
           if (isMounted) {
             var baseReady = true
@@ -112,6 +113,12 @@ object Common extends Logging {
             if (baseReady && !basePackage.exists) {
               if (!basePackage.mkdir) {
                 log.error("mkdir '" + basePackage + "' failed")
+                baseReady = false
+              }
+            }
+            if (baseReady && !baseFiles.exists) {
+              if (!baseFiles.mkdir) {
+                log.error("mkdir '" + baseFiles + "' failed")
                 baseReady = false
               }
             }

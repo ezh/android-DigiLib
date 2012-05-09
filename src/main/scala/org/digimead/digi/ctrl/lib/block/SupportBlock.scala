@@ -161,8 +161,8 @@ class SupportBlock(val context: Activity,
             Block.copyLink(context, item, projectUri.toString)
           case id if id == Android.getId(context, "block_link_send") =>
             Block.sendLink(context, item, item.name, projectUri.toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
+          case item =>
+            log.fatal("skip unknown menu item " + item)
             false
         } case this.itemIssues =>
         menuItem.getItemId match {
@@ -170,8 +170,8 @@ class SupportBlock(val context: Activity,
             Block.copyLink(context, item, issuesUri.toString)
           case id if id == Android.getId(context, "block_link_send") =>
             Block.sendLink(context, item, item.name, issuesUri.toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
+          case item =>
+            log.fatal("skip unknown menu item " + item)
             false
         } case this.itemEmail =>
         false
