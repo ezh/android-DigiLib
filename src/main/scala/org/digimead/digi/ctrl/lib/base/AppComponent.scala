@@ -356,6 +356,11 @@ protected class AppComponent private () extends Actor with Logging {
   }
   @Loggable
   private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
+    // for example: pause activity in the middle of the process
+    if (!activitySafeDialog.isSet) {
+      log.warn("skip onMessageShowDialog for " + dialog + ", reason: dialog gone")
+      return None
+    }
     assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
       { "unexpected dialog value " + activitySafeDialog.get(0) })
     if (!isActivityValid(activity)) {
@@ -386,6 +391,11 @@ protected class AppComponent private () extends Actor with Logging {
   }
   @Loggable
   private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
+    // for example: pause activity in the middle of the process
+    if (!activitySafeDialog.isSet) {
+      log.warn("skip onMessageShowDialogResource for " + id + ", reason: dialog gone")
+      return None
+    }
     assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
       { "unexpected dialog value " + activitySafeDialog.get(0) })
     if (!isActivityValid(activity)) {

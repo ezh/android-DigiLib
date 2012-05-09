@@ -176,8 +176,8 @@ trait Activity extends AActivity with AnyBase with Logging {
   override def unregisterReceiver(receiver: BroadcastReceiver) {
     log.trace("Activity::unregisterReceiver " + receiver)
     Activity.registeredReceivers.remove(receiver)
-    Activity.activeReceivers.remove(receiver)
-    super.unregisterReceiver(receiver)
+    if (Activity.activeReceivers.remove(receiver))
+      super.unregisterReceiver(receiver)
   }
 }
 
