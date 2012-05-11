@@ -21,8 +21,9 @@ import org.scalatest.BeforeAndAfter
 import org.digimead.RobotEsTrick
 import org.digimead.digi.ctrl.lib.log.Logging
 import android.os.Parcel
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.log.ConsoleLogger
+import android.os.Bundle
 
 class DMessageTest_IAmMumble_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -36,8 +37,12 @@ class DMessageTest_IAmMumble_j1 extends FunSuite with BeforeAndAfter with RobotE
 
   // :-(
   test("test parcelable") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
-    activity.onCreate(null)
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
+    //activity.onCreate(null)
     Logging.init(activity)
     Logging.addLogger(ConsoleLogger)
     val logger = Logging.getLogger("TESTL")

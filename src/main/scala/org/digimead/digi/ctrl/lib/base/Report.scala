@@ -30,9 +30,10 @@ import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.storage.GoogleCloud
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.AnyBase
 
+import android.app.Activity
 import android.app.ActivityManager
 import android.app.Service
 import android.content.Context
@@ -78,7 +79,7 @@ object Report extends Logging {
       if (reports.isEmpty)
         return true
       context match {
-        case activity: Activity =>
+        case activity: Activity with DActivity =>
           activity.sendBroadcast(new Intent(DIntent.FlushReport))
           Thread.sleep(500) // waiting for no reason ;-)
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]

@@ -32,9 +32,10 @@ import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.AnyBase
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
 import android.app.ProgressDialog
@@ -57,7 +58,7 @@ object Report extends Logging {
   val searchAndSubmitLock = new AtomicBoolean(false)
   def getId(context: Context) = Android.getId(context, "report")
   @Loggable
-  def createDialog(activity: Activity): Dialog = {
+  def createDialog(activity: Activity with DActivity): Dialog = {
     val inflater = LayoutInflater.from(activity)
     val view = inflater.inflate(Android.getId(activity, "report", "layout"), null)
     new AlertDialog.Builder(activity).
@@ -164,14 +165,14 @@ object Report extends Logging {
   }
   def submit(description: String): Unit = submit(null, Some(description))
   @Loggable
-  def submit(activity: Activity = null, description: Option[String] = None): Unit = {
+  def submit(activity: Activity with DActivity = null, description: Option[String] = None): Unit = {
     if (activity != null) {
       takeScreenshot(activity)
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
       AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
     } else {
       AppComponent.Context.foreach {
-        case activity: Activity =>
+        case activity: Activity with DActivity =>
           description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
           AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
         case context =>
@@ -202,7 +203,7 @@ object Report extends Logging {
       }
   }
   @Loggable // try to submit reports if there any stack traces
-  def searchAndSubmit(activity: Activity) = AnyBase.info.get.map {
+  def searchAndSubmit(activity: Activity with DActivity) = AnyBase.info.get.map {
     info =>
       if (searchAndSubmitLock.compareAndSet(false, true)) {
         Thread.sleep(DTimeout.short) // take it gently ;-)

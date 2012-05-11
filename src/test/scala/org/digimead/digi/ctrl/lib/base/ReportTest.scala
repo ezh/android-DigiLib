@@ -18,12 +18,13 @@ package org.digimead.digi.ctrl.lib.base
 
 import org.digimead.digi.ctrl.lib.log.ConsoleLogger
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
+import android.os.Bundle
 
 class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -36,8 +37,12 @@ class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   }
 
   test("logging before initialization") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
-    activity.onCreate(null)
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
+    //activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Logging.addLogger(ConsoleLogger)
     AppComponent.LazyInit.init

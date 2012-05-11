@@ -35,8 +35,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.Date
 
-import scala.annotation.elidable
-import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
@@ -53,9 +51,11 @@ import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.ICtrlComponent
 
+import android.app.Activity
+import android.app.Dialog
 import android.content.pm.PackageManager
 import android.content.ComponentName
 import android.content.Context
@@ -63,7 +63,6 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Environment
 import android.os.IBinder
-import annotation.elidable.ASSERTION
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
@@ -71,7 +70,7 @@ object Common extends Logging {
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
   @Loggable
-  def onCreateDialog(id: Int, activity: Activity)(implicit logger: RichLogger, dispatcher: Dispatcher) = id match {
+  def onCreateDialog(id: Int, activity: Activity with DActivity)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = id match {
     case id if id == InstallControl.getId(activity) =>
       InstallControl.createDialog(activity)(logger, dispatcher)
     case id if id == FailedMarket.getId(activity) =>

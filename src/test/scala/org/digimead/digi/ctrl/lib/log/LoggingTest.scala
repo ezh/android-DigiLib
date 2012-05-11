@@ -17,14 +17,14 @@
 package org.digimead.digi.ctrl.lib.log
 
 import java.util.Date
-
 import org.digimead.digi.ctrl.lib.base.AppComponent
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
+import android.os.Bundle
 
 class LoggingTestBeforeInit_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -67,7 +67,7 @@ class LoggingTestAfterInit_j1 extends FunSuite with BeforeAndAfter with RobotEsT
   }
 
   test("logging after initialization") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
+    val activity = new android.app.Activity with DActivity { val dispatcher = null }
     Logging.init(activity)
     assert(!Logging.queue.isEmpty)
     Logging.queue.peek.isInstanceOf[Logging.Record] should be(true)
@@ -87,8 +87,12 @@ class LoggingTestConsoleLogger_j1 extends FunSuite with BeforeAndAfter with Robo
   }
 
   test("logging console") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
-    activity.onCreate(null)
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
+    //activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)
     Logging.loggingThread.isAlive should be(false)
@@ -116,8 +120,12 @@ class LoggingTestAndroidLogger_j1 extends FunSuite with BeforeAndAfter with Robo
   }
 
   test("logging android") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
-    activity.onCreate(null)
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
+    //activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)
     Logging.loggingThread.isAlive should be(false)
@@ -150,8 +158,12 @@ class LoggingTestFileLogger_j1 extends FunSuite with BeforeAndAfter with RobotEs
   }
 
   test("logging file") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
-    activity.onCreate(null)
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
+    //activity.onCreate(null)
     AnyBase.info.get should not be (None)
     Thread.sleep(100)
     Logging.loggingThread.isAlive should be(false)

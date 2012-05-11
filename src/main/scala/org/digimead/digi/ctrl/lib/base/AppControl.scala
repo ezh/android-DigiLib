@@ -16,13 +16,13 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
+
 import scala.actors.Futures.future
 import scala.actors.Future
 import scala.collection.JavaConversions._
+
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
@@ -31,9 +31,11 @@ import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.SyncVar
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.ICtrlHost
+
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -112,7 +114,7 @@ protected class AppControl private () extends Logging {
           var result: Option[ICtrlHost] = None
           while (result == None && AppControl.Inner != null) {
             AppComponent.Context.foreach(_ match {
-              case activity: Activity =>
+              case activity: Activity with DActivity =>
                 log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
                 bind(activity)
               case _ =>

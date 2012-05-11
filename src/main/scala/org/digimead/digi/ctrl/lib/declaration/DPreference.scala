@@ -16,10 +16,12 @@
 
 package org.digimead.digi.ctrl.lib.declaration
 
+// list of predefined preferences name spaces, or global preferences
 object DPreference {
-  val Main = getClass.getPackage.getName + "@main" // shared preferences name
-  val FilterInterface = getClass.getPackage.getName + "@filter_interface" // shared preferences name
-  val FilterConnectionAllow = getClass.getPackage.getName + "@filter_connection_allow" // shared preferences name
-  val FilterConnectionDeny = getClass.getPackage.getName + "@filter_connection_deny" // shared preferences name
-  val Log = getClass.getPackage.getName + "@log" // shared preferences name
+  val Main = getClass.getPackage.getName + "@namespace.main"
+  val Users = getClass.getPackage.getName + "@namespace.users"
+  val FilterInterface = getClass.getPackage.getName + "@namespace.filter.interface"
+  val FilterConnectionAllow = getClass.getPackage.getName + "@namespace.filter.connection.allow"
+  val FilterConnectionDeny = getClass.getPackage.getName + "@namespace.filter.connection.deny"
+  val Log = getClass.getPackage.getName + "@prefrence.log"
 }

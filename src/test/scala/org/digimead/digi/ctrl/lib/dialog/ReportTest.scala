@@ -16,14 +16,14 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.RobotEsTrick
 import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
-
 import com.xtremelabs.robolectric.shadows.ShadowAlertDialog
 import com.xtremelabs.robolectric.Robolectric
+import android.os.Bundle
 
 class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -37,7 +37,11 @@ class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   }
 
   test("test Report dialog") {
-    val activity = new android.app.Activity() with Activity { val dispatcher = null }
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
     Report.getId(activity) should (not equal (null) and not be (0) and not be (-1))
     val dialog = Report.createDialog(activity)
     dialog.show()

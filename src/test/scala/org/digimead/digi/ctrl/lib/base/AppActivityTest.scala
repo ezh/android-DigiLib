@@ -18,11 +18,12 @@ package org.digimead.digi.ctrl.lib.base
 
 import org.digimead.digi.ctrl.lib.log.ConsoleLogger
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.Activity
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.RobotEsTrick
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
 import org.scalatest.matchers.ShouldMatchers._
+import android.os.Bundle
 
 class AppComponentTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
@@ -35,9 +36,13 @@ class AppComponentTestOnPrepareEnvironment_j1 extends FunSuite with BeforeAndAft
   }
 
   test("check environment version") {
-    val activity = new android.app.Activity with Activity { val dispatcher = null }
+    val activity = new android.app.Activity with DActivity {
+      override def onCreate(b: Bundle) =
+        super.onCreate(b: Bundle)
+      val dispatcher = null
+    }
     Logging.addLogger(ConsoleLogger)
-    activity.onCreate(null)
+    //activity.onCreate(null)
     val nativeManifest = <manifest>
                            <build>
                              <name>digiControl</name>

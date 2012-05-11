@@ -24,8 +24,16 @@ import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 import org.slf4j.helpers.MarkerIgnoringBase
 
 @implicitNotFound(msg = "please define implicit RichLogger")
-class RichLogger(private val _name: String) extends MarkerIgnoringBase {
-  name = _name // set protected String name in abstract class NamedLoggerBase
+class RichLogger(val _name: String) extends MarkerIgnoringBase {
+  try {
+    // set protected String name in abstract class NamedLoggerBase
+    name = _name
+  } catch {
+    case e =>
+      // scala blow up sometimes
+      val field = getClass.getField("name")
+      field.set(this, _name)
+  }
   // fast look while development, highlight it in your IDE
   def g_a_s_e(msg: String) {
     val t = new Throwable(msg)

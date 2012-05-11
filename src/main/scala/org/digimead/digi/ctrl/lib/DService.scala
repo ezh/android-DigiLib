@@ -19,28 +19,27 @@ package org.digimead.digi.ctrl.lib
 import org.digimead.digi.ctrl.lib.base.AppControl
 import org.digimead.digi.ctrl.lib.log.Logging
 
-import android.app.{Service => AService}
+import android.app.Service
 
-trait Service extends AService with AnyBase with Logging {
+trait DService extends AnyBase with Logging {
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    */
-  override def onCreate(): Unit = {
-    log.trace("Service::onCreate")
-    onCreateBase(this, { Service.super.onCreate() })
+  def onCreateExt(service: Service): Unit = {
+    log.trace("Service::onCreateExt")
+    onCreateBase(service, {})
   }
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    * in fact AppControl.deinit is sporadic event
    */
-  override def onDestroy(): Unit = {
-    log.trace("Service::onDestroy")
-    onDestroyBase(this, {
+  def onDestroyExt(service: Service): Unit = {
+    log.trace("Service::onDestroyExt")
+    onDestroyBase(service, {
       if (AnyBase.isLastContext)
         AppControl.deinit()
       else
-        log.debug("skip onDestroy deinitialization, because there is another context coexists")
-      Service.super.onDestroy()
+        log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
     })
   }
 }

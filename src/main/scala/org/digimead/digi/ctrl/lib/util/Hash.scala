@@ -21,7 +21,7 @@
 /*
 
    crypt adapted from
-   
+
    MD5Crypt.java
 
    Created: 3 November 1999
@@ -37,7 +37,7 @@
    this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
    ----------------------------------------------------------------------------
 
-   This Java Port is  
+   This Java Port is
 
      Copyright (c) 1999-2008 The University of Texas at Austin.
 
@@ -55,7 +55,7 @@
 
 */
 
-package org.digimead.digi.ctrl.lib.util;
+package org.digimead.digi.ctrl.lib.util
 
 import java.security.MessageDigest
 import scala.collection.mutable.ArrayBuffer

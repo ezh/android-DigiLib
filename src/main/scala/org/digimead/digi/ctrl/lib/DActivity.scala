@@ -32,7 +32,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 
 import android.accounts.AccountManager
-import android.app.{ Activity => AActivity }
+import android.app.Activity
 import android.app.Dialog
 import android.content.BroadcastReceiver
 import android.content.Intent
@@ -46,49 +46,48 @@ import android.widget.TextView
 /*
  * trait hasn't ability to use @Loggable
  */
-trait Activity extends AActivity with AnyBase with Logging {
+trait DActivity extends AnyBase with Logging {
   implicit val dispatcher: Dispatcher
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    */
-  override def onCreate(savedInstanceState: Bundle): Unit = {
-    log.trace("Activity::onCreate")
-    onCreateBase(this, { Activity.super.onCreate(savedInstanceState) })
+  def onCreateExt(activity: Activity with DActivity): Unit = {
+    log.trace("Activity::onCreateExt")
+    onCreateBase(activity, {})
     // sometimes onDestroy skipped, there is no harm to drop garbage
-    Activity.registeredReceivers.clear
-    Activity.activeReceivers.clear
+    DActivity.registeredReceivers.clear
+    DActivity.activeReceivers.clear
   }
-  override def onResume() = {
-    log.trace("Activity::onResume")
+  def onResumeExt(activity: Activity with DActivity) = {
+    log.trace("Activity::onResumeExt")
     Report.searchAndSubmitLock.set(false)
     AppComponent.Inner.lockRotationCounter.set(0)
     AppComponent.Inner.resetDialogSafe
-    Activity.registeredReceivers.foreach(t => {
-      if (Activity.activeReceivers(t._1)) {
-        log.trace("onResume skip registerReceiver " + t._1)
+    DActivity.registeredReceivers.foreach(t => {
+      if (DActivity.activeReceivers(t._1)) {
+        log.trace("onResumeExt skip registerReceiver " + t._1)
       } else {
-        log.trace("onResume registerReceiver " + t._1)
-        Activity.activeReceivers(t._1) = true
-        super.registerReceiver(t._1, t._2._1, t._2._2, t._2._3)
+        log.trace("onResumeExt registerReceiver " + t._1)
+        DActivity.activeReceivers(t._1) = true
+        activity.registerReceiver(t._1, t._2._1, t._2._2, t._2._3)
       }
     })
-    super.onResume()
   }
-  override def onPause() {
-    log.trace("Activity::onPause")
-    Activity.registeredReceivers.foreach(t => {
-      if (Activity.activeReceivers(t._1)) {
-        log.trace("onResume unregisterReceiver " + t._1)
-        Activity.activeReceivers(t._1) = false
+  def onPauseExt(activity: Activity with DActivity) {
+    log.trace("Activity::onPauseExt")
+    DActivity.registeredReceivers.foreach(t => {
+      if (DActivity.activeReceivers(t._1)) {
+        log.trace("onResumeExt unregisterReceiver " + t._1)
+        DActivity.activeReceivers(t._1) = false
         try {
-          super.unregisterReceiver(t._1)
+          activity.unregisterReceiver(t._1)
         } catch {
           case e =>
             log.error(e.getMessage)
         }
       } else {
-        log.trace("onPause skip unregisterReceiver " + t._1)
+        log.trace("onPauseExt skip unregisterReceiver " + t._1)
       }
     })
     if (AppComponent.Inner != null) {
@@ -96,43 +95,38 @@ trait Activity extends AActivity with AnyBase with Logging {
       AppComponent.Inner.disableSafeDialogs
       AppComponent.Inner.resetDialogSafe
     }
-    Android.enableRotation(this)
-    super.onPause()
+    Android.enableRotation(activity)
   }
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    * in fact AppComponent.deinit is a sporadic event
    */
-  override def onDestroy() = {
-    log.trace("Activity::onDestroy")
-    Activity.registeredReceivers.clear
-    Activity.activeReceivers.clear
-    super.onDestroy()
-    onDestroyBase(this, {
+  def onDestroyExt(activity: Activity with DActivity) = {
+    log.trace("Activity::onDestroyExt")
+    DActivity.registeredReceivers.clear
+    DActivity.activeReceivers.clear
+    onDestroyBase(activity, {
       if (AnyBase.isLastContext)
         AppComponent.deinit()
       else
-        log.debug("skip onDestroy deinitialization, because there is another context coexists")
-      Activity.super.onDestroy()
+        log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
     })
   }
-  override def onCreateDialog(id: Int, args: Bundle): Dialog = {
-    log.trace("Activity::onCreateDialog")
+  def onCreateDialogExt(activity: Activity with DActivity, id: Int, args: Bundle): Dialog = {
+    log.trace("Activity::onCreateDialogExt")
     id match {
-      case id if id == Report.getId(this) =>
+      case id if id == Report.getId(activity) =>
         log.debug("show Report dialog")
-        Report.createDialog(this)
+        Report.createDialog(activity)
       case id =>
-        Option(Common.onCreateDialog(id, this)(log, dispatcher)).foreach(dialog => return dialog)
-        super.onCreateDialog(id)
+        Common.onCreateDialog(id, activity)(log, dispatcher)
     }
   }
-  override def onPrepareDialog(id: Int, dialog: Dialog, args: Bundle): Unit = {
-    super.onPrepareDialog(id, dialog, args)
-    log.trace("Activity::onPrepareDialog")
+  def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Unit = {
+    log.trace("Activity::onPrepareDialogExt")
     AppComponent.Inner.setDialogSafe(dialog)
     id match {
-      case id if id == Report.getId(this) =>
+      case id if id == Report.getId(activity) =>
         log.debug("prepare Report dialog with id " + id)
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
@@ -142,46 +136,46 @@ trait Activity extends AActivity with AnyBase with Logging {
             summary.getRootView.post(new Runnable { def run = summary.setText("") })
         }
         val spinner = dialog.findViewById(android.R.id.text2).asInstanceOf[Spinner]
-        val emails = AccountManager.get(this).getAccounts().map(_.name).filter(_.contains('@')).toList :+ "none"
-        val adapter = new ArrayAdapter(this, android.R.layout.simple_spinner_item, emails)
+        val emails = AccountManager.get(activity).getAccounts().map(_.name).filter(_.contains('@')).toList :+ "none"
+        val adapter = new ArrayAdapter(activity, android.R.layout.simple_spinner_item, emails)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.setAdapter(adapter)
       case _ =>
     }
   }
-  override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
-    log.trace("Activity::registerReceiver " + receiver)
-    assert(!Activity.registeredReceivers.isDefinedAt(receiver),
+  def registerReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
+    log.trace("Activity::registerExt " + receiver)
+    assert(!DActivity.registeredReceivers.isDefinedAt(receiver),
       { "receiver " + receiver + " already registered" })
-    Activity.registeredReceivers(receiver) = (filter, null, null)
-    Activity.activeReceivers(receiver) = true
-    super.registerReceiver(receiver, filter)
+    DActivity.registeredReceivers(receiver) = (filter, null, null)
+    DActivity.activeReceivers(receiver) = true
+    activity.registerReceiver(receiver, filter)
   } catch {
     case e =>
       log.error(e.getMessage, e)
       null
   }
-  override def registerReceiver(receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
-    log.trace("Activity::registerReceiver " + receiver)
-    assert(!Activity.registeredReceivers.isDefinedAt(receiver),
+  def registerReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
+    log.trace("Activity::registerExt " + receiver)
+    assert(!DActivity.registeredReceivers.isDefinedAt(receiver),
       { "receiver " + receiver + " not found" })
-    Activity.registeredReceivers(receiver) = (filter, broadcastPermission, scheduler)
-    Activity.activeReceivers(receiver) = true
-    super.registerReceiver(receiver, filter, broadcastPermission, scheduler)
+    DActivity.registeredReceivers(receiver) = (filter, broadcastPermission, scheduler)
+    DActivity.activeReceivers(receiver) = true
+    activity.registerReceiver(receiver, filter, broadcastPermission, scheduler)
   } catch {
     case e =>
       log.error(e.getMessage, e)
       null
   }
-  override def unregisterReceiver(receiver: BroadcastReceiver) {
-    log.trace("Activity::unregisterReceiver " + receiver)
-    Activity.registeredReceivers.remove(receiver)
-    if (Activity.activeReceivers.remove(receiver))
-      super.unregisterReceiver(receiver)
+  def unregisterReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver) {
+    log.trace("Activity::unregisterReceiverExt " + receiver)
+    DActivity.registeredReceivers.remove(receiver)
+    if (DActivity.activeReceivers.remove(receiver))
+      activity.unregisterReceiver(receiver)
   }
 }
 
-object Activity extends Logging {
+object DActivity extends Logging {
   /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
   private val registeredReceivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
   private val activeReceivers = new HashSet[BroadcastReceiver] with SynchronizedSet[BroadcastReceiver]
