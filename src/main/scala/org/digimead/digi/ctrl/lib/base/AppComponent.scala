@@ -57,6 +57,7 @@ import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.ICtrlComponent
+import org.digimead.digi.ctrl.lib.declaration.DState
 
 import android.app.Activity
 import android.content.Context
@@ -197,7 +198,7 @@ protected class AppComponent private () extends Actor with Logging {
   @Loggable
   def setDialogSafe(dialog: Dialog) {
     assert(!activitySafeDialog.isSet || activitySafeDialog.get == null,
-      { log.error("unexpected dialog value " + activitySafeDialog.get) })
+      { "unexpected dialog value " + activitySafeDialog.get })
     activitySafeDialog.set((dialog, null))
   }
   @Loggable
@@ -331,15 +332,20 @@ protected class AppComponent private () extends Actor with Logging {
    *  false - we need some work
    */
   @Loggable
-  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null) = AppComponent.Context.foreach {
+  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
+      if (AppComponent.Inner.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
+        // DigiControl unavailable and state already broken, submit and return
+        if (onFinish != null) onFinish(DState.Broken)
+        return
+      }
       AppControl.Inner.callStatus(activity.getPackageName)() match {
         case Right(componentState) =>
           val appState = componentState.state match {
             case DState.Active =>
               AppComponent.State(DState.Active)
             case DState.Broken =>
-              AppComponent.State(DState.Broken, "service_failed")
+              AppComponent.State(DState.Broken, Seq("service_failed"))
             case _ =>
               AppComponent.State(DState.Passive)
           }
@@ -347,12 +353,25 @@ protected class AppComponent private () extends Actor with Logging {
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
           val appState = if (AppControl.Inner.isAvailable == Some(false))
-            AppComponent.State(DState.Broken, error, (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a)) })
+            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a)) })
           else
-            AppComponent.State(DState.Broken, error)
+            AppComponent.State(DState.Broken, Seq(error))
           AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Broken)
       }
+  }
+  @Loggable
+  def minVersionRequired(componentPackage: String): Option[Version] = try {
+    applicationManifest.flatMap {
+      xml =>
+        val node = xml \\ "required" find { _.text == componentPackage }
+        node.flatMap(_.attribute("version"))
+        node.flatMap(_.attribute("version")).map(n => new Version(n.toString))
+    }
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
+      None
   }
   @Loggable
   private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
@@ -582,7 +601,7 @@ object AppComponent extends Logging {
 
     @Loggable
     override def set(d: (Dialog, () => Unit), signalAll: Boolean = true): Unit = lock.synchronized {
-      log.debug("set safe dialog to '" + d + "'")
+      log.debugWhere("set safe dialog to '" + d + "'", Logging.Where.BEFORE)
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
@@ -675,7 +694,7 @@ object AppComponent extends Logging {
     case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
     case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
   }
-  case class State(val value: DState.Value, val message: String = null, val onClickCallback: (Activity) => Any = (a) => {
+  case class State(val value: DState.Value, val rawMessage: Seq[String] = Seq(), val onClickCallback: (Activity) => Any = (a) => {
     log.warn("onClick callback unimplemented for " + this)
   }) extends Logging {
     log.debugWhere("create new state " + value, 3)
@@ -695,12 +714,12 @@ object AppComponent extends Logging {
         lastNonBusyState = newState
       } else
         super.set(newState, signalAll)
-      log.debug("set status to " + newState)
+      log.debugWhere("set status to " + newState, Logging.Where.BEFORE)
       publish(newState)
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     override def get() = super.get match {
-      case DState.Busy =>
+      case State(DState.Busy, message, callback) =>
         lastNonBusyState
       case state =>
         state

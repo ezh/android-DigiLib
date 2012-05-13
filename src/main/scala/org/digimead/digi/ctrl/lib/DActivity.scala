@@ -143,35 +143,36 @@ trait DActivity extends AnyBase with Logging {
       case _ =>
     }
   }
-  def registerReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
+  def registerReceiverExt(orig: () => Intent, receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {
     log.trace("Activity::registerExt " + receiver)
     assert(!DActivity.registeredReceivers.isDefinedAt(receiver),
       { "receiver " + receiver + " already registered" })
     DActivity.registeredReceivers(receiver) = (filter, null, null)
     DActivity.activeReceivers(receiver) = true
-    activity.registerReceiver(receiver, filter)
+    orig()
   } catch {
     case e =>
       log.error(e.getMessage, e)
       null
   }
-  def registerReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
+  def registerReceiverExt(orig: () => Intent, receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
     log.trace("Activity::registerExt " + receiver)
     assert(!DActivity.registeredReceivers.isDefinedAt(receiver),
       { "receiver " + receiver + " not found" })
     DActivity.registeredReceivers(receiver) = (filter, broadcastPermission, scheduler)
     DActivity.activeReceivers(receiver) = true
-    activity.registerReceiver(receiver, filter, broadcastPermission, scheduler)
+    orig()
   } catch {
     case e =>
       log.error(e.getMessage, e)
       null
   }
-  def unregisterReceiverExt(activity: Activity with DActivity, receiver: BroadcastReceiver) {
+  // orig = unregisterReceiverExt((super.un), receiver)
+  def unregisterReceiverExt(orig: () => Unit, receiver: BroadcastReceiver) {
     log.trace("Activity::unregisterReceiverExt " + receiver)
     DActivity.registeredReceivers.remove(receiver)
     if (DActivity.activeReceivers.remove(receiver))
-      activity.unregisterReceiver(receiver)
+      orig()
   }
 }
 

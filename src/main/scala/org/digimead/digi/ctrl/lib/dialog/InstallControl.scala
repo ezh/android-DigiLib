@@ -21,13 +21,12 @@ import scala.annotation.implicitNotFound
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
 import org.digimead.digi.ctrl.lib.util.Android
-import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.ICtrlHost
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -43,18 +42,19 @@ object InstallControl extends Logging {
   def createDialog(activity: Activity)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = {
     // check whether the intent can be resolved. If not, we will see
     // whether we can download it from the Market.
-    val intent = new Intent(activity, classOf[ICtrlHost])
+    val intent = new Intent(DIntent.HostService)
     val packagename = intent.getPackage()
     val yesString = if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
       // install
       log.info("install " + DConstant.controlPackage)
-      Android.getString(activity, "install").getOrElse("install")
+      Android.getString(activity, "Install").getOrElse("Install")
     } else {
       // reinstall
       log.info("reinstall " + DConstant.controlPackage)
-      Android.getString(activity, "reinstall").getOrElse("reinstall")
+      Android.getString(activity, "Reinstall_Update").getOrElse("Reinstall/Update")
     }
     new AlertDialog.Builder(activity).
+      setIcon(Android.getId(activity, "ic_control_icon", "drawable")).
       setTitle(Android.getString(activity, "error_digicontrol_not_found_title").
         getOrElse("DigiControl failed")).
       setMessage(Android.getString(activity, "error_digicontrol_not_found_content").

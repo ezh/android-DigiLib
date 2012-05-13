@@ -44,8 +44,8 @@ import android.os.IBinder
 import android.os.Looper
 
 protected class AppControl private () extends Logging {
-  protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   private val ctrlBindTimeout = DTimeout.short
+  protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
   protected lazy val ctrlConnection = new ServiceConnection() with Logging {
     @Loggable
@@ -92,6 +92,9 @@ protected class AppControl private () extends Logging {
   @Loggable
   def getWait(throwError: Boolean): ICtrlHost =
     AppControl.get(-1, throwError, ready).get
+  @Loggable
+  def bindStub(error: String*): Unit =
+    AppControl.bindStub(ctrlBindContext, ready, ctrlConnection, error)
   @Loggable
   def bind(caller: Context, allowCallFromUI: Boolean = false): Unit = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
@@ -421,13 +424,18 @@ object AppControl extends Logging {
       intent.putExtra("packageName", caller.getPackageName())
       log.info("bind to service " + DIntent.HostService)
       if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
-        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Android.getString(caller, "error_digicontrol_not_found").
-          getOrElse("Bind failed, DigiControl application not found")))
+        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found")))
         serviceInstance.set(None)
       }
       ctrlBindContext.set(caller)
     } else
       log.debug("service " + DIntent.HostService + " already binding/binded")
+  }
+  private def bindStub(ctrlBindContext: AtomicReference[Context], serviceInstance: SyncVar[Option[ICtrlHost]],
+    ctrlConnection: ServiceConnection, error: Seq[String]) = synchronized {
+    AppComponent.Inner.state.set(AppComponent.State(DState.Broken, error))
+    serviceInstance.set(None)
+    ctrlBindContext.set(null)
   }
   private def unbind(ctrlBindContext: AtomicReference[Context], serviceInstance: SyncVar[Option[ICtrlHost]],
     ctrlConnection: ServiceConnection) = synchronized {

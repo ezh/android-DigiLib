@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical" >
+
+    <LinearLayout
+        android:id="@+id/listing"
+        android:layout_width="match_parent"
+        android:layout_height="0dip"
+        android:layout_weight="1"
+        android:orientation="vertical" >
+
+        <ListView
+            android:id="@+id/android:list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <ScrollView
+            android:id="@id/android:empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone" >
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" >
+
+                <RelativeLayout
+                    android:id="@id/android:empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" >
+
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerHorizontal="true"
+                        android:layout_centerVertical="true"
+                        android:padding="30dip"
+                        android:src="@drawable/ic_background_logo" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_centerHorizontal="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_horizontal"
+                        android:text="@string/filechooser_no_entries" />
+                </RelativeLayout>
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <HorizontalScrollView
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:scrollbars="none" >
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal" >
+
+            <Button
+                android:id="@+id/filechooser_home"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_home"
+                android:text="@string/filechooser_menu_item_home"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_up"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_up"
+                android:text="@string/filechooser_menu_item_up"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_multiple"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_multiple"
+                android:text="multiple"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_order"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_filter"
+                android:text="@string/filechooser_sorting"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_preference"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_filter"
+                android:text="@string/filechooser_menu_item_filter"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_cancel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_cancel"
+                android:text="@android:string/cancel"
+                android:textSize="8sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/filechooser_copy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_copy"
+                android:text="@string/filechooser_copy"
+                android:textSize="8sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/filechooser_cut"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_cut"
+                android:text="@string/filechooser_cut"
+                android:textSize="8sp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/filechooser_paste"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_paste"
+                android:text="@string/filechooser_paste"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_clear"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_clear"
+                android:text="@string/filechooser_action_clear_clipboard"
+                android:textSize="8sp" />
+
+            <Button
+                android:id="@+id/filechooser_delete"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dip"
+                android:background="@android:color/transparent"
+                android:clickable="true"
+                android:drawableTop="@drawable/filechooser_delete"
+                android:text="@string/filechooser_delete"
+                android:textSize="8sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" >
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="left"
+                android:text="@string/filechooser_path_header"
+                android:textColor="#ffffff"
+                android:textSize="12dip" />
+
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#404040"
+            android:scrollbars="none" >
+
+            <TextView
+                android:id="@+id/filechooser_path"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="left"
+                android:textColor="#ffffff"
+                android:textSize="12dip" />
+        </HorizontalScrollView>
+    </LinearLayout>
+
+</LinearLayout>

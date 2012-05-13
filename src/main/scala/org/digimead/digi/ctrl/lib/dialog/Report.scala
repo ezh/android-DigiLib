@@ -167,7 +167,7 @@ object Report extends Logging {
   @Loggable
   def submit(activity: Activity with DActivity = null, description: Option[String] = None): Unit = {
     if (activity != null) {
-      takeScreenshot(activity)
+      activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
       AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
     } else {
