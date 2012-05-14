@@ -17,7 +17,7 @@
 
     <string name="error_digicontrol_not_found">DigiControl not found</string>
     <string name="error_digicontrol_not_found_title">DigiControl connection failed</string>
-    <string name="error_digicontrol_not_found_content">Do you allow to update/install it? DigiControl have a lot of things under the hood that required to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.</string>
+    <string name="error_digicontrol_not_found_content">Do you allow to %s it? DigiControl have a lot of things under the hood that required to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.&lt;br/&gt;&lt;br/&gt;&lt;i&gt;&lt;small&gt;DigiControl built without advertising, it is fully functional core under free of charge license. Read more in project description.&lt;/small&gt;&lt;/i&gt;</string>
     <string name="error_digicontrol_minimum_version">Required minimum version of DigiControl: %1$s. Current version is %2$s</string>
     <string name="error_market_failed_title">Market failed</string>
     <string name="error_market_failed_content">Market application not found on the device</string>

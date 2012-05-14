@@ -64,7 +64,7 @@ class SupportBlock(val context: Activity,
   val itemEmail = SupportBlock.Item(Android.getString(context, "block_email_title").getOrElse("send message"),
     Android.getString(context, "block_support_email_description").getOrElse("email us directly"), "ic_block_support_message")
   val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat via Skype, VoIP, ..."),
-    Android.getString(context, "block_support_chat_description").getOrElse("please call from 08:00 to 18:00 UTC"), "ic_block_support_chat")
+    Android.getString(context, "block_support_chat_description").getOrElse("please call from 06:00 to 18:00 UTC"), "ic_block_support_chat")
   val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
   private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
@@ -230,7 +230,7 @@ class SupportBlock(val context: Activity,
   }
 }
 
-object SupportBlock {
+object SupportBlock extends Logging {
   @volatile private var block: Option[SupportBlock] = None
   private val name = "name"
   private val description = "description"
@@ -253,16 +253,7 @@ object SupportBlock {
           val icon = view.findViewById(android.R.id.icon1).asInstanceOf[ImageView]
           text2.setVisibility(View.VISIBLE)
           text1.setText(Html.fromHtml(item.name))
-          block match {
-            case Some(block) if item == block.itemChat =>
-              val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
-              if (hour > 7 && hour < 19)
-                text2.setText(Html.fromHtml("<font color='green'>" + item.description + "</font>"))
-              else
-                text2.setText(Html.fromHtml("<font color='red'>" + item.description + "</font>"))
-            case _ =>
-              text2.setText(Html.fromHtml(item.description))
-          }
+          setCallTimeDescription(item, text2)
           if (item.icon.nonEmpty)
             Android.getId(context, item.icon, "drawable") match {
               case i if i != 0 =>
@@ -273,7 +264,22 @@ object SupportBlock {
           item.view = new WeakReference(view)
           view
         case Some(view) =>
+          val text2 = view.findViewById(android.R.id.text2).asInstanceOf[TextView]
+          setCallTimeDescription(item, text2)
           view
+      }
+    }
+    private def setCallTimeDescription(item: SupportBlock.Item, text2: TextView) {
+      block match {
+        case Some(block) if item == block.itemChat =>
+          val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
+          log.debug("current hour " + hour)
+          if (hour >= 6 && hour <= 18)
+            text2.setText(Html.fromHtml("<font color='green'>" + item.description + "</font>"))
+          else
+            text2.setText(Html.fromHtml("<font color='red'>" + item.description + "</font>"))
+        case _ =>
+          text2.setText(Html.fromHtml(item.description))
       }
     }
   }

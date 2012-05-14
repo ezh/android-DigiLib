@@ -18,6 +18,7 @@ package org.digimead.digi.ctrl;
 
 import org.digimead.digi.ctrl.lib.info.ExecutableInfo;
 import org.digimead.digi.ctrl.lib.info.ComponentInfo;
+import org.digimead.digi.ctrl.lib.info.UserInfo;
 
 interface ICtrlComponent {
   // serialized to Array[Byte] Common.ComponentInfo
@@ -34,4 +35,5 @@ interface ICtrlComponent {
   String readStringProperty(in int property);
   boolean accessRulesOrder(); // ADA vs DAD
   Map interfaceRules(); // String, Boolean
+  UserInfo user(in String name);
 }

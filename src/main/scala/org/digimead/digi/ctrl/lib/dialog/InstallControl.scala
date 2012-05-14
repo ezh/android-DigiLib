@@ -27,6 +27,7 @@ import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
 import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.util.Version
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -34,7 +35,9 @@ import android.app.Dialog
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
+import android.content.pm.PackageManager.NameNotFoundException
 import android.net.Uri
+import android.text.Html
 
 object InstallControl extends Logging {
   def getId(context: Context) = Android.getId(context, "install_digicontrol")
@@ -44,22 +47,37 @@ object InstallControl extends Logging {
     // whether we can download it from the Market.
     val intent = new Intent(DIntent.HostService)
     val packagename = intent.getPackage()
-    val yesString = if (activity.getPackageManager().resolveActivity(intent, 0) == null) {
-      // install
-      log.info("install " + DConstant.controlPackage)
-      Android.getString(activity, "Install").getOrElse("Install")
-    } else {
-      // reinstall
-      log.info("reinstall " + DConstant.controlPackage)
-      Android.getString(activity, "Reinstall_Update").getOrElse("Reinstall/Update")
-    }
+    val action =
+      AppComponent.Inner.minVersionRequired(DConstant.controlPackage) match {
+        case Some(minVersion) => try {
+          val pm = activity.getPackageManager()
+          val pi = pm.getPackageInfo(DConstant.controlPackage, 0)
+          val version = new Version(pi.versionName)
+          log.debug(DConstant.controlPackage + " minimum version '" + minVersion + "' and current version '" + version + "'")
+          if (version.compareTo(minVersion) == -1)
+            Android.getString(activity, "update").getOrElse("update")
+          else
+            Android.getString(activity, "reinstall").getOrElse("reinstall")
+        } catch {
+          case e: NameNotFoundException =>
+            Android.getString(activity, "install").getOrElse("install")
+        }
+        case None => try {
+          val pm = activity.getPackageManager()
+          val pi = pm.getPackageInfo(DConstant.controlPackage, 0)
+          Android.getString(activity, "update").getOrElse("update")
+        } catch {
+          case e: NameNotFoundException =>
+            Android.getString(activity, "install").getOrElse("install")
+        }
+      }
     new AlertDialog.Builder(activity).
       setIcon(Android.getId(activity, "ic_control_icon", "drawable")).
       setTitle(Android.getString(activity, "error_digicontrol_not_found_title").
         getOrElse("DigiControl failed")).
-      setMessage(Android.getString(activity, "error_digicontrol_not_found_content").
-        getOrElse("DigiControl application not found on the device")).
-      setPositiveButton(yesString, new DialogInterface.OnClickListener() {
+      setMessage(Html.fromHtml(Android.getString(activity, "error_digicontrol_not_found_content").
+        getOrElse("DigiControl application not found on the device").format(action))).
+      setPositiveButton(action(0).toUpper + action.substring(1), new DialogInterface.OnClickListener() {
         @Loggable
         def onClick(dialog: DialogInterface, whichButton: Int) {
           IAmMumble("install DigiControl from market")(logger, dispatcher)

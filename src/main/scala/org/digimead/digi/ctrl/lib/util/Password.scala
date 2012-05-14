@@ -18,14 +18,12 @@
 package org.digimead.digi.ctrl.lib.util
 
 trait Passwords {
-  private val randomIntN = new scala.util.Random(System.currentTimeMillis())
-  private val numbers = ('0' to '9').toList
-  private val symbols = "!@$*".toList
-  private val alphabet = ('a' to 'z').toList
-  private val upperAlphabet = ('A' to 'Z').toList
-  private val vowels = "aeiou".toList
-  private val consonants = alphabet filterNot (vowels contains) // alphabet -- vowels
-  private val defaultPasswordCharacters = numbers ++ symbols ++ alphabet ++ upperAlphabet
+  val randomIntN = new scala.util.Random(System.currentTimeMillis())
+  val numbers = ('0' to '9').toList
+  val symbols = "!@$*".toList
+  val alphabet = ('a' to 'z').toList
+  val upperAlphabet = ('A' to 'Z').toList
+  val defaultPasswordCharacters = numbers ++ symbols ++ alphabet ++ upperAlphabet
   private val random = new java.security.SecureRandom
   def generate(length: Int): String =
     (for (i <- 1 to length) yield defaultPasswordCharacters(random.nextInt(defaultPasswordCharacters.size))).mkString

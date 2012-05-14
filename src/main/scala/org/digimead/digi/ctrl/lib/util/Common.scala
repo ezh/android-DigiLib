@@ -253,7 +253,8 @@ object Common extends Logging {
   @Loggable
   def doComponentService(componentPackage: String, reuse: Boolean = true, operationTimeout: Long = DTimeout.long)(f: (ICtrlComponent) => Any): Unit = AppComponent.Context foreach {
     context =>
-      log.debug("start doComponentService with timeout " + operationTimeout)
+      val bindContext = context.getApplicationContext()
+      log.debug("start doComponentService for " + componentPackage + " with timeout " + operationTimeout)
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
       if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
         log.debug("reuse service connection")
@@ -286,7 +287,7 @@ object Common extends Logging {
       val intent = new Intent(DIntent.ComponentService)
       intent.setPackage(componentPackage)
       lock.available = false
-      if (context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+      if (bindContext.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
         lock.acquire
         connectionGuard.shutdownNow
         val executionGuard = Executors.newSingleThreadExecutor()
@@ -295,14 +296,14 @@ object Common extends Logging {
             if (service != null) {
               if (reuse) {
                 log.debug("add service connection to bindedICtrlPool")
-                AppComponent.Inner.bindedICtrlPool(componentPackage) = (context, connection, service)
+                AppComponent.Inner.bindedICtrlPool(componentPackage) = (bindContext, connection, service)
               }
               f(service)
             }
           } finally {
             service = null
             if (!reuse)
-              context.unbindService(connection)
+              bindContext.unbindService(connection)
           }
         })
         try {
@@ -316,12 +317,12 @@ object Common extends Logging {
             executionFuture.cancel(true)
             service = null
             if (!reuse)
-              context.unbindService(connection)
+              bindContext.unbindService(connection)
         } finally {
           executionGuard.shutdown
         }
       } else {
-        log.fatal("service bind failed")
+        log.fatal("context.bindService failed with context " + bindContext + " and intent " + intent)
       }
   }
   @Loggable

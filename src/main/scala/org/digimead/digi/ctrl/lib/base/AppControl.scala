@@ -16,24 +16,26 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
-import scala.actors.Futures.future
 import scala.actors.Future
-import scala.collection.JavaConversions._
+import scala.actors.Futures.future
+import scala.annotation.elidable
+import scala.collection.JavaConversions.asScalaBuffer
 
+import org.digimead.digi.ctrl.ICtrlHost
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
+import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.SyncVar
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.ICtrlHost
 
 import android.app.Activity
 import android.content.ComponentName
@@ -42,6 +44,7 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Looper
+import annotation.elidable.ASSERTION
 
 protected class AppControl private () extends Logging {
   private val ctrlBindTimeout = DTimeout.short
@@ -137,7 +140,7 @@ protected class AppControl private () extends Logging {
     } else
       None
   }
-  @Loggable
+  @Loggable(result = false)
   def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callListDirectories AppControl function from UI thread")
@@ -157,7 +160,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callEnable(componentPackage: String, flag: Boolean, allowCallFromUI: Boolean = false): Future[_] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStart AppControl function from UI thread")
@@ -172,7 +175,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callReset(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callReset AppControl function from UI thread")
@@ -187,7 +190,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStart AppControl function from UI thread")
@@ -202,7 +205,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callStatus(componentPackage: String, allowCallFromUI: Boolean = false): Future[Either[String, ComponentState]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStatus AppControl function from UI thread")
@@ -232,20 +235,13 @@ protected class AppControl private () extends Logging {
               case None =>
                 componentPackage + "component status unavailable"
             }
-          } else {
-            AppComponent.Context match {
-              case Some(context) =>
-                Android.getString(context, "error_digicontrol_not_found").
-                  getOrElse("DigiControl not found")
-              case None =>
-                "DigiControl not found"
-            }
-          }
+          } else
+            "error_digicontrol_not_found"
           Left(text)
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callStop(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callStop AppControl function from UI thread")
@@ -260,7 +256,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callDisconnect(componentPackage: String, processID: Int, connectionID: Int, allowCallFromUI: Boolean = false): Future[Boolean] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callDisconnect AppControl function from UI thread")
@@ -275,7 +271,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callListActiveInterfaces(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[String]]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callListActiveInterfaces AppControl function from UI thread")
@@ -295,7 +291,7 @@ protected class AppControl private () extends Logging {
       }
     }
   }
-  @Loggable
+  @Loggable(result = false)
   def callListPendingConnections(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[Intent]]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callListPendingConnections AppControl function from UI thread")
@@ -424,7 +420,8 @@ object AppControl extends Logging {
       intent.putExtra("packageName", caller.getPackageName())
       log.info("bind to service " + DIntent.HostService)
       if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
-        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found")))
+        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
+          AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a))))
         serviceInstance.set(None)
       }
       ctrlBindContext.set(caller)

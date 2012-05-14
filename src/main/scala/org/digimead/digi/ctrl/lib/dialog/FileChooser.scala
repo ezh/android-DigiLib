@@ -138,8 +138,8 @@ object FileChooser extends Logging {
       home.setOnClickListener(new View.OnClickListener() {
         override def onClick(v: View) {
           activeDirectory = new File("/")
-          Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
-            getOrElse("change directory to %s").format(activeDirectory), Toast.LENGTH_SHORT).show()
+//          Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+//            getOrElse("change directory to %s").format(activeDirectory), Toast.LENGTH_SHORT).show()
           showDirectory(activeDirectory)
         }
       })
@@ -147,8 +147,8 @@ object FileChooser extends Logging {
         override def onClick(v: View) = {
           activeDirectory.getParentFile match {
             case parent: File =>
-              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
-                getOrElse("change directory to %s").format(parent), Toast.LENGTH_SHORT).show()
+//              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+//                getOrElse("change directory to %s").format(parent), Toast.LENGTH_SHORT).show()
               showDirectory(parent)
             case null =>
               Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to_failed").
@@ -283,8 +283,8 @@ object FileChooser extends Logging {
     }
     if (file.isDirectory)
       if (file.canExecute && file.canRead) {
-        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to").
-          getOrElse("change directory to %s").format(file), Toast.LENGTH_SHORT).show()
+//        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to").
+//          getOrElse("change directory to %s").format(file), Toast.LENGTH_SHORT).show()
         showDirectory(file)
       } else {
         Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to_failed").

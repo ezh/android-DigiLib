@@ -59,7 +59,7 @@ trait DActivity extends AnyBase with Logging {
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
   }
-  def onResumeExt(activity: Activity with DActivity) = {
+  def onResumeExt(activity: Activity with DActivity, origRegisterReceiver: (BroadcastReceiver, IntentFilter, String, Handler) => Intent) = {
     log.trace("Activity::onResumeExt")
     Report.searchAndSubmitLock.set(false)
     AppComponent.Inner.lockRotationCounter.set(0)
@@ -70,18 +70,18 @@ trait DActivity extends AnyBase with Logging {
       } else {
         log.trace("onResumeExt registerReceiver " + t._1)
         DActivity.activeReceivers(t._1) = true
-        activity.registerReceiver(t._1, t._2._1, t._2._2, t._2._3)
+        origRegisterReceiver(t._1, t._2._1, t._2._2, t._2._3)
       }
     })
   }
-  def onPauseExt(activity: Activity with DActivity) {
+  def onPauseExt(activity: Activity with DActivity, origUnregisterReceiver: (BroadcastReceiver) => Unit) {
     log.trace("Activity::onPauseExt")
     DActivity.registeredReceivers.foreach(t => {
       if (DActivity.activeReceivers(t._1)) {
-        log.trace("onResumeExt unregisterReceiver " + t._1)
+        log.trace("onPauseExt unregisterReceiver " + t._1)
         DActivity.activeReceivers(t._1) = false
         try {
-          activity.unregisterReceiver(t._1)
+          origUnregisterReceiver(t._1)
         } catch {
           case e =>
             log.error(e.getMessage)
@@ -158,7 +158,7 @@ trait DActivity extends AnyBase with Logging {
   def registerReceiverExt(orig: () => Intent, receiver: BroadcastReceiver, filter: IntentFilter, broadcastPermission: String, scheduler: Handler): Intent = try {
     log.trace("Activity::registerExt " + receiver)
     assert(!DActivity.registeredReceivers.isDefinedAt(receiver),
-      { "receiver " + receiver + " not found" })
+      { "receiver " + receiver + " already registered" })
     DActivity.registeredReceivers(receiver) = (filter, broadcastPermission, scheduler)
     DActivity.activeReceivers(receiver) = true
     orig()

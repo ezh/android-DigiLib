@@ -352,7 +352,7 @@ protected class AppComponent private () extends Actor with Logging {
           AppComponent.Inner.state.set(appState)
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
-          val appState = if (AppControl.Inner.isAvailable == Some(false))
+          val appState = if (error == "error_digicontrol_not_found")
             AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a)) })
           else
             AppComponent.State(DState.Broken, Seq(error))
