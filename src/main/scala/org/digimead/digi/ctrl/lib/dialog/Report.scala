@@ -209,7 +209,7 @@ object Report extends Logging {
         Thread.sleep(DTimeout.short) // take it gently ;-)
         log.info("looking for stack trace reports in: " + info.reportPath)
         val dir = new File(info.reportPath + "/")
-        val reports = Option(dir.list()).flatten
+        val reports = Option(dir.list()).getOrElse(Array[String]())
         if (reports.exists(_.endsWith(".trc")))
           submit(activity, Some("stack trace detected"))
       }

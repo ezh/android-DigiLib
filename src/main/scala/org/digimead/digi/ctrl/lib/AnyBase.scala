@@ -70,14 +70,14 @@ object AnyBase extends Logging {
     AppControl.resurrect()
     context match {
       case activity: Activity =>
-        if (!contextPool.exists(_.get == context)) {
+        if (!contextPool.exists(_.get == Some(context))) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
           if (contextPool.isEmpty)
             AppComponent.init(context)
         }
       case service: Service =>
-        if (!contextPool.exists(_.get == context)) {
+        if (!contextPool.exists(_.get == Some(context))) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
           if (contextPool.isEmpty)
@@ -85,7 +85,7 @@ object AnyBase extends Logging {
         }
       case context =>
         // all other contexts are temporary, look at isLastContext
-        if (!contextPool.exists(_.get == context))
+        if (!contextPool.exists(_.get == Some(context)))
           contextPool = contextPool :+ new WeakReference(context)
         if (stackTraceOnUnknownContext)
           log.fatal("init from unknown context " + context)
@@ -120,7 +120,7 @@ object AnyBase extends Logging {
     if (AppControl.Inner != null && AppControl.Inner.ctrlBindContext.get == context)
       AppControl.Inner.unbind
     // update contextPool
-    contextPool = contextPool.filter(_.get != context)
+    contextPool = contextPool.filter(_.get != Some(context))
     updateContext()
   }
   // count only Activity and Service contexts

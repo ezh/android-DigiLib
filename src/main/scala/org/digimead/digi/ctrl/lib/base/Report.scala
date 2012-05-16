@@ -75,7 +75,7 @@ object Report extends Logging {
     } yield {
       log.debug("looking for error reports in: " + info.reportPath)
       val dir = new File(info.reportPath + "/")
-      val reports = Option(dir.list()).flatten
+      val reports = Option(dir.list()).getOrElse(Array[String]())
       if (reports.isEmpty)
         return true
       context match {
@@ -142,7 +142,7 @@ object Report extends Logging {
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
             name.toLowerCase.endsWith(".description")
-        })).flatten.foreach(name => {
+        })).getOrElse(Array[String]()).foreach(name => {
           val report = new File(info.reportPath, name)
           log.info("delete outdated description file " + report.getName)
           report.delete
@@ -151,7 +151,7 @@ object Report extends Logging {
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
             name.toLowerCase.endsWith(".png")
-        })).flatten.foreach(name => {
+        })).getOrElse(Array[String]()).foreach(name => {
           val report = new File(info.reportPath, name)
           log.info("delete outdated png file " + report.getName)
           report.delete
@@ -160,7 +160,7 @@ object Report extends Logging {
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
             name.toLowerCase.endsWith(".log")
-        })).flatten.toSeq.sorted.reverse.drop(keepLogFiles).foreach(name => {
+        })).getOrElse(Array[String]()).sorted.reverse.drop(keepLogFiles).foreach(name => {
           val report = new File(info.reportPath, name)
           log.info("delete outdated log file " + report.getName)
           report.delete
@@ -169,7 +169,7 @@ object Report extends Logging {
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
             name.toLowerCase.endsWith(".trc")
-        })).flatten.toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
+        })).getOrElse(Array[String]()).toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
           val trace = new File(info.reportPath, name)
           log.info("delete outdated stacktrace file " + trace.getName)
           trace.delete
@@ -187,7 +187,7 @@ object Report extends Logging {
       context <- AppComponent.Context
     } {
       val dir = new File(info.reportPath + "/")
-      val reports = Option(dir.list()).flatten
+      val reports = Option(dir.list()).getOrElse(Array[String]())
       if (reports.isEmpty)
         return
       val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]

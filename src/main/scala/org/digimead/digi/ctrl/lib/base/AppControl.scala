@@ -227,7 +227,7 @@ protected class AppControl private () extends Logging {
               Left(e.getMessage)
           }
         case None =>
-          val text = if (ready.isSet && ready == None) {
+          val text = if (ready.isSet && ready.get == None) {
             AppComponent.Context match {
               case Some(context) =>
                 Android.getString(context, "error_component_status_unavailable").

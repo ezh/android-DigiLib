@@ -36,7 +36,7 @@ case class UserInfo(name: String, password: String, home: String, enabled: Boole
   def describeContents() = 0
 }
 
-protected object UserInfo extends Logging {
+object UserInfo extends Logging {
   override val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[UserInfo] = new Parcelable.Creator[UserInfo]() {
     def createFromParcel(in: Parcel): UserInfo = try {
