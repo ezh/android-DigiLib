@@ -69,7 +69,7 @@ object Report extends Logging {
   }
   @Loggable
   def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Boolean = synchronized {
-    val a = for {
+    for {
       info <- AnyBase.info.get
       context <- AppComponent.Context
     } yield {
@@ -128,7 +128,6 @@ object Report extends Logging {
           false
       }
     }
-    a
   } getOrElse false
   @Loggable
   def clean(): Unit = synchronized {
