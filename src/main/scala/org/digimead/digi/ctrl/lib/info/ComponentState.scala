@@ -39,8 +39,9 @@ case class ComponentState(val componentPackage: String,
       },
     state = DState(in.readInt),
     reason = in.readString match {
-        case empty if empty == "" => None
-        case reason => Some(reason) },
+      case empty if empty == "" => None
+      case reason => Some(reason)
+    },
     execPath = in.readString,
     dataPath = in.readString,
     enabled = (in.readByte == 1))

@@ -43,8 +43,7 @@ case class ExecutableInfo(val executableID: Int,
   assert(commandLine == None || commandLine.get.nonEmpty)
   def this(in: Parcel) = this(executableID = in.readInt,
     commandLine = {
-      val isNone = in.readByte == 0
-      if (isNone) {
+      if (in.readByte == 0) {
         None
       } else {
         val mDataTypes = new ArrayList[String]()

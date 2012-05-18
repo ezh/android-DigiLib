@@ -63,7 +63,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
     project = in.readString,
     thumb = {
       val dataLength = in.readInt
-      if (dataLength == -1) {
+      if (dataLength < 0) {
         None
       } else {
         ComponentInfo.log.trace("set thumb array size to " + dataLength)
@@ -77,7 +77,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
     email = in.readString,
     iconHDPI = {
       val dataLength = in.readInt
-      if (dataLength == -1) {
+      if (dataLength < 0) {
         None
       } else {
         ComponentInfo.log.trace("set iconHDPI array size to " + dataLength)
@@ -88,7 +88,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
     },
     iconLDPI = {
       val dataLength = in.readInt
-      if (dataLength == -1) {
+      if (dataLength < 0) {
         None
       } else {
         ComponentInfo.log.trace("set iconLDPI array size to " + dataLength)
@@ -99,7 +99,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
     },
     iconMDPI = {
       val dataLength = in.readInt
-      if (dataLength == -1) {
+      if (dataLength < 0) {
         None
       } else {
         ComponentInfo.log.trace("set iconMDPI array size to " + dataLength)
@@ -110,7 +110,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
     },
     iconXHDPI = {
       val dataLength = in.readInt
-      if (dataLength == -1) {
+      if (dataLength < 0) {
         None
       } else {
         ComponentInfo.log.trace("set iconXHDPI array size to " + dataLength)
