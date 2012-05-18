@@ -163,7 +163,7 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
   // always enabled
   def error(msg: String, t: Throwable) {
     if (ExceptionHandler.allowGenerateStackTrace)
-      ExceptionHandler.generateStackTrace(Thread.currentThread, t)
+      ExceptionHandler.generateStackTrace(Thread.currentThread, t, System.currentTimeMillis)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg, Some(t)))
   }
   def errorWhere(msg: String): Unit = if (Logging.isErrorEnabled)

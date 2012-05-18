@@ -93,7 +93,6 @@ trait DActivity extends AnyBase with Logging {
     if (AppComponent.Inner != null) {
       AppComponent.Inner.lockRotationCounter.set(0)
       AppComponent.Inner.disableSafeDialogs
-      AppComponent.Inner.resetDialogSafe
     }
     Android.enableRotation(activity)
   }

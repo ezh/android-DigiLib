@@ -22,12 +22,16 @@ import java.io.FileWriter
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Thread.UncaughtExceptionHandler
+import java.util.Date
 
-import org.digimead.digi.ctrl.lib.log.Logging
+import scala.annotation.tailrec
+
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.base.Report
 import org.digimead.digi.ctrl.lib.declaration.DIntent
-import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.content.Context
 import android.content.Intent
@@ -48,7 +52,18 @@ class ExceptionHandler extends Logging {
 
 object ExceptionHandler extends Logging {
   @volatile var allowGenerateStackTrace = true
-  def generateStackTrace(t: Thread, e: Throwable) = AnyBase.info.get.foreach {
+
+  @annotation.tailrec
+  def retry[T](n: Int, timeout: Int = -1)(fn: => T): T = {
+    val r = try { Some(fn) } catch { case e: Exception if n > 1 => None }
+    r match {
+      case Some(x) => x
+      case None =>
+        if (timeout >= 0) Thread.sleep(timeout)
+        retry(n - 1, timeout)(fn)
+    }
+  }
+  def generateStackTrace(t: Thread, e: Throwable, when: Long) = AnyBase.info.get.foreach {
     info =>
       // Here you should have a more robust, permanent record of problems
       val reportName = Report.reportPrefix + ".trc"
@@ -61,6 +76,7 @@ object ExceptionHandler extends Logging {
         // Write the stacktrace to disk
         val bos = new BufferedWriter(new FileWriter(file))
         bos.write(AnyBase.info.get.get.toString + "\n")
+        bos.write(Common.dateString(new Date(when)))
         bos.write(result.toString())
         bos.flush()
         // Close up everything
@@ -77,7 +93,7 @@ object ExceptionHandler extends Logging {
     // Default exception handler
     def uncaughtException(t: Thread, e: Throwable) {
       if (allowGenerateStackTrace)
-        generateStackTrace(t, e)
+        generateStackTrace(t, e, System.currentTimeMillis)
       // call original handler, handler blown up if java.lang.Throwable.getStackTrace return null :-)
       try {
         defaultExceptionHandler.uncaughtException(t, e)

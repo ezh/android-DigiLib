@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 import scala.Array.canBuildFrom
 import scala.actors.Futures.future
@@ -39,6 +40,7 @@ import scala.collection.mutable.HashMap
 import scala.ref.WeakReference
 import scala.xml.Node
 import scala.xml.XML
+import scala.actors.OutputChannel
 
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -91,7 +93,7 @@ protected class AppComponent private () extends Actor with Logging {
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
   private[lib] val lockRotationCounter = new AtomicInteger(0)
-  private val isSafeDialogEnabled = new AtomicBoolean(false)
+  private val isSafeDialogEnabled = new AtomicReference[Option[Boolean]](None)
   private val activitySafeDialog = new AppComponent.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
@@ -106,14 +108,12 @@ protected class AppComponent private () extends Actor with Logging {
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
               log.debug("wait isSafeDialogEnabled lock")
-              while (!isSafeDialogEnabled.get)
-                isSafeDialogEnabled.wait
+              while (isSafeDialogEnabled.get match {
+                case Some(true) => show(activity, dialog, onDismiss, s); false // show dialog and exit from loop
+                case Some(false) => true // wait
+                case None => resetDialogSafe; false // skip
+              }) isSafeDialogEnabled.wait
             }
-            // show dialog
-            val result = onMessageShowDialog(activity, dialog, onDismiss)
-            log.debug("return from message ShowDialog with result " + result)
-            if (s.receiver.getState == Actor.State.Blocked)
-              s ! result // only for ShowDialogSafeWait
           case AppComponent.Message.ShowDialogResource(activity, dialog, args, onDismiss) =>
             val s = sender
             log.info("receive message ShowDialogResource " + dialog)
@@ -123,20 +123,31 @@ protected class AppComponent private () extends Actor with Logging {
             // wait isSafeDialogEnabled
             isSafeDialogEnabled.synchronized {
               log.debug("wait isSafeDialogEnabled lock")
-              while (!isSafeDialogEnabled.get)
-                isSafeDialogEnabled.wait
+              while (isSafeDialogEnabled.get match {
+                case Some(true) => show(activity, dialog, args, onDismiss, s); false // show dialog and exit from loop
+                case Some(false) => true // wait
+                case None => resetDialogSafe; false // skip
+              }) isSafeDialogEnabled.wait
             }
-            // show dialog
-            val result = onMessageShowDialogResource(activity, dialog, args, onDismiss)
-            log.debug("return from message ShowDialog with result " + result)
-            if (s.receiver.getState == Actor.State.Blocked)
-              s ! result // only for ShowDialogSafeWait
+          // show dialog
           case message: AnyRef =>
             log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
           case message =>
             log.errorWhere("skip unknown message " + message)
         }
       }
+    }
+    private def show(activity: Activity, dialog: () => Dialog, onDismiss: Option[() => Unit], sender: OutputChannel[Any]) {
+      val result = onMessageShowDialog(activity, dialog, onDismiss)
+      log.debug("return from message ShowDialog with result " + result)
+      if (sender.receiver.getState == Actor.State.Blocked)
+        sender ! result // only for ShowDialogSafeWait
+    }
+    private def show(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit], sender: OutputChannel[Any]) {
+      val result = onMessageShowDialogResource(activity, dialog, args, onDismiss)
+      log.debug("return from message ShowDialog with result " + result)
+      if (sender.receiver.getState == Actor.State.Blocked)
+        sender ! result // only for ShowDialogSafeWait
     }
   }
   log.debug("disable safe dialogs")
@@ -211,7 +222,15 @@ protected class AppComponent private () extends Actor with Logging {
   def enableSafeDialogs() {
     log.debug("enable safe dialogs")
     isSafeDialogEnabled.synchronized {
-      isSafeDialogEnabled.set(true)
+      isSafeDialogEnabled.set(Some(true))
+      isSafeDialogEnabled.notifyAll
+    }
+  }
+  @Loggable
+  def suspendSafeDialogs() {
+    log.debug("disable safe dialogs")
+    isSafeDialogEnabled.synchronized {
+      isSafeDialogEnabled.set(Some(false))
       isSafeDialogEnabled.notifyAll
     }
   }
@@ -219,7 +238,7 @@ protected class AppComponent private () extends Actor with Logging {
   def disableSafeDialogs() {
     log.debug("disable safe dialogs")
     isSafeDialogEnabled.synchronized {
-      isSafeDialogEnabled.set(false)
+      isSafeDialogEnabled.set(None)
       isSafeDialogEnabled.notifyAll
     }
   }
