@@ -55,6 +55,8 @@ trait DActivity extends AnyBase with Logging {
   def onCreateExt(activity: Activity with DActivity): Unit = {
     log.trace("Activity::onCreateExt")
     onCreateBase(activity, {})
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.resetDialogSafe
     // sometimes onDestroy skipped, there is no harm to drop garbage
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
@@ -92,6 +94,7 @@ trait DActivity extends AnyBase with Logging {
     })
     if (AppComponent.Inner != null) {
       AppComponent.Inner.lockRotationCounter.set(0)
+      AppComponent.Inner.initialOrientation.set(activity.getRequestedOrientation)
       AppComponent.Inner.disableSafeDialogs
     }
     Android.enableRotation(activity)
