@@ -17,7 +17,7 @@
 
     <string name="error_digicontrol_not_found">DigiControl not found</string>
     <string name="error_digicontrol_not_found_title">DigiControl connection failed</string>
-    <string name="error_digicontrol_not_found_content">Do you allow to %s it? DigiControl have a lot of things under the hood that required to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.&lt;br/&gt;&lt;br/&gt;&lt;i&gt;&lt;small&gt;DigiControl built without advertising, it is fully functional core under free of charge license. Read more in project description.&lt;/small&gt;&lt;/i&gt;</string>
+    <string name="error_digicontrol_not_found_content">Do you allow to %s it? DigiControl have a lot of things under the hood that required to start/stop/restart Digi components, interact with sessions and permissions and much more. It is mediator between installed components, plugins, your android device and you.&lt;br/>&lt;br/>&lt;i>&lt;small>DigiControl built without advertising, it is fully functional core under free of charge license. Read more in project description.&lt;/small>&lt;/i></string>
     <string name="error_digicontrol_minimum_version">Required minimum version of DigiControl: %1$s. Current version is %2$s</string>
     <string name="error_market_failed_title">Market failed</string>
     <string name="error_market_failed_content">Market application not found on the device</string>
@@ -54,7 +54,8 @@
     <string name="empty"></string>
     <string name="error_prepare_environment_failed">prepare environment failed</string>
     <string name="Disconnect_All">Disconnect All</string>
-    <string name="session_title">%1$s to %2$s</string>
+    <string name="session_title_user">&lt;b&gt;%1$s&lt;/b&gt; from %2$s to %3$s</string>
+    <string name="session_title_nouser">%1$s to %2$s</string>
     <string name="session_description">%1$s</string>
     <string name="Apply">Apply</string>
     <string name="Cancel">Cancel</string>
@@ -69,6 +70,8 @@
     <string name="preference_debug_android">Android Logging</string>
     <string name="preference_debug_android_on">Built-in facility to log information to the android console. Enabled</string>
     <string name="preference_debug_android_off">Built-in facility to log information to the android console. Disabled</string>
+    <string name="preference_layout">Interface Layout</string>
+    <string name="preference_layout_description">Set preffered UI orientation</string>
     <string name="report_upload_failed">Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later.</string>
     <string name="filechooser_menu_item_home">home</string>
     <string name="filechooser_menu_item_up">up</string>

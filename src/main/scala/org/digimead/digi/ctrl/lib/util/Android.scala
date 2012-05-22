@@ -132,10 +132,7 @@ object Android extends Logging {
   @Loggable
   def enableRotation(activity: Activity) = {
     log.debug("UNLOCK orientation")
-    //activity.setRequestedOrientation(AppComponent.Inner.initialOrientation.get)
-    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER)
-    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
-    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+    activity.setRequestedOrientation(AppComponent.Inner.preferredOrientation.get)
   }
   @Loggable
   def addLeadingDrawable(text: TextView, drawable: Drawable, drawablePadding: Int, dW: Int = -1, dH: Int = -1) {

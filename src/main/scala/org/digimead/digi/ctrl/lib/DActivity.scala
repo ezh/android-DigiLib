@@ -94,7 +94,6 @@ trait DActivity extends AnyBase with Logging {
     })
     if (AppComponent.Inner != null) {
       AppComponent.Inner.lockRotationCounter.set(0)
-      AppComponent.Inner.initialOrientation.set(activity.getRequestedOrientation)
       AppComponent.Inner.disableSafeDialogs
     }
     Android.enableRotation(activity)
@@ -126,10 +125,10 @@ trait DActivity extends AnyBase with Logging {
   }
   def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Unit = {
     log.trace("Activity::onPrepareDialogExt")
-    AppComponent.Inner.setDialogSafe(dialog)
     id match {
       case id if id == Report.getId(activity) =>
         log.debug("prepare Report dialog with id " + id)
+        AppComponent.Inner.setDialogSafe(Some(Report.getClass.getName), Some(dialog))
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
           case Some(stash) =>
