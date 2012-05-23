@@ -38,7 +38,10 @@ case class ComponentState(val componentPackage: String,
           p.map(_.asInstanceOf[ExecutableState]).toList
       },
     state = DState(in.readInt),
-    reason = in.readString match { case empty if empty.isEmpty => None case reason => Some(reason) },
+    reason = in.readString match {
+      case empty if empty == "" => None
+      case reason => Some(reason)
+    },
     execPath = in.readString,
     dataPath = in.readString,
     enabled = (in.readByte == 1))

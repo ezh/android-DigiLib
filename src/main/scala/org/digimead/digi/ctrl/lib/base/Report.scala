@@ -42,6 +42,8 @@ import android.content.Intent
 object Report extends Logging {
   val keepLogFiles = 4
   val keepTrcFiles = 8
+  val logFileExtension = "dlog"
+  val traceFileExtension = "dtrc"
   def reportPrefix = "U" + android.os.Process.myUid + "-" + Common.dateFile(new Date()) + "-P" + android.os.Process.myPid
   private[lib] def init(context: Context): Unit = synchronized {
     try {
@@ -85,7 +87,7 @@ object Report extends Logging {
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {
-            if (force || reports.exists(_.endsWith(".trc"))) {
+            if (force || reports.exists(_.endsWith("." + traceFileExtension))) {
               val sessionId = UUID.randomUUID.toString + "-"
               val futures = reports.map(name => {
                 val report = new File(info.reportPath, name)
@@ -158,7 +160,7 @@ object Report extends Logging {
         // delete log files
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
-            name.toLowerCase.endsWith(".log")
+            name.toLowerCase.endsWith("." + logFileExtension)
         })).getOrElse(Array[String]()).sorted.reverse.drop(keepLogFiles).foreach(name => {
           val report = new File(info.reportPath, name)
           log.info("delete outdated log file " + report.getName)
@@ -167,7 +169,7 @@ object Report extends Logging {
         // delete trc files
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
-            name.toLowerCase.endsWith(".trc")
+            name.toLowerCase.endsWith("." + traceFileExtension)
         })).getOrElse(Array[String]()).toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
           val trace = new File(info.reportPath, name)
           log.info("delete outdated stacktrace file " + trace.getName)
@@ -202,7 +204,7 @@ object Report extends Logging {
             case _ =>
               false
           }
-          if (!active || !report.getName.endsWith(".log")) {
+          if (!active || !report.getName.endsWith("." + logFileExtension)) {
             log.info("delete " + report.getName)
             report.delete
           }

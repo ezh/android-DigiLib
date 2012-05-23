@@ -23,7 +23,6 @@ import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
 import org.digimead.digi.ctrl.lib.util.Android
-
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.content.Context
 import android.content.SharedPreferences
@@ -35,22 +34,29 @@ import android.preference.PreferenceActivity
 import android.preference.PreferenceCategory
 import android.preference.PreferenceManager
 import android.widget.Toast
+import org.digimead.digi.ctrl.lib.base.AppComponent
+import android.content.pm.ActivityInfo
 
 abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceActivity with Logging with OnSharedPreferenceChangeListener {
   implicit protected val logger: RichLogger
+  @Loggable
   override def onCreate(savedInstanceState: Bundle) {
     log.trace("Preference::onCreate")
     super.onCreate(savedInstanceState)
+    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_BEHIND)
     addPreferencesFromResource(Android.getId(this, "options", "xml"))
     for (i <- 0 until getPreferenceScreen.getPreferenceCount())
       initSummary(getPreferenceScreen.getPreference(i))
   }
+  @Loggable
   override def onResume() {
     log.trace("Preference::onResume")
+    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_BEHIND)
     super.onResume()
     // Set up a listener whenever a key changes
     getPreferenceScreen.getSharedPreferences.registerOnSharedPreferenceChangeListener(this)
   }
+  @Loggable
   override def onPause() {
     log.trace("Preference::onPause")
     super.onPause()
@@ -78,6 +84,8 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
         Preference.setLogLevel(p.getValue.toString, this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if key == Preference.debugAndroidCheckBoxKey =>
         Preference.setAndroidLogger(PreferenceManager.getDefaultSharedPreferences(this).getBoolean(key, false), this, notify)(logger, dispatcher)
+      case p: ListPreference if key == Preference.layoutListKey =>
+        Preference.setLayout(p.getValue.toString, this, notify)(logger, dispatcher)
     }
   }
 }
@@ -85,6 +93,7 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
 object Preference extends Logging {
   val debugLevelsListKey = "debug_level"
   val debugAndroidCheckBoxKey = "debug_android"
+  val layoutListKey = "layout"
   @volatile private var lastLogLevelLevel = ""
   @volatile private var lastAndroidLogging = false
   @Loggable
@@ -178,5 +187,40 @@ object Preference extends Logging {
     if (notify)
       Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     IAmMumble(message)(logger, dispatcher)
+  }
+  @Loggable
+  def setLayout(l: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
+    l match {
+      case "0" =>
+        AppComponent.Inner.preferredOrientation.set(0)
+        val message = Android.getString(context, "set_layout_landscape").getOrElse("Set preferred orientation to landscape")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "1" =>
+        AppComponent.Inner.preferredOrientation.set(1)
+        val message = Android.getString(context, "set_layout_portrait").getOrElse("Set preferred orientation to portrait")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "8" =>
+        AppComponent.Inner.preferredOrientation.set(8)
+        val message = Android.getString(context, "set_layout_portrait").getOrElse("Set preferred orientation to reverse landscape")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "9" =>
+        AppComponent.Inner.preferredOrientation.set(9)
+        val message = Android.getString(context, "set_layout_portrait").getOrElse("Set preferred orientation to reverse portraint")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+      case "4" =>
+        AppComponent.Inner.preferredOrientation.set(4)
+        val message = Android.getString(context, "set_layout_portrait").getOrElse("Set preferred orientation to dynamic")
+        if (notify)
+          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        IAmMumble(message)(logger, dispatcher)
+    }
   }
 }

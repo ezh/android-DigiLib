@@ -31,5 +31,19 @@
         <item>4</item>
         <item>5</item>
     </string-array>
-
+    <string-array name="layoutDisplay">
+        <item>Auto</item>
+        <item>Landscape</item>
+        <item>Reverse Landscape</item>
+        <item>Portrait</item>
+        <item>Reverse Portrait</item>
+        </string-array>
+    <string-array name="layoutValue">
+        <item>4</item> <!-- SCREEN_ORIENTATION_SENSOR -->
+        <item>0</item> <!-- SCREEN_ORIENTATION_LANDSCAPE -->
+        <item>8</item> <!-- SCREEN_ORIENTATION_REVERSE_LANDSCAPE -->
+        <item>1</item> <!-- SCREEN_ORIENTATION_PORTRAIT -->
+        <item>9</item> <!-- SCREEN_ORIENTATION_REVERSE_PORTRAIT -->
+    </string-array>
+    
 </resources>

@@ -23,13 +23,15 @@ object DControlProvider {
     val process_id: Int,
     val component: Array[Byte],
     val executable: Array[Byte],
-    val connection: Array[Byte])
+    val connection: Array[Byte],
+    val user: Array[Byte])
   object Field extends Enumeration {
     val ID = Value("_id")
     val ProcessID = Value("process_id")
     val Component = Value("component")
     val Executable = Value("executable")
     val Connection = Value("connection")
+    val User = Value("user")
   }
   object Uri extends Enumeration {
     val Session = Value("content://" + authority + "/session")

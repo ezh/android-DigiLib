@@ -55,6 +55,8 @@ trait DActivity extends AnyBase with Logging {
   def onCreateExt(activity: Activity with DActivity): Unit = {
     log.trace("Activity::onCreateExt")
     onCreateBase(activity, {})
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.resetDialogSafe
     // sometimes onDestroy skipped, there is no harm to drop garbage
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
@@ -123,10 +125,10 @@ trait DActivity extends AnyBase with Logging {
   }
   def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Unit = {
     log.trace("Activity::onPrepareDialogExt")
-    AppComponent.Inner.setDialogSafe(dialog)
     id match {
       case id if id == Report.getId(activity) =>
         log.debug("prepare Report dialog with id " + id)
+        AppComponent.Inner.setDialogSafe(Some(Report.getClass.getName), Some(dialog))
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
           case Some(stash) =>
