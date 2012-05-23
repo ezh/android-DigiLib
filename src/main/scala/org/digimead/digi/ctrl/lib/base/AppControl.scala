@@ -345,13 +345,13 @@ object AppControl extends Logging {
     }
     log.info("resurrect AppControl core subsystem")
   }
-  private[lib] def deinit(): Unit = future {
-    if (deinitializationInProgressLock.compareAndSet(false, true))
+  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
+    val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
+    log.info("deinitializing AppControl for " + packageName)
+    if (deinitializationLock.isSet)
+      deinitializationLock.unset()
+    future {
       try {
-        val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
-        log.info("deinitializing AppControl for " + packageName)
-        if (deinitializationLock.isSet)
-          deinitializationLock.unset()
         deinitializationLock.get(deinitializationTimeout) match {
           case Some(false) =>
             log.info("deinitialization AppControl for " + packageName + " canceled")
@@ -364,6 +364,7 @@ object AppControl extends Logging {
           deinitializationInProgressLock.notifyAll
         }
       }
+    }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppControl for " + packageName)
@@ -421,7 +422,7 @@ object AppControl extends Logging {
       log.info("bind to service " + DIntent.HostService)
       if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
-          AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a))))
+          AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a))))
         serviceInstance.set(None)
       }
       ctrlBindContext.set(caller)

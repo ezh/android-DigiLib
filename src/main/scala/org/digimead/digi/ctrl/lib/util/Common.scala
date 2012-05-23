@@ -93,7 +93,7 @@ object Common extends Logging {
           val baseAndroid = new File(preBase, "Android")
           val baseAndroidData = new File(baseAndroid, "data")
           val basePackage = new File(baseAndroidData, context.getPackageName)
-          val baseFiles = new File(baseAndroidData, "files")
+          val baseFiles = new File(basePackage, "files")
           log.debug("try SD storage directory " + basePackage + ", SD storage is mounted: " + isMounted)
           if (isMounted) {
             var baseReady = true
@@ -122,7 +122,7 @@ object Common extends Logging {
               }
             }
             if (baseReady)
-              Some(new File(basePackage, name))
+              Some(new File(baseFiles, name))
             else
               None
           } else
@@ -171,6 +171,9 @@ object Common extends Logging {
       try { Android.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
     directory
   }
+  @Loggable
+  def getPublicPreference(context: Context): Option[PublicPreferences] =
+    PublicPreferences(context)
   @Loggable
   def listInterfaces(): Seq[String] = {
     var interfaces = HashMap[String, Seq[String]]()

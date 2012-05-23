@@ -27,6 +27,7 @@ import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.base.AppComponent
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
@@ -36,6 +37,16 @@ import android.os.Build
 import android.view.Surface
 import android.view.Display
 import android.view.WindowManager
+import android.widget.TextView
+import android.graphics.drawable.Drawable
+import android.text.SpannableString
+import android.graphics.drawable.LayerDrawable
+import android.text.style.LeadingMarginSpan
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.text.Layout
+import android.widget.ImageView
+import android.widget.ImageView.ScaleType
 
 object Android extends Logging {
   @volatile private var busybox: Option[File] = null
@@ -96,47 +107,62 @@ object Android extends Logging {
   def disableRotation(activity: Activity) {
     val display = activity.getWindowManager.getDefaultDisplay()
     val orientation = getScreenOrientation(display)
-    val rotation = display.getRotation();
-
-    // Copied from Android docs, since we don't have these values in Froyo 2.2
-    var SCREEN_ORIENTATION_REVERSE_LANDSCAPE = 8
-    var SCREEN_ORIENTATION_REVERSE_PORTRAIT = 9
-    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.FROYO) {
-      SCREEN_ORIENTATION_REVERSE_LANDSCAPE = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-      SCREEN_ORIENTATION_REVERSE_PORTRAIT = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-    }
+    val rotation = display.getRotation()
     orientation match {
       case Configuration.ORIENTATION_PORTRAIT =>
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.FROYO) {
-          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        if (rotation == android.view.Surface.ROTATION_90 || rotation == android.view.Surface.ROTATION_180) {
+          log.debug("LOCK orientation REVERSE_PORTRAIT with r:" + rotation)
+          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT)
         } else {
-          if (rotation == android.view.Surface.ROTATION_90 || rotation == android.view.Surface.ROTATION_180) {
-            log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and ORIENTATION_REVERSE_PORTRAIT")
-            activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_PORTRAIT)
-          } else {
-            log.debug("lock orientation REVERSE_PORTRAIT with r:" + rotation + " and ORIENTATION_PORTRAIT")
-            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-          }
+          log.debug("LOCK orientation PORTRAIT with r:" + rotation)
+          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         }
       case Configuration.ORIENTATION_LANDSCAPE =>
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.FROYO) {
+        if (rotation == android.view.Surface.ROTATION_0 || rotation == android.view.Surface.ROTATION_90) {
+          log.debug("LOCK orientation LANDSCAPE with r:" + rotation)
           activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
         } else {
-          if (rotation == android.view.Surface.ROTATION_0 || rotation == android.view.Surface.ROTATION_90) {
-            log.debug("lock orientation LANDSCAPE with r:" + rotation + " and ORIENTATION_LANDSCAPE")
-            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE)
-          } else {
-            log.debug("lock orientation LANDSCAPE with r:" + rotation + " and ORIENTATION_REVERSE_LANDSCAPE")
-            activity.setRequestedOrientation(SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
-          }
+          log.debug("LOCK orientation REVERSE_LANDSCAPE with r:" + rotation)
+          activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE)
         }
       case n =>
         log.warn("don't know what to do with orientation " + n)
     }
   }
   @Loggable
-  def enableRotation(activity: Activity) =
-    activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+  def enableRotation(activity: Activity) = {
+    log.debug("UNLOCK orientation")
+    activity.setRequestedOrientation(AppComponent.Inner.preferredOrientation.get)
+  }
+  @Loggable
+  def addLeadingDrawable(text: TextView, drawable: Drawable, drawablePadding: Int, dW: Int = -1, dH: Int = -1) {
+    // bugs in 2.x
+    val width = dW match {
+      case h if h == -1 =>
+        val r = drawable.getIntrinsicWidth
+        if (r == -1) log.fatal("drawable.getIntrinsicHeight return -1")
+        r
+      case h => h
+    }
+    val height = dW match {
+      case h if h == -1 =>
+        val r = drawable.getIntrinsicHeight
+        if (r == -1) log.fatal("drawable.getIntrinsicHeight return -1")
+        r
+      case h => h
+    }
+    val leadingMargin = width + drawablePadding
+    val leadingLines = scala.math.ceil((height + drawablePadding).toFloat / text.getLineHeight).toInt
+    log.debug("add leading space for drawable " + drawable + " w:%d, h:%d, margin:%d, lines:%d".format(width, height, leadingMargin, leadingMargin))
+    val ss = new SpannableString(text.getText)
+    ss.setSpan(new TextViewLeadingMarginSpan(leadingLines, leadingMargin, text.getPaddingLeft), 0, ss.length(), 0)
+    text.setText(ss)
+    val container = new LayerDrawable(Array(drawable))
+    container.setLayerInset(0, text.getPaddingLeft, text.getPaddingTop,
+      text.getWidth - width - text.getPaddingLeft,
+      text.getHeight - height - text.getPaddingTop)
+    text.setBackgroundDrawable(container)
+  }
   @Loggable
   def findBusyBox(): Option[File] = {
     val names = Seq("busybox", "toolbox")
@@ -177,6 +203,36 @@ object Android extends Logging {
     }
     busybox = None
     busybox
+  }
+  @Loggable
+  def getLayerInsets(drawable: LayerDrawable, id: Int): Option[(Int, Int, Int, Int, Int)] = try {
+    val state = drawable.getConstantState
+    val mChildren = state.getClass.getDeclaredField("mChildren")
+    mChildren.setAccessible(true)
+    val arrayOfChildDrawable = mChildren.get(state).asInstanceOf[Array[AnyRef]]
+    if (arrayOfChildDrawable.isEmpty)
+      return None
+    val fieldID = arrayOfChildDrawable.head.getClass.getDeclaredField("mId")
+    val fieldL = arrayOfChildDrawable.head.getClass.getDeclaredField("mInsetL")
+    val fieldT = arrayOfChildDrawable.head.getClass.getDeclaredField("mInsetT")
+    val fieldR = arrayOfChildDrawable.head.getClass.getDeclaredField("mInsetR")
+    val fieldB = arrayOfChildDrawable.head.getClass.getDeclaredField("mInsetB")
+    for (n <- 0 until arrayOfChildDrawable.length) {
+      if (arrayOfChildDrawable(n) != null) {
+        if (fieldID.get(arrayOfChildDrawable(n)).asInstanceOf[Int] == id) {
+          return (Some(n, fieldL.get(arrayOfChildDrawable(n)).asInstanceOf[Int],
+            fieldT.get(arrayOfChildDrawable(n)).asInstanceOf[Int],
+            fieldR.get(arrayOfChildDrawable(n)).asInstanceOf[Int],
+            fieldB.get(arrayOfChildDrawable(n)).asInstanceOf[Int]))
+        }
+      }
+    }
+    None
+  } catch {
+    case ce: ControlThrowable => throw ce // propagate
+    case e =>
+      log.warn(e.getMessage)
+      None
   }
   @Loggable
   def execChmod(permission: Int, file: File, recursive: Boolean = false): Boolean = {
@@ -286,5 +342,13 @@ object Android extends Logging {
       return None
     val args = Array(busybox.get.getAbsolutePath) ++ commandArgs
     collectCommandOutput(args: _*)
+  }
+  class TextViewLeadingMarginSpan(val lines: Int, val margin: Int, normalMargin: Int) extends LeadingMarginSpan.LeadingMarginSpan2 {
+    /** return margin for lines */
+    override def getLeadingMargin(thisIsFirstLine: Boolean): Int = if (thisIsFirstLine) margin + normalMargin else normalMargin
+    override def drawLeadingMargin(c: Canvas, p: Paint, x: Int, dir: Int, top: Int, baseline: Int, bottom: Int,
+      text: CharSequence, start: Int, end: Int, first: Boolean, layout: Layout) {}
+    /** return lines count with margin for the 1st paragraph */
+    override def getLeadingMarginLineCount(): Int = lines
   }
 }

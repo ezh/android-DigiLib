@@ -72,7 +72,7 @@ object Report extends Logging {
             info =>
               AppComponent.Inner.resetDialogSafe
               future {
-                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
@@ -169,12 +169,12 @@ object Report extends Logging {
     if (activity != null) {
       activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-      AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+      AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
     } else {
       AppComponent.Context.foreach {
         case activity: Activity with DActivity =>
           description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-          AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+          AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
         case context =>
           log.fatal("unable to launch report dialog from illegal context")
       }
@@ -210,7 +210,7 @@ object Report extends Logging {
         log.info("looking for stack trace reports in: " + info.reportPath)
         val dir = new File(info.reportPath + "/")
         val reports = Option(dir.list()).getOrElse(Array[String]())
-        if (reports.exists(_.endsWith(".trc")))
+        if (reports.exists(_.endsWith("." + org.digimead.digi.ctrl.lib.base.Report.traceFileExtension)))
           submit(activity, Some("stack trace detected"))
       }
   } getOrElse ({ "skip searchAndSubmit - uninitialized AnyBase.info" })

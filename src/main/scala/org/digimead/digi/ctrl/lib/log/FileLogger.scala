@@ -48,7 +48,7 @@ object FileLogger extends Logger with Logging {
   }
   @Loggable
   override def init(context: Context) = synchronized {
-    val logname = Report.reportPrefix + ".log"
+    val logname = Report.reportPrefix + "." + Report.logFileExtension
     deinit
     // open new
     file = AnyBase.info.get.flatMap(info => {
