@@ -123,7 +123,7 @@ trait DActivity extends AnyBase with Logging {
         Common.onCreateDialog(id, activity)(log, dispatcher)
     }
   }
-  def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Unit = {
+  def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Boolean = {
     log.trace("Activity::onPrepareDialogExt")
     id match {
       case id if id == Report.getId(activity) =>
@@ -141,7 +141,9 @@ trait DActivity extends AnyBase with Logging {
         val adapter = new ArrayAdapter(activity, android.R.layout.simple_spinner_item, emails)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.setAdapter(adapter)
+        true
       case _ =>
+        false
     }
   }
   def registerReceiverExt(orig: () => Intent, receiver: BroadcastReceiver, filter: IntentFilter): Intent = try {

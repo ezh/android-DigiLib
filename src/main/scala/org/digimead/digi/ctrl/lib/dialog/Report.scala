@@ -210,7 +210,7 @@ object Report extends Logging {
         log.info("looking for stack trace reports in: " + info.reportPath)
         val dir = new File(info.reportPath + "/")
         val reports = Option(dir.list()).getOrElse(Array[String]())
-        if (reports.exists(_.endsWith("." + org.digimead.digi.ctrl.lib.base.Report.traceFileExtension)))
+        if (reports.exists(_.endsWith(org.digimead.digi.ctrl.lib.base.Report.traceFileExtension)))
           submit(activity, Some("stack trace detected"))
       }
   } getOrElse ({ "skip searchAndSubmit - uninitialized AnyBase.info" })
