@@ -125,18 +125,19 @@ object AnyBase extends Logging {
   }
   // count only Activity and Service contexts
   def isLastContext() =
-    contextPool.filter(_.get.map(c => c.isInstanceOf[android.app.Activity] || c.isInstanceOf[android.app.Service]) == Some(true)).size <= 1
+    contextPool.filter(_.get.map(c => c.isInstanceOf[Activity] || c.isInstanceOf[Service]) == Some(true)).size <= 1
   def getContext(): Option[Context] = currentContext.get match {
     case None => updateContext()
     case result: Some[_] => result
   }
   private def updateContext(): Option[Context] = synchronized {
     contextPool = contextPool.filter(_.get != None).sortBy(n => n.get match {
-      case Some(activity) if activity.isInstanceOf[android.app.Activity] => 1
-      case Some(service) if service.isInstanceOf[android.app.Service] => 2
+      case Some(activity) if activity.isInstanceOf[Activity] => 1
+      case Some(service) if service.isInstanceOf[Service] => 2
       case _ => 3
     })
     contextPool.headOption.foreach(currentContext = _)
+    log.debug("update primary context to " + currentContext)
     currentContext.get
   }
   case class Info(val reportPath: File,

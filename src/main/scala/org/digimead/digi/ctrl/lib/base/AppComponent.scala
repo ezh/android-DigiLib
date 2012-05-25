@@ -368,7 +368,7 @@ protected class AppComponent private () extends Actor with Logging {
             case DState.Active =>
               AppComponent.State(DState.Active)
             case DState.Broken =>
-              AppComponent.State(DState.Broken, Seq("service_failed"))
+              AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
             case _ =>
               AppComponent.State(DState.Passive)
           }

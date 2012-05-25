@@ -369,7 +369,6 @@ object AppControl extends Logging {
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppControl for " + packageName)
     assert(inner != null)
-    val _inner = inner
     inner = null
     if (AnyBase.isLastContext && AppComponent.Inner != null) {
       log.info("AppControl hold last context. Clear.")
