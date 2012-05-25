@@ -16,22 +16,27 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.FilenameFilter
 import java.util.Date
 import java.util.UUID
+import java.util.zip.GZIPOutputStream
 
-import scala.Option.option2Iterable
+import scala.Array.canBuildFrom
 import scala.collection.JavaConversions._
 import scala.util.control.ControlThrowable
 
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.storage.GoogleCloud
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
 
 import android.app.Activity
 import android.app.ActivityManager
@@ -42,8 +47,9 @@ import android.content.Intent
 object Report extends Logging {
   val keepLogFiles = 4
   val keepTrcFiles = 8
-  val logFileExtension = "dlog"
-  val traceFileExtension = "dtrc"
+  val logFilePrefix = "d"
+  val logFileExtension = "log" // d(z)log, z - compressed
+  val traceFileExtension = "trc"
   def reportPrefix = "U" + android.os.Process.myUid + "-" + Common.dateFile(new Date()) + "-P" + android.os.Process.myPid
   private[lib] def init(context: Context): Unit = synchronized {
     try {
@@ -64,6 +70,7 @@ object Report extends Logging {
           }
         }
         clean()
+        compress()
       }
     } catch {
       case e => log.error(e.getMessage, e)
@@ -87,7 +94,7 @@ object Report extends Logging {
           val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {
-            if (force || reports.exists(_.endsWith("." + traceFileExtension))) {
+            if (force || reports.exists(_.endsWith(traceFileExtension))) {
               val sessionId = UUID.randomUUID.toString + "-"
               val futures = reports.map(name => {
                 val report = new File(info.reportPath, name)
@@ -151,17 +158,30 @@ object Report extends Logging {
         // delete png files
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
-            name.toLowerCase.endsWith(".png")
+            name.toLowerCase.endsWith("png")
         })).getOrElse(Array[String]()).foreach(name => {
           val report = new File(info.reportPath, name)
           log.info("delete outdated png file " + report.getName)
           report.delete
         })
         // delete log files
-        Option(dir.list(new FilenameFilter {
+        val logFiles = Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
-            name.toLowerCase.endsWith("." + logFileExtension)
-        })).getOrElse(Array[String]()).sorted.reverse.drop(keepLogFiles).foreach(name => {
+            name.toLowerCase.endsWith(logFileExtension)
+        })).getOrElse(Array[String]()).sorted.reverse
+        // keep all log files with PID == last run
+        val logKeep = logFiles.take(keepLogFiles).map(_ match {
+          case compressed if compressed.endsWith("z" + logFileExtension) =>
+            // for example "-P0000.dzlog"
+            Array(compressed.substring(compressed.length - logFilePrefix.length - logFileExtension.length - 8))
+          case plain =>
+            // for example "-P0000.dlog"
+            Array(plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7),
+              plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
+                "." + logFilePrefix + "z" + logFileExtension)
+        }).flatten.distinct
+        log.debug("keep log files with suffixes: " + logKeep.mkString(","))
+        logFiles.drop(keepLogFiles).foreach(name => if (!logKeep.exists(name.endsWith)) {
           val report = new File(info.reportPath, name)
           log.info("delete outdated log file " + report.getName)
           report.delete
@@ -169,7 +189,7 @@ object Report extends Logging {
         // delete trc files
         Option(dir.list(new FilenameFilter {
           def accept(dir: File, name: String) =
-            name.toLowerCase.endsWith("." + traceFileExtension)
+            name.toLowerCase.endsWith(traceFileExtension)
         })).getOrElse(Array[String]()).toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
           val trace = new File(info.reportPath, name)
           log.info("delete outdated stacktrace file " + trace.getName)
@@ -204,8 +224,65 @@ object Report extends Logging {
             case _ =>
               false
           }
-          if (!active || !report.getName.endsWith("." + logFileExtension)) {
+          if (!active || !report.getName.endsWith(logFileExtension)) {
             log.info("delete " + report.getName)
+            report.delete
+          }
+        })
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+      }
+    }
+  }
+  @Loggable
+  def compress(): Unit = synchronized {
+    for {
+      info <- AnyBase.info.get
+      context <- AppComponent.Context
+    } {
+      val dir = new File(info.reportPath + "/")
+      val reports = Option(dir.list(new FilenameFilter {
+        def accept(dir: File, name: String) =
+          name.toLowerCase.endsWith(logFileExtension) && !name.toLowerCase.endsWith("z" + logFileExtension)
+      }).sorted.reverse).getOrElse(Array[String]())
+      if (reports.isEmpty)
+        return
+      val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE).asInstanceOf[ActivityManager]
+      val processList = activityManager.getRunningAppProcesses().toSeq
+      try {
+        reports.foreach(name => {
+          val report = new File(info.reportPath, name)
+          val compressed = new File(info.reportPath, name.substring(0, name.length - logFileExtension.length) + "z" + logFileExtension)
+          val active = try {
+            val pid = Integer.parseInt(name.split("""[-\.]""")(4).drop(1))
+            if (processList.exists(_.pid == pid)) {
+              // "-P0000.dlog"
+              val suffix = name.substring(name.length - logFilePrefix.length - logFileExtension.length - 7)
+              reports.find(_.endsWith(suffix)) match {
+                case Some(activeName) =>
+                  activeName == name
+                case None =>
+                  false
+              }
+            } else
+              false
+          } catch {
+            case _ =>
+              false
+          }
+          if (!active) {
+            // compress log files
+            log.info("save compressed log file " + compressed.getName)
+            val is = new BufferedInputStream(new FileInputStream(report))
+            val zos = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(compressed)))
+            try {
+              Common.writeToStream(is, zos)
+            } finally {
+              zos.close()
+            }
+            // delete uncompressed file
+            log.info("delete uncompressed log file " + report.getName)
             report.delete
           }
         })

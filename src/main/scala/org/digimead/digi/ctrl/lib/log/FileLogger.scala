@@ -30,7 +30,23 @@ import android.content.Context
 object FileLogger extends Logger with Logging {
   private[lib] var file: Option[File] = None
   private[lib] var output: Option[BufferedWriter] = None
+  private val fileLimit = 102400 // 100kB
+  private val checkEveryNLines = 1000
+  private var counter = 0
   protected var f = (records: Seq[Logging.Record]) => synchronized {
+    // rotate
+    for {
+      output <- output
+      file <- file
+    } {
+      counter += records.size
+      if (counter > checkEveryNLines) {
+        counter = 0
+        if (file.length > fileLimit)
+          openLogFile()
+      }
+    }
+    // write
     output.foreach {
       output =>
         output.write(records.map(r => {
@@ -48,11 +64,30 @@ object FileLogger extends Logger with Logging {
   }
   @Loggable
   override def init(context: Context) = synchronized {
-    val logname = Report.reportPrefix + "." + Report.logFileExtension
+    openLogFile()
+    output.foreach(_.flush)
+  }
+  override def deinit() = synchronized {
+    try {
+      // close output if any
+      output.foreach(_.close)
+      output = None
+      file = None
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
+    }
+  }
+  override def flush() = synchronized {
+    try { output.foreach(_.flush) } catch { case e => log.error(e.getMessage, e) }
+  }
+  private def getLogFileName() =
+    Report.reportPrefix + "." + Report.logFilePrefix + Report.logFileExtension
+  private def openLogFile() = try {
     deinit
     // open new
     file = AnyBase.info.get.flatMap(info => {
-      val file = new File(info.reportPath, logname)
+      val file = new File(info.reportPath, getLogFileName)
       if (file.exists) {
         log.warn("log file " + file + " already exists")
         Some(file)
@@ -70,20 +105,9 @@ object FileLogger extends Logger with Logging {
     output = file.map(f => new BufferedWriter(new FileWriter(f)))
     // write header
     output.foreach(_.write(AnyBase.info.get.toString + "\n"))
-    output.foreach(_.flush)
-  }
-  override def deinit() = synchronized {
-    try {
-      // close output if any
-      output.foreach(_.close)
-      output = None
-      file = None
-    } catch {
-      case e =>
-        log.error(e.getMessage, e)
-    }
-  }
-  override def flush() = synchronized {
-    try { output.foreach(_.flush) } catch { case e => log.error(e.getMessage, e) }
+    Report.compress
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
   }
 }
