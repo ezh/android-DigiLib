@@ -273,7 +273,7 @@ object SupportBlock extends Logging {
       block match {
         case Some(block) if item == block.itemChat =>
           val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
-          log.debug("current hour " + hour)
+          log.trace("current hour " + hour)
           if (hour >= 6 && hour <= 18)
             text2.setText(Html.fromHtml("<font color='green'>" + item.description + "</font>"))
           else

@@ -17,11 +17,12 @@
 package org.digimead.digi.ctrl.lib
 
 import scala.Array.canBuildFrom
+import scala.annotation.elidable
 import scala.collection.JavaConversions._
+import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.SynchronizedSet
-import scala.collection.mutable.HashMap
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
@@ -42,6 +43,7 @@ import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
+import annotation.elidable.ASSERTION
 
 /*
  * trait hasn't ability to use @Loggable
@@ -54,18 +56,16 @@ trait DActivity extends AnyBase with Logging {
    */
   def onCreateExt(activity: Activity with DActivity): Unit = {
     log.trace("Activity::onCreateExt")
-    onCreateBase(activity, {})
+    onCreateBase(activity)
     AppComponent.Inner.lockRotationCounter.set(0)
     AppComponent.Inner.resetDialogSafe
     // sometimes onDestroy skipped, there is no harm to drop garbage
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
   }
-  def onResumeExt(activity: Activity with DActivity, origRegisterReceiver: (BroadcastReceiver, IntentFilter, String, Handler) => Intent) = {
-    log.trace("Activity::onResumeExt")
-    Report.searchAndSubmitLock.set(false)
-    AppComponent.Inner.lockRotationCounter.set(0)
-    AppComponent.Inner.resetDialogSafe
+  def onStartExt(activity: Activity with DActivity, origRegisterReceiver: (BroadcastReceiver, IntentFilter, String, Handler) => Intent) = {
+    log.trace("Activity::onStartExt")
+    onStartBase(activity)
     DActivity.registeredReceivers.foreach(t => {
       if (DActivity.activeReceivers(t._1)) {
         log.trace("onResumeExt skip registerReceiver " + t._1)
@@ -76,8 +76,22 @@ trait DActivity extends AnyBase with Logging {
       }
     })
   }
-  def onPauseExt(activity: Activity with DActivity, origUnregisterReceiver: (BroadcastReceiver) => Unit) {
+  def onResumeExt(activity: Activity with DActivity) = {
+    log.trace("Activity::onResumeExt")
+    onResumeBase(activity)
+    Report.searchAndSubmitLock.set(false)
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.resetDialogSafe
+  }
+  def onPauseExt(activity: Activity with DActivity) {
     log.trace("Activity::onPauseExt")
+    AppComponent.Inner.lockRotationCounter.set(0)
+    AppComponent.Inner.disableSafeDialogs
+    Android.enableRotation(activity)
+    onPauseBase(activity)
+  }
+  def onStopExt(activity: Activity with DActivity, shutdownIfActive: Boolean, origUnregisterReceiver: (BroadcastReceiver) => Unit) = {
+    log.trace("Activity::onStopExt")
     DActivity.registeredReceivers.foreach(t => {
       if (DActivity.activeReceivers(t._1)) {
         log.trace("onPauseExt unregisterReceiver " + t._1)
@@ -92,11 +106,7 @@ trait DActivity extends AnyBase with Logging {
         log.trace("onPauseExt skip unregisterReceiver " + t._1)
       }
     })
-    if (AppComponent.Inner != null) {
-      AppComponent.Inner.lockRotationCounter.set(0)
-      AppComponent.Inner.disableSafeDialogs
-    }
-    Android.enableRotation(activity)
+    onStopBase(activity, shutdownIfActive)
   }
   /*
    * sometimes in life cycle onCreate stage invoked without onDestroy stage

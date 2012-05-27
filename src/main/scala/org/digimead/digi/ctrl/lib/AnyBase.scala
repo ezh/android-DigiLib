@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib
 import java.io.File
 import java.util.Date
 
+import scala.actors.Futures.future
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
 import scala.ref.WeakReference
@@ -38,13 +39,31 @@ import android.app.Service
 import android.content.Context
 
 private[lib] trait AnyBase extends Logging {
-  protected def onCreateBase(context: Context, callSuper: => Any) = synchronized {
+  protected def onCreateBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onCreateBase")
+    AnyBase.stopOnShutdownTimer(context)
     callSuper
     AnyBase.init(context)
   }
-  protected def onDestroyBase(context: Context, callSuper: => Any) = synchronized {
+  protected def onStartBase(context: Context) = synchronized {
+    log.trace("AnyBase::onStartBase")
+    AnyBase.stopOnShutdownTimer(context)
+    if (AppComponent.Inner == null)
+      AnyBase.init(context)
+  }
+  protected def onResumeBase(context: Context) = synchronized {
+    log.trace("AnyBase::onResumeBase")
+  }
+  protected def onPauseBase(context: Context) = synchronized {
+    log.trace("AnyBase::onPauseBase")
+  }
+  protected def onStopBase(context: Context, shutdownIfActive: Boolean) = synchronized {
+    log.trace("AnyBase::onStopBase")
+    AnyBase.startOnShutdownTimer(context, shutdownIfActive)
+  }
+  protected def onDestroyBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onDestroyBase")
+    AnyBase.stopOnShutdownTimer(context)
     callSuper
     AnyBase.deinit(context)
   }
@@ -55,6 +74,7 @@ object AnyBase extends Logging {
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile private var reportDirectory = "report"
+  private val onShutdownTimer = new SyncVar[Boolean]()
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -138,6 +158,92 @@ object AnyBase extends Logging {
     })
     contextPool.headOption.foreach(currentContext = _)
     currentContext.get
+  }
+  @Loggable
+  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
+    log.debug("start startOnShutdownTimer")
+    if (Seq(onShutdownTimer.get(0)).exists(state => state == None || state == Some(false)))
+      onShutdownTimer.set(true)
+    future {
+      onShutdownTimer.get(5000, _ != true) match {
+        case Some(true) if isLastContext || shutdownIfActive =>
+          log.info("start onShutdown sequence")
+          AppComponent.deinit()
+        case Some(true) =>
+          log.info("cancel onShutdown sequence, component in use")
+          onShutdownTimer.unset()
+        case _ =>
+          log.info("cancel onShutdown sequence")
+          onShutdownTimer.unset()
+      }
+    }
+  }
+  @Loggable
+  private def stopOnShutdownTimer(context: Context) = {
+    onShutdownTimer.set(true)
+    AppComponent.resurrect(context)
+  }
+  /**
+   * Shutdown the app either safely or quickly. The app is killed safely by
+   * killing the virtual machine that the app runs in after finalizing all
+   * {@link Object}s created by the app. The app is killed quickly by abruptly
+   * killing the process that the virtual machine that runs the app runs in
+   * without finalizing all {@link Object}s created by the app. Whether the
+   * app is killed safely or quickly the app will be completely created as a
+   * new app in a new virtual machine running in a new process if the user
+   * starts the app again.
+   *
+   * <P>
+   * <B>NOTE:</B> The app will not be killed until all of its threads have
+   * closed if it is killed safely.
+   * </P>
+   *
+   * <P>
+   * <B>NOTE:</B> All threads running under the process will be abruptly
+   * killed when the app is killed quickly. This can lead to various issues
+   * related to threading. For example, if one of those threads was making
+   * multiple related changes to the database, then it may have committed some
+   * of those changes but not all of those changes when it was abruptly
+   * killed.
+   * </P>
+   *
+   * @param safely
+   *            Primitive boolean which indicates whether the app should be
+   *            exited safely or quickly killed. If true then the app will be exited
+   *            safely. Otherwise it will be killed quickly.
+   */
+  @Loggable
+  def shutdownApp(packageName: String, safely: Boolean) = synchronized {
+    if (safely) {
+      log.info("shutdown safely " + packageName)
+      Logging.flush
+      Thread.sleep(1000)
+      Logging.deinit
+      /*
+       * Force the system to close the app down completely instead of
+       * retaining it in the background. The virtual machine that runs the
+       * app will be killed. The app will be completely created as a new
+       * app in a new virtual machine running in a new process if the user
+       * starts the app again.
+       */
+      System.exit(0)
+    } else {
+      log.info("shutdown quick " + packageName)
+      Logging.flush
+      Thread.sleep(1000)
+      Logging.deinit
+      /*
+       * Alternatively the process that runs the virtual machine could be
+       * abruptly killed. This is the quickest way to remove the app from
+       * the device but it could cause problems since resources will not
+       * be finalized first. For example, all threads running under the
+       * process will be abruptly killed when the process is abruptly
+       * killed. If one of those threads was making multiple related
+       * changes to the database, then it may have committed some of those
+       * changes but not all of those changes when it was abruptly killed.
+       */
+      android.os.Process.sendSignal(android.os.Process.myPid(), 1)
+    }
   }
   case class Info(val reportPath: File,
     val appVersion: String,

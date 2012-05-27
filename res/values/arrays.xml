@@ -37,7 +37,7 @@
         <item>Reverse Landscape</item>
         <item>Portrait</item>
         <item>Reverse Portrait</item>
-        </string-array>
+    </string-array>
     <string-array name="layoutValue">
         <item>4</item> <!-- SCREEN_ORIENTATION_SENSOR -->
         <item>0</item> <!-- SCREEN_ORIENTATION_LANDSCAPE -->
@@ -45,5 +45,25 @@
         <item>1</item> <!-- SCREEN_ORIENTATION_PORTRAIT -->
         <item>9</item> <!-- SCREEN_ORIENTATION_REVERSE_PORTRAIT -->
     </string-array>
-    
+    <string-array name="shutdownTimeoutDisplay">
+        <item>30 seconds</item>
+        <item>1 minute</item>
+        <item>5 minutes</item>
+        <item>10 minutes</item>
+        <item>30 minutes</item>
+        <item>1 hour</item>
+        <item>2 hours</item>
+        <item>never</item>
+    </string-array>
+    <string-array name="shutdownTimeoutValue">
+        <item>30</item>
+        <item>60</item>
+        <item>300</item>
+        <item>600</item>
+        <item>1800</item>
+        <item>3600</item>
+        <item>7200</item>
+        <item>0</item>
+    </string-array>
+
 </resources>

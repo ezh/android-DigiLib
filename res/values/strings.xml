@@ -54,7 +54,7 @@
     <string name="empty"></string>
     <string name="error_prepare_environment_failed">prepare environment failed</string>
     <string name="Disconnect_All">Disconnect All</string>
-    <string name="session_title_user">&lt;b&gt;%1$s&lt;/b&gt; from %2$s to %3$s</string>
+    <string name="session_title_user">&lt;b>%1$s&lt;/b> from %2$s to %3$s</string>
     <string name="session_title_nouser">%1$s to %2$s</string>
     <string name="session_description">%1$s</string>
     <string name="Apply">Apply</string>
@@ -71,7 +71,15 @@
     <string name="preference_debug_android_on">Built-in facility to log information to the android console. Enabled</string>
     <string name="preference_debug_android_off">Built-in facility to log information to the android console. Disabled</string>
     <string name="preference_layout">Interface Layout</string>
-    <string name="preference_layout_description">Set preffered UI orientation</string>
+    <string name="preference_layout_description">Set preferred UI orientation</string>
+    <string name="preference_show_dialog_welcome_off">&lt;Welcome> dialog disabled</string>
+    <string name="preference_show_dialog_welcome_on">&lt;Welcome> dialog enabled</string>
+    <string name="preference_show_dialog_welcome">Show &lt;Welcome> dialog</string>
+    <string name="preference_show_dialog_rate_off">&lt;Rate It> dialog disabled</string>
+    <string name="preference_show_dialog_rate_on">&lt;Rate It> dialog enabled</string>
+    <string name="preference_show_dialog_rate">Show &lt;Rate It> dialog</string>
+    <string name="preference_shutdown_timeout">Idle shutdown timeout</string>
+    <string name="preference_shutdown_timeout_description">Gracefull application shutdown with internal task killer</string>
     <string name="report_upload_failed">Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later.</string>
     <string name="filechooser_menu_item_home">home</string>
     <string name="filechooser_menu_item_up">up</string>

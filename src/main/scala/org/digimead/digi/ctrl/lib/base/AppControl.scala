@@ -317,7 +317,6 @@ object AppControl extends Logging {
   @volatile private var inner: AppControl = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-  private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
   @Loggable
@@ -346,24 +345,30 @@ object AppControl extends Logging {
     log.info("resurrect AppControl core subsystem")
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppControl for " + packageName)
-    if (deinitializationLock.isSet)
-      deinitializationLock.unset()
-    future {
-      try {
-        deinitializationLock.get(deinitializationTimeout) match {
-          case Some(false) =>
-            log.info("deinitialization AppControl for " + packageName + " canceled")
-          case _ =>
-            deinitRoutine(packageName)
+    AnyBase.getContext map {
+      context =>
+        val packageName = context.getPackageName()
+        log.info("deinitializing AppControl for " + packageName)
+        if (deinitializationLock.isSet)
+          deinitializationLock.unset()
+        future {
+          try {
+            deinitializationLock.get(AppComponent.deinitializationTimeout(context)) match {
+              case Some(false) =>
+                log.info("deinitialization AppControl for " + packageName + " canceled")
+              case _ =>
+                deinitRoutine(packageName)
+            }
+          } finally {
+            deinitializationInProgressLock.synchronized {
+              deinitializationInProgressLock.set(false)
+              deinitializationInProgressLock.notifyAll
+            }
+          }
         }
-      } finally {
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
-      }
+    } orElse {
+      log.fatal("unable to find deinitialization context")
+      None
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
@@ -420,9 +425,12 @@ object AppControl extends Logging {
       val intent = new Intent(DIntent.HostService)
       intent.putExtra("packageName", caller.getPackageName())
       log.info("bind to service " + DIntent.HostService)
-      if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
+      if (!isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
           AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a))))
+        serviceInstance.set(None)
+      } else if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) {
+        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_bind_failed")))
         serviceInstance.set(None)
       }
       ctrlBindContext.set(caller)

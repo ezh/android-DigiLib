@@ -60,6 +60,7 @@ import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.dialog.Preference
 
 import android.app.Activity
 import android.content.Context
@@ -496,9 +497,14 @@ object AppComponent extends Logging {
   @volatile private var inner: AppComponent = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-  private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
+  @Loggable
+  def deinitializationTimeout(context: Context): Int = {
+    val result = Preference.getShutdownTimeout(context)
+    log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
+    result * 1000
+  }
   @Loggable
   private[lib] def init(root: Context, _inner: AppComponent = null) = {
     deinitializationLock.set(false)
@@ -538,29 +544,39 @@ object AppComponent extends Logging {
           deinitializationInProgressLock.wait
       }
     }
-    log.info("resurrect AppComponent core subsystem")
-    if (caller.isInstanceOf[AppComponent])
-      caller.asInstanceOf[AppComponent].activitySafeDialog.unset()
+    caller match {
+      case component: AppComponent if component.activitySafeDialog.isSet =>
+        log.info("resurrect AppComponent core subsystem")
+        component.activitySafeDialog.unset()
+      case _ =>
+        log.warn("resurrect ignored, unknown AppComponent caller " + caller)
+    }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppComponent for " + packageName)
-    if (deinitializationLock.isSet)
-      deinitializationLock.unset()
-    future {
-      try {
-        deinitializationLock.get(deinitializationTimeout) match {
-          case Some(false) =>
-            log.info("deinitialization AppComponent for " + packageName + " canceled")
-          case _ =>
-            deinitRoutine(packageName)
+    AnyBase.getContext map {
+      context =>
+        val packageName = context.getPackageName()
+        log.info("deinitializing AppComponent for " + packageName)
+        if (deinitializationLock.isSet)
+          deinitializationLock.unset()
+        future {
+          try {
+            deinitializationLock.get(deinitializationTimeout(context)) match {
+              case Some(false) =>
+                log.info("deinitialization AppComponent for " + packageName + " canceled")
+              case _ =>
+                deinitRoutine(packageName)
+            }
+          } finally {
+            deinitializationInProgressLock.synchronized {
+              deinitializationInProgressLock.set(false)
+              deinitializationInProgressLock.notifyAll
+            }
+          }
         }
-      } finally {
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
-      }
+    } orElse {
+      log.fatal("unable to find deinitialization context")
+      None
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
@@ -583,6 +599,7 @@ object AppComponent extends Logging {
         })
     }
     AppCache.deinit()
+    AnyBase.shutdownApp(packageName, true)
   }
   def Inner = inner
   def Context = AnyBase.getContext
