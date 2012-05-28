@@ -41,13 +41,13 @@ import android.content.Context
 private[lib] trait AnyBase extends Logging {
   protected def onCreateBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onCreateBase")
-    AnyBase.stopOnShutdownTimer(context)
+    reset(context)
     callSuper
     AnyBase.init(context)
   }
   protected def onStartBase(context: Context) = synchronized {
     log.trace("AnyBase::onStartBase")
-    AnyBase.stopOnShutdownTimer(context)
+    reset(context)
     if (AppComponent.Inner == null)
       AnyBase.init(context)
   }
@@ -65,9 +65,21 @@ private[lib] trait AnyBase extends Logging {
   }
   protected def onDestroyBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onDestroyBase")
-    AnyBase.stopOnShutdownTimer(context)
+    reset(context)
     callSuper
     AnyBase.deinit(context)
+  }
+  private def reset(context: Context) {
+    AnyBase.stopOnShutdownTimer(context)
+    if (AppComponent.Inner != null) {
+      AppComponent.Inner.state.resetBusyCounter
+      context match {
+        case component: DActivity =>
+          if (AppComponent.Inner.activitySafeDialog.isSet)
+            AppComponent.Inner.activitySafeDialog.unset()
+        case _ =>
+      }
+    }
   }
 }
 
@@ -162,7 +174,7 @@ object AnyBase extends Logging {
     currentContext.get
   }
   @Loggable
-  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
+  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = {
     log.debug("start startOnShutdownTimer")
     if (Seq(onShutdownTimer.get(0)).exists(state => state == None || state == Some(false)))
       onShutdownTimer.set(true)
@@ -182,7 +194,7 @@ object AnyBase extends Logging {
   }
   @Loggable
   private def stopOnShutdownTimer(context: Context) = {
-    onShutdownTimer.set(true)
+    onShutdownTimer.set(false)
     AppComponent.resurrect(context)
   }
   /**

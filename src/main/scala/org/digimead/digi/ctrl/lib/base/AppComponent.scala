@@ -98,7 +98,7 @@ protected class AppComponent private () extends Actor with Logging {
   val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
   private[lib] val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicReference[Option[Boolean]](None)
-  private val activitySafeDialog = new AppComponent.SafeDialog
+  private[lib] val activitySafeDialog = new AppComponent.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
       loop {
@@ -549,12 +549,6 @@ object AppComponent extends Logging {
       }
     }
     log.info("resurrect AppComponent core subsystem")
-    caller match {
-      case component: DActivity if inner != null =>
-        if (inner.activitySafeDialog.isSet)
-          inner.activitySafeDialog.unset()
-      case _ =>
-    }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
     AnyBase.getContext map {
@@ -789,8 +783,10 @@ object AppComponent extends Logging {
         super.set(newState, signalAll)
       } else if (busyCounter != 0) {
         lastNonBusyState = newState
-      } else
+      } else {
+        lastNonBusyState = newState
         super.set(newState, signalAll)
+      }
       log.debugWhere("set status to " + newState, Logging.Where.BEFORE)
       publish(newState)
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
@@ -806,8 +802,13 @@ object AppComponent extends Logging {
       if (busyCounter > 1) {
         busyCounter -= 1
         log.debug("decrease status busy counter to " + busyCounter)
-      } else if (busyCounter == 1) {
-        busyCounter -= 1
+      } else {
+        if (busyCounter == 1) {
+          busyCounter -= 1
+        } else {
+          log.warn("busyCounter " + busyCounter + " out of range")
+          busyCounter = 0
+        }
         log.debug("reset status busy counter")
         lastNonBusyState match {
           case state: AppComponent.State =>
@@ -816,12 +817,10 @@ object AppComponent extends Logging {
           case state =>
             log.warn("unknown lastNonBusyState condition " + state)
         }
-      } else {
-        log.fatal("illegal busyCounter")
       }
     }
-    def isBusy(): Boolean = synchronized {
-      busyCounter != 0
-    }
+    def isBusy(): Boolean =
+      synchronized { busyCounter != 0 }
+    def resetBusyCounter() = { busyCounter = 0 }
   }
 }
