@@ -43,6 +43,7 @@ import scala.xml.Node
 import scala.xml.XML
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -60,6 +61,7 @@ import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.dialog.Preference
 
 import android.app.Activity
 import android.content.Context
@@ -96,7 +98,7 @@ protected class AppComponent private () extends Actor with Logging {
   val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
   private[lib] val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicReference[Option[Boolean]](None)
-  private val activitySafeDialog = new AppComponent.SafeDialog
+  private[lib] val activitySafeDialog = new AppComponent.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
       loop {
@@ -357,7 +359,7 @@ protected class AppComponent private () extends Actor with Logging {
   @Loggable
   def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
-      if (AppComponent.Inner.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
+      if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
         // DigiControl unavailable and state already broken, submit and return
         if (onFinish != null) onFinish(DState.Broken)
         return
@@ -372,14 +374,14 @@ protected class AppComponent private () extends Actor with Logging {
             case _ =>
               AppComponent.State(DState.Passive)
           }
-          AppComponent.Inner.state.set(appState)
+          AppComponent.this.state.set(appState)
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
           val appState = if (error == "error_digicontrol_not_found")
-            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
+            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
           else
             AppComponent.State(DState.Broken, Seq(error))
-          AppComponent.Inner.state.set(appState)
+          AppComponent.this.state.set(appState)
           if (onFinish != null) onFinish(DState.Broken)
       }
   }
@@ -414,14 +416,14 @@ protected class AppComponent private () extends Actor with Logging {
       def run =
         activitySafeDialog.set(AppComponent.SafeDialogEntry(Some(tag), Option(dialog()), Some(() => {
           log.trace("safe dialog dismiss callback")
-          AppComponent.Inner.enableRotation()
+          AppComponent.this.enableRotation()
           onDismiss.foreach(_())
         })))
     })
     (activitySafeDialog.get(DTimeout.longest, _ != AppComponent.SafeDialogEntry(Some(tag), None, None)) match {
       case Some(entry @ AppComponent.SafeDialogEntry(tag, result @ Some(dialog), dismissCb)) =>
         log.debug("show new safe dialog " + entry + " for " + m.erasure.getName)
-        AppComponent.Inner.disableRotation()
+        AppComponent.this.disableRotation()
         result
       case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
         log.error("unable to show safe dialog '" + tag + "' for " + m.erasure.getName + ", reset detected")
@@ -470,10 +472,10 @@ protected class AppComponent private () extends Actor with Logging {
         log.debug("show new safe dialog " + entry + " for id " + id)
         activitySafeDialog.updateDismissCallback(Some(() => {
           log.trace("safe dialog dismiss callback")
-          AppComponent.Inner.enableRotation()
+          AppComponent.this.enableRotation()
           onDismiss.foreach(_())
         }))
-        AppComponent.Inner.disableRotation()
+        AppComponent.this.disableRotation()
         result
       case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
         log.error("unable to show safe dialog '" + tag + "' for id " + id + ", reset detected")
@@ -496,9 +498,17 @@ object AppComponent extends Logging {
   @volatile private var inner: AppComponent = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-  private val deinitializationTimeout = DTimeout.longest
 
   log.debug("alive")
+  @Loggable
+  def deinitializationTimeout(context: Context): Int = {
+    val result = Preference.getShutdownTimeout(context)
+    log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
+    if (result > 0)
+      result * 1000
+    else
+      Integer.MAX_VALUE
+  }
   @Loggable
   private[lib] def init(root: Context, _inner: AppComponent = null) = {
     deinitializationLock.set(false)
@@ -539,28 +549,32 @@ object AppComponent extends Logging {
       }
     }
     log.info("resurrect AppComponent core subsystem")
-    if (caller.isInstanceOf[AppComponent])
-      caller.asInstanceOf[AppComponent].activitySafeDialog.unset()
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-    log.info("deinitializing AppComponent for " + packageName)
-    if (deinitializationLock.isSet)
-      deinitializationLock.unset()
-    future {
-      try {
-        deinitializationLock.get(deinitializationTimeout) match {
-          case Some(false) =>
-            log.info("deinitialization AppComponent for " + packageName + " canceled")
-          case _ =>
-            deinitRoutine(packageName)
+    AnyBase.getContext map {
+      context =>
+        val packageName = context.getPackageName()
+        log.info("deinitializing AppComponent for " + packageName)
+        if (deinitializationLock.isSet)
+          deinitializationLock.unset()
+        future {
+          try {
+            deinitializationLock.get(deinitializationTimeout(context)) match {
+              case Some(false) =>
+                log.info("deinitialization AppComponent for " + packageName + " canceled")
+              case _ =>
+                deinitRoutine(packageName)
+            }
+          } finally {
+            deinitializationInProgressLock.synchronized {
+              deinitializationInProgressLock.set(false)
+              deinitializationInProgressLock.notifyAll
+            }
+          }
         }
-      } finally {
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
-      }
+    } orElse {
+      log.fatal("unable to find deinitialization context")
+      None
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
@@ -583,6 +597,7 @@ object AppComponent extends Logging {
         })
     }
     AppCache.deinit()
+    AnyBase.shutdownApp(packageName, true)
   }
   def Inner = inner
   def Context = AnyBase.getContext
@@ -768,8 +783,10 @@ object AppComponent extends Logging {
         super.set(newState, signalAll)
       } else if (busyCounter != 0) {
         lastNonBusyState = newState
-      } else
+      } else {
+        lastNonBusyState = newState
         super.set(newState, signalAll)
+      }
       log.debugWhere("set status to " + newState, Logging.Where.BEFORE)
       publish(newState)
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
@@ -785,8 +802,13 @@ object AppComponent extends Logging {
       if (busyCounter > 1) {
         busyCounter -= 1
         log.debug("decrease status busy counter to " + busyCounter)
-      } else if (busyCounter == 1) {
-        busyCounter -= 1
+      } else {
+        if (busyCounter == 1) {
+          busyCounter -= 1
+        } else {
+          log.warn("busyCounter " + busyCounter + " out of range")
+          busyCounter = 0
+        }
         log.debug("reset status busy counter")
         lastNonBusyState match {
           case state: AppComponent.State =>
@@ -795,12 +817,10 @@ object AppComponent extends Logging {
           case state =>
             log.warn("unknown lastNonBusyState condition " + state)
         }
-      } else {
-        log.fatal("illegal busyCounter")
       }
     }
-    def isBusy(): Boolean = synchronized {
-      busyCounter != 0
-    }
+    def isBusy(): Boolean =
+      synchronized { busyCounter != 0 }
+    def resetBusyCounter() = { busyCounter = 0 }
   }
 }

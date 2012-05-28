@@ -172,7 +172,7 @@ object Common extends Logging {
     directory
   }
   @Loggable
-  def getPublicPreference(context: Context): Option[PublicPreferences] =
+  def getPublicPreferences(context: Context): Option[PublicPreferences] =
     PublicPreferences(context)
   @Loggable
   def listInterfaces(): Seq[String] = {
@@ -327,6 +327,19 @@ object Common extends Logging {
       } else {
         log.fatal("context.bindService failed with context " + bindContext + " and intent " + intent)
       }
+  }
+  @Loggable
+  def removeCachedComponentService(componentPackage: String) = try {
+    if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
+      log.debug("reuse service connection")
+      val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
+      log.warn("try to unbind cached service")
+      context.unbindService(connection)
+      AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
+    }
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
   }
   @Loggable
   def copyFile(sourceFile: File, destFile: File) {
