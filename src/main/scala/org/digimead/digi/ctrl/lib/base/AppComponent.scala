@@ -43,6 +43,7 @@ import scala.xml.Node
 import scala.xml.XML
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -358,7 +359,7 @@ protected class AppComponent private () extends Actor with Logging {
   @Loggable
   def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
-      if (AppComponent.Inner.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
+      if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
         // DigiControl unavailable and state already broken, submit and return
         if (onFinish != null) onFinish(DState.Broken)
         return
@@ -373,14 +374,14 @@ protected class AppComponent private () extends Actor with Logging {
             case _ =>
               AppComponent.State(DState.Passive)
           }
-          AppComponent.Inner.state.set(appState)
+          AppComponent.this.state.set(appState)
           if (onFinish != null) onFinish(DState.Passive)
         case Left(error) =>
           val appState = if (error == "error_digicontrol_not_found")
-            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
+            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
           else
             AppComponent.State(DState.Broken, Seq(error))
-          AppComponent.Inner.state.set(appState)
+          AppComponent.this.state.set(appState)
           if (onFinish != null) onFinish(DState.Broken)
       }
   }
@@ -415,14 +416,14 @@ protected class AppComponent private () extends Actor with Logging {
       def run =
         activitySafeDialog.set(AppComponent.SafeDialogEntry(Some(tag), Option(dialog()), Some(() => {
           log.trace("safe dialog dismiss callback")
-          AppComponent.Inner.enableRotation()
+          AppComponent.this.enableRotation()
           onDismiss.foreach(_())
         })))
     })
     (activitySafeDialog.get(DTimeout.longest, _ != AppComponent.SafeDialogEntry(Some(tag), None, None)) match {
       case Some(entry @ AppComponent.SafeDialogEntry(tag, result @ Some(dialog), dismissCb)) =>
         log.debug("show new safe dialog " + entry + " for " + m.erasure.getName)
-        AppComponent.Inner.disableRotation()
+        AppComponent.this.disableRotation()
         result
       case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
         log.error("unable to show safe dialog '" + tag + "' for " + m.erasure.getName + ", reset detected")
@@ -471,10 +472,10 @@ protected class AppComponent private () extends Actor with Logging {
         log.debug("show new safe dialog " + entry + " for id " + id)
         activitySafeDialog.updateDismissCallback(Some(() => {
           log.trace("safe dialog dismiss callback")
-          AppComponent.Inner.enableRotation()
+          AppComponent.this.enableRotation()
           onDismiss.foreach(_())
         }))
-        AppComponent.Inner.disableRotation()
+        AppComponent.this.disableRotation()
         result
       case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
         log.error("unable to show safe dialog '" + tag + "' for id " + id + ", reset detected")
@@ -503,7 +504,10 @@ object AppComponent extends Logging {
   def deinitializationTimeout(context: Context): Int = {
     val result = Preference.getShutdownTimeout(context)
     log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
-    result * 1000
+    if (result > 0)
+      result * 1000
+    else
+      Integer.MAX_VALUE
   }
   @Loggable
   private[lib] def init(root: Context, _inner: AppComponent = null) = {
@@ -544,12 +548,12 @@ object AppComponent extends Logging {
           deinitializationInProgressLock.wait
       }
     }
+    log.info("resurrect AppComponent core subsystem")
     caller match {
-      case component: AppComponent if component.activitySafeDialog.isSet =>
-        log.info("resurrect AppComponent core subsystem")
-        component.activitySafeDialog.unset()
+      case component: DActivity if inner != null =>
+        if (inner.activitySafeDialog.isSet)
+          inner.activitySafeDialog.unset()
       case _ =>
-        log.warn("resurrect ignored, unknown AppComponent caller " + caller)
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {

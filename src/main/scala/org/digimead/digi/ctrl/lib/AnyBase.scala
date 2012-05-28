@@ -53,9 +53,11 @@ private[lib] trait AnyBase extends Logging {
   }
   protected def onResumeBase(context: Context) = synchronized {
     log.trace("AnyBase::onResumeBase")
+    AnyBase.stopOnShutdownTimer(context)
   }
   protected def onPauseBase(context: Context) = synchronized {
     log.trace("AnyBase::onPauseBase")
+    AnyBase.stopOnShutdownTimer(context)
   }
   protected def onStopBase(context: Context, shutdownIfActive: Boolean) = synchronized {
     log.trace("AnyBase::onStopBase")
