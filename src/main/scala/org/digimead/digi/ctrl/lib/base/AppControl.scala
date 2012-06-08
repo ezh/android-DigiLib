@@ -317,8 +317,9 @@ object AppControl extends Logging {
   @volatile private var inner: AppControl = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-
+  deinitializationLock.set(false)
   log.debug("alive")
+
   @Loggable
   private[lib] def init(root: Context, _inner: AppControl = null) = {
     deinitializationLock.set(false) // cancel deinitialization sequence if any
@@ -334,15 +335,19 @@ object AppControl extends Logging {
     }
   }
   private[lib] def resurrect() = {
-    deinitializationLock.set(false)
+    if (deinitializationLock.get(0) != Some(false)) {
+      log.info("resurrect AppControl core subsystem")
+      deinitializationLock.set(false) // try to cancel
+      // deinitialization canceled
+    }
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, waiting...")
       deinitializationInProgressLock.synchronized {
         while (deinitializationInProgressLock.get)
           deinitializationInProgressLock.wait
       }
+      // deinitialization complete
     }
-    log.info("resurrect AppControl core subsystem")
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
     AnyBase.getContext map {

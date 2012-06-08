@@ -180,7 +180,7 @@ object Report extends Logging {
               plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
                 "." + logFilePrefix + "z" + logFileExtension)
         }).flatten.distinct
-        log.debug("keep log files with suffixes: " + logKeep.mkString(","))
+        log.debug("keep log files with suffixes: " + logKeep.mkString(", "))
         logFiles.drop(keepLogFiles).foreach(name => if (!logKeep.exists(name.endsWith)) {
           val report = new File(info.reportPath, name)
           log.info("delete outdated log file " + report.getName)

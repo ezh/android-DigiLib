@@ -19,7 +19,6 @@ package org.digimead.digi.ctrl.lib.dialog
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DOption
-import org.digimead.digi.ctrl.lib.declaration.DOption.OptVal.value2string_id
 import org.digimead.digi.ctrl.lib.log.AndroidLogger
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -90,10 +89,10 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
         Preference.setAndroidLogger(Preference.getAndroidLogger(this), this, notify)(logger, dispatcher)
       case p: ListPreference if key == Preference.layoutListKey =>
         Preference.setPrefferedLayoutOrientation(p.getValue.toString, this, notify)(logger, dispatcher)
-      case p: CheckBoxPreference if (key == Preference.showDialogWelcomeKey) =>
-        Preference.setShowDialogWelcome(Preference.getShowDialogWelcome(this), this, notify)(logger, dispatcher)
-      case p: CheckBoxPreference if (key == Preference.showDialogRateKey) =>
-        Preference.setShowDialogRate(Preference.getShowDialogRate(this) > -1, this, notify)(logger, dispatcher)
+      case p: CheckBoxPreference if (key == DOption.ShowDialogWelcome.tag) =>
+        Preference.ShowDialogWelcome.set(Preference.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
+      case p: CheckBoxPreference if (key == DOption.ShowDialogRate.tag) =>
+        Preference.ShowDialogRate.set(Preference.ShowDialogRate.get(this) > -1, this, notify)(logger, dispatcher)
       case p: ListPreference if key == Preference.shutdownTimeoutKey =>
         Preference.setShutdownTimeout(p.getValue.toString, this, notify)(logger, dispatcher)
     }
@@ -112,19 +111,13 @@ object Preference extends Logging {
   // orientation layout
   val layoutListKey = "layout"
   val defaultLayout = 4 // see res/xml/options.xml/ListPreference/android:defaultValue SCREEN_ORIENTATION_SENSOR    
-  // show dialog welcome
-  val showDialogWelcomeKey = "show_dialog_welcome"
-  val defaultShowDialogWelcome = true // see res/xml/options.xml/CheckBoxPreference/android:defaultValue
-  // show rate dialog
-  val showDialogRateKey = "show_dialog_rate"
-  val defaultShowDialogRate = true // see res/xml/options.xml/CheckBoxPreference/android:defaultValue
   // shutdown timeout
   val shutdownTimeoutKey = "shutdown_timeout"
   val defaultShutdownTimeout = 300 // seconds, see res/xml/options.xml/ListPreference/android:defaultValue
   @Loggable
   def initPersistentOptions(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
-    setShowDialogWelcome(context)(logger, dispatcher)
-    setShowDialogRate(context)(logger, dispatcher)
+    ShowDialogWelcome.set(context)(logger, dispatcher)
+    ShowDialogRate.set(context)(logger, dispatcher)
     setShutdownTimeout(context)(logger, dispatcher)
   }
   @Loggable
@@ -290,99 +283,12 @@ object Preference extends Logging {
         IAmMumble(message)(logger, dispatcher)
     }
   }
-  @Loggable
-  def getShowDialogWelcome(context: Context): Boolean = try {
-    Common.getPublicPreferences(context) map {
-      pref =>
-        pref.getBoolean(DOption.ShowDialogWelcome, PreferenceManager.getDefaultSharedPreferences(context).
-          getBoolean(Preference.showDialogWelcomeKey, defaultShowDialogWelcome))
-    } getOrElse {
-      PreferenceManager.getDefaultSharedPreferences(context).
-        getBoolean(Preference.showDialogWelcomeKey, defaultShowDialogWelcome)
-    }
-  } catch {
-    case e =>
-      log.error(e.getMessage, e)
-      defaultShowDialogWelcome
-  }
-  @Loggable
-  def setShowDialogWelcome(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
-    setShowDialogWelcome(getShowDialogWelcome(context), context)(logger, dispatcher)
-  @Loggable
-  def setShowDialogWelcome(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
-    Common.getPublicPreferences(context) map {
-      pref =>
-        if (pref.getBoolean(DOption.ShowDialogWelcome, defaultShowDialogWelcome) == f) {
-          log.info("current 'show dialog welcome' already set to " + f)
-          return
-        } else {
-          val editor = pref.edit()
-          editor.putBoolean(DOption.ShowDialogWelcome, f)
-          editor.commit()
-        }
-        val message = if (f)
-          Android.getString(context, "show_dialog_welcome_on_notify").getOrElse("Dialog <Welcome> enabled")
-        else
-          Android.getString(context, "show_dialog_welcome_off_notify").getOrElse("Dialog <Welcome> disabled")
-        if (notify)
-          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        IAmMumble(message)(logger, dispatcher)
-    } orElse {
-      log.fatal("unable to get public preferences with context" + context)
-      None
-    }
-  }
-  @Loggable
-  def getShowDialogRate(context: Context): Int = try {
-    if (PreferenceManager.getDefaultSharedPreferences(context).
-      getBoolean(Preference.showDialogRateKey, defaultShowDialogRate)) {
-      Common.getPublicPreferences(context) map (_.getInt(DOption.ShowDialogRate, 0)) getOrElse 0
-    } else -1
-  } catch {
-    case e =>
-      log.error(e.getMessage, e)
-      -1
-  }
-  @Loggable
-  def incAndGetShowDialogRate(context: Context): Int = {
-    Common.getPublicPreferences(context) foreach {
-      pref =>
-        val newVal = pref.getInt(DOption.ShowDialogRate, 0) + 1
-        val editor = pref.edit()
-        editor.putInt(DOption.ShowDialogRate, newVal)
-        editor.commit()
-    }
-    getShowDialogRate(context)
-  }
-  @Loggable
-  def setShowDialogRate(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
-    setShowDialogRate(PreferenceManager.getDefaultSharedPreferences(context).
-      getBoolean(Preference.showDialogRateKey, defaultShowDialogRate), context)(logger, dispatcher)
-  @Loggable
-  def setShowDialogRate(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
-    Common.getPublicPreferences(context) map {
-      pref =>
-        if (pref.getBoolean(DOption.ShowDialogRate, defaultShowDialogRate) == f) {
-          log.info("current 'show dialog rate' already set to " + f)
-          return
-        }
-        val message = if (f)
-          Android.getString(context, "show_dialog_rate_on_notify").getOrElse("Dialog <Rate It> enabled")
-        else
-          Android.getString(context, "show_dialog_rate_off_notify").getOrElse("Dialog <Rate It> disabled")
-        if (notify)
-          Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        IAmMumble(message)(logger, dispatcher)
-    } orElse {
-      log.fatal("unable to get public preferences with context" + context)
-      None
-    }
-  }
+
   @Loggable
   def getShutdownTimeout(context: Context): Int = try {
     Common.getPublicPreferences(context) map {
       pref =>
-        pref.getInt(DOption.ShutdownTimeout, PreferenceManager.getDefaultSharedPreferences(context).
+        pref.getInt(DOption.ShutdownTimeout.tag, PreferenceManager.getDefaultSharedPreferences(context).
           getString(Preference.shutdownTimeoutKey, defaultShutdownTimeout.toString).toInt)
     } getOrElse {
       PreferenceManager.getDefaultSharedPreferences(context).
@@ -400,12 +306,12 @@ object Preference extends Logging {
   def setShutdownTimeout(timeout: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
     Common.getPublicPreferences(context) map {
       pref =>
-        if (pref.getInt(DOption.ShutdownTimeout, defaultShutdownTimeout).toString == timeout) {
+        if (pref.getInt(DOption.ShutdownTimeout.tag, defaultShutdownTimeout).toString == timeout) {
           log.info("current 'shutdown timeout' already set to " + timeout)
           return
         } else {
           val editor = pref.edit()
-          editor.putInt(DOption.ShutdownTimeout, timeout.toInt)
+          editor.putInt(DOption.ShutdownTimeout.tag, timeout.toInt)
           editor.commit()
         }
         val message = Android.getString(context, "shutdown_timeout_on_notify").getOrElse("Set timeout to %s seconds").format(timeout)
@@ -415,6 +321,95 @@ object Preference extends Logging {
     } orElse {
       log.fatal("unable to get public preferences with context" + context)
       None
+    }
+  }
+  object ShowDialogRate extends Logging {
+    def default = true // DOption.ShowDialogRate.default is Integer
+    @Loggable
+    def get(context: Context): Int = synchronized {
+      try {
+        if (PreferenceManager.getDefaultSharedPreferences(context).getBoolean(DOption.ShowDialogRate.tag, default)) {
+          Common.getPublicPreferences(context) map (_.getInt(DOption.ShowDialogRate.tag, 0)) getOrElse 0
+        } else -1
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+          -1
+      }
+    }
+    @Loggable
+    def incAndGet(context: Context): Int = synchronized {
+      Common.getPublicPreferences(context) foreach {
+        pref =>
+          val newVal = pref.getInt(DOption.ShowDialogRate.tag, 0) + 1
+          val editor = pref.edit()
+          editor.putInt(DOption.ShowDialogRate.tag, newVal)
+          editor.commit()
+      }
+      get(context)
+    }
+    @Loggable
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
+      set(PreferenceManager.getDefaultSharedPreferences(context).
+        getBoolean(DOption.ShowDialogRate.tag, default), context)(logger, dispatcher)
+    @Loggable
+    def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
+      val currentValue = PreferenceManager.getDefaultSharedPreferences(context).
+        getBoolean(DOption.ShowDialogRate.tag, default)
+      val message = if (f)
+        Android.getString(context, "show_dialog_rate_on_notify").getOrElse("Dialog <Rate It> enabled")
+      else
+        Android.getString(context, "show_dialog_rate_off_notify").getOrElse("Dialog <Rate It> disabled")
+      if (notify)
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      IAmMumble(message)(logger, dispatcher)
+      val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
+      sharedEditor.putBoolean(DOption.ShowDialogRate.tag, f)
+      sharedEditor.commit
+    }
+  }
+  object ShowDialogWelcome extends Logging {
+    def default = DOption.ShowDialogWelcome.default.asInstanceOf[Boolean]
+    @Loggable
+    def get(context: Context): Boolean = synchronized {
+      try {
+        PreferenceManager.getDefaultSharedPreferences(context).getBoolean(DOption.ShowDialogWelcome.tag,
+          Common.getPublicPreferences(context).map(_.getBoolean(DOption.ShowDialogWelcome.tag,
+            default)).getOrElse(default))
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+          default
+      }
+    }
+    @Loggable
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      set(get(context), context)(logger, dispatcher)
+    }
+    @Loggable
+    def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+
+      Common.getPublicPreferences(context) map {
+        pref =>
+          log.debug("modify ShowDialogWelcome preference from [%s] to [%s]".
+            format(pref.getBoolean(DOption.ShowDialogWelcome.tag, default), f))
+          val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
+          sharedEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
+          sharedEditor.commit
+          val publicEditor = pref.edit()
+          publicEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
+          publicEditor.commit()
+          val message = if (f)
+            Android.getString(context, "show_dialog_welcome_on_notify").getOrElse("Dialog <Welcome> enabled")
+          else
+            Android.getString(context, "show_dialog_welcome_off_notify").getOrElse("Dialog <Welcome> disabled")
+          if (notify)
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+          IAmMumble(message)(logger, dispatcher)
+      } orElse {
+        log.fatal("unable to get public preferences with context" + context)
+        None
+      }
     }
   }
 }

@@ -31,14 +31,11 @@ object DOption extends Enumeration {
   val OnBoot: OptVal = Value("on_boot", classOf[Boolean], false: java.lang.Boolean)
   val Port: OptVal = Value("port", classOf[Int], 2222: java.lang.Integer)
   val ShutdownTimeout: OptVal = Value("shutdown_timeout",  classOf[Int], 300: java.lang.Integer)
-  val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], false: java.lang.Boolean)
+  val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], true: java.lang.Boolean)
   val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Int], 0: java.lang.Integer)
-  class OptVal(val r: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, r) {
+  class OptVal(val tag: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, tag) {
     def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
     def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
-  }
-  object OptVal {
-    implicit def value2string_id(v: OptVal): String = v.r
   }
   final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
     val name = if (_name != null) _name else "option_" + id + "_name"

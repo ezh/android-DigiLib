@@ -32,9 +32,10 @@ object AndroidLogger extends Logger {
       val tag = validName.get(record.tag).getOrElse(this.synchronized {
         val valid = forceValidName(record.tag)
         validName = validName + (record.tag -> valid)
-        Log.i(getClass.getSimpleName(),
-          "Logger name '" + record.tag + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
-            " characters, using '" + valid + "' instead.")
+        if (valid != record.tag)
+          Log.i(Logging.commonLogger.getName,
+            "Logger name '" + record.tag + "' exceeds maximum length of " + AndroidLogger.TAG_MAX_LENGTH +
+              " characters, using '" + valid + "' instead.")
         valid
       })
       record.level match {

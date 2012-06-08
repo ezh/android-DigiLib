@@ -143,7 +143,9 @@ class SyncVar[A] extends Logging {
     }
   }
 
-  def put(x: A, signalAll: Boolean = true): Unit = {
+  def put(x: A): Unit =
+    put(x, true)
+  def put(x: A, signalAll: Boolean): Unit = {
     while (!value.compareAndSet(None, Some(x)))
       value.synchronized {
         log.traceWhere(this + " put(...) waiting, current value is " + value, Logging.Where.BEFORE)
@@ -156,6 +158,40 @@ class SyncVar[A] extends Logging {
       else
         value.notify
     }
+  }
+
+  def put(x: A, timeout: Long): Unit =
+    put(x, timeout, true)
+  def put(x: A, timeout: Long, signalAll: Boolean): Unit = {
+    if (timeout > 0) {
+      var rest = timeout
+      while ((if (value.compareAndSet(None, Some(x)))
+        value.synchronized {
+        if (signalAll)
+          value.notifyAll
+        else
+          value.notify
+        false
+      }
+      else
+        true) && rest >= 0)
+        value.synchronized {
+          log.traceWhere(this + " put(...) waiting, current value is " + value, Logging.Where.BEFORE)
+          /**
+           * Defending against the system clock going backward
+           *  by counting time elapsed directly.  Loop required
+           *  to deal with spurious wakeups.
+           */
+          rest -= waitMeasuringElapsed(rest)
+          log.traceWhere(this + " put(...) running", Logging.Where.BEFORE)
+        }
+    } else if (value.compareAndSet(None, Some(x)))
+      value.synchronized {
+        if (signalAll)
+          value.notifyAll
+        else
+          value.notify
+      }
   }
 
   def isSet: Boolean = value.get != None

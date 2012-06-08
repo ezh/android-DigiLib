@@ -494,12 +494,15 @@ protected class AppComponent private () extends Actor with Logging {
     !activity.isFinishing && activity.getWindow != null
 }
 
-object AppComponent extends Logging {
+sealed trait AppComponentEvent
+
+object AppComponent extends Logging with Publisher[AppComponentEvent] {
   @volatile private var inner: AppComponent = null
   private val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-
+  deinitializationLock.set(false)
   log.debug("alive")
+
   @Loggable
   def deinitializationTimeout(context: Context): Int = {
     val result = Preference.getShutdownTimeout(context)
@@ -540,15 +543,19 @@ object AppComponent extends Logging {
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
-    deinitializationLock.set(false) // try to cancel
+    if (deinitializationLock.get(0) != Some(false)) {
+      log.info("resurrect AppComponent core subsystem")
+      deinitializationLock.set(false) // try to cancel
+      // deinitialization canceled
+    }
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, waiting...")
       deinitializationInProgressLock.synchronized {
         while (deinitializationInProgressLock.get)
           deinitializationInProgressLock.wait
       }
+      // deinitialization complete
     }
-    log.info("resurrect AppComponent core subsystem")
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
     AnyBase.getContext map {
@@ -579,6 +586,7 @@ object AppComponent extends Logging {
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppComponent for " + packageName)
+    publish(Event.Shutdown)
     assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
@@ -822,5 +830,8 @@ object AppComponent extends Logging {
     def isBusy(): Boolean =
       synchronized { busyCounter != 0 }
     def resetBusyCounter() = { busyCounter = 0 }
+  }
+  object Event {
+    object Shutdown extends AppComponentEvent
   }
 }

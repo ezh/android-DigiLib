@@ -40,7 +40,6 @@ import scala.collection.mutable.HashMap
 import scala.ref.SoftReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.declaration.DOption.OptVal.value2string_id
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DOption
 import org.digimead.digi.ctrl.lib.declaration.DPreference
@@ -302,9 +301,9 @@ object AppCache extends Actor with Logging {
       log.info("initialize AppCache for " + context.getPackageName())
     contextPackageName = context.getPackageName()
     val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
-    period = pref.getLong(DOption.CachePeriod, period)
-    cachePath = pref.getString(DOption.CacheFolder, context.getCacheDir + "/")
-    cacheClass = pref.getString(DOption.CacheClass, cacheClass)
+    period = pref.getLong(DOption.CachePeriod.tag, period)
+    cachePath = pref.getString(DOption.CacheFolder.tag, context.getCacheDir + "/")
+    cacheClass = pref.getString(DOption.CacheClass.tag, cacheClass)
     if (innerCache != null) {
       inner = innerCache
     } else {

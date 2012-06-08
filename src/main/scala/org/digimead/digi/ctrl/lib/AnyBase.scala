@@ -41,23 +41,23 @@ import android.content.Context
 private[lib] trait AnyBase extends Logging {
   protected def onCreateBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onCreateBase")
-    reset(context)
+    reset(context, "onCreate")
     callSuper
     AnyBase.init(context)
   }
   protected def onStartBase(context: Context) = synchronized {
     log.trace("AnyBase::onStartBase")
-    reset(context)
+    reset(context, "onStart")
     if (AppComponent.Inner == null)
       AnyBase.init(context)
   }
   protected def onResumeBase(context: Context) = synchronized {
     log.trace("AnyBase::onResumeBase")
-    AnyBase.stopOnShutdownTimer(context)
+    AnyBase.stopOnShutdownTimer(context, "onResume")
   }
   protected def onPauseBase(context: Context) = synchronized {
     log.trace("AnyBase::onPauseBase")
-    AnyBase.stopOnShutdownTimer(context)
+    AnyBase.stopOnShutdownTimer(context, "onPause")
   }
   protected def onStopBase(context: Context, shutdownIfActive: Boolean) = synchronized {
     log.trace("AnyBase::onStopBase")
@@ -65,12 +65,12 @@ private[lib] trait AnyBase extends Logging {
   }
   protected def onDestroyBase(context: Context, callSuper: => Any = {}) = synchronized {
     log.trace("AnyBase::onDestroyBase")
-    reset(context)
+    reset(context, "onDestroy")
     callSuper
     AnyBase.deinit(context)
   }
-  private def reset(context: Context) {
-    AnyBase.stopOnShutdownTimer(context)
+  private def reset(context: Context, reason: String) {
+    AnyBase.stopOnShutdownTimer(context, reason)
     if (AppComponent.Inner != null) {
       AppComponent.Inner.state.resetBusyCounter
       context match {
@@ -88,7 +88,7 @@ object AnyBase extends Logging {
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile private var reportDirectory = "report"
-  private val onShutdownTimer = new SyncVar[Boolean]()
+  private val onShutdownTimer = new SyncVar[String]() // string - cancel reason
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -175,27 +175,30 @@ object AnyBase extends Logging {
     currentContext.get
   }
   @Loggable
-  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = {
+  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
     log.debug("start startOnShutdownTimer")
-    if (Seq(onShutdownTimer.get(0)).exists(state => state == None || state == Some(false)))
-      onShutdownTimer.set(true)
+    if (onShutdownTimer.get(0) == Some(null))
+      onShutdownTimer.set(null)
     future {
-      onShutdownTimer.get(5000, _ != true) match {
-        case Some(true) if isLastContext || shutdownIfActive =>
+      onShutdownTimer.get(5000, _ != null) match {
+        case Some(null) if isLastContext || shutdownIfActive =>
           log.info("start onShutdown sequence")
           AppComponent.deinit()
-        case Some(true) =>
+        case Some(null) =>
           log.info("cancel onShutdown sequence, component in use")
           onShutdownTimer.unset()
-        case _ =>
-          log.info("cancel onShutdown sequence")
+        case Some(reason) =>
+          log.info("cancel onShutdown sequence, reason: " + reason)
+          onShutdownTimer.unset()
+        case None =>
+          log.fatal("cancel onShutdown sequence, reason unknown")
           onShutdownTimer.unset()
       }
     }
   }
   @Loggable
-  private def stopOnShutdownTimer(context: Context) = {
-    onShutdownTimer.set(false)
+  private def stopOnShutdownTimer(context: Context, reason: String) = {
+    onShutdownTimer.set(reason)
     AppComponent.resurrect(context)
   }
   /**
