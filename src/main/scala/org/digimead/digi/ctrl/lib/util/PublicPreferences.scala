@@ -23,6 +23,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.FilenameFilter
+import java.util.concurrent.atomic.AtomicLong
 
 import scala.Option.option2Iterable
 import scala.actors.Futures.future
@@ -48,16 +50,20 @@ import android.os.Bundle
 import android.os.Parcel
 import android.os.Parcelable
 
-class PublicPreferences private (val file: File, val bundle: Bundle)
+case class PublicPreferences private (val file: File, val bundle: Bundle, baseBlob: Long)
   extends SharedPreferences with Parcelable with Logging {
-  log.debug("public preferences file is \"" + file.getAbsolutePath + "\"")
+  val blob = new AtomicLong(baseBlob)
+  log.debug("public preferences directory is \"" + file.getAbsolutePath + "\"")
+  log.debug("create new public preferences id " + blob.get)
   log.debug("alive")
+
   def this(in: Parcel) =
-    this(file = new File(in.readString), bundle = in.readBundle())
+    this(file = new File(in.readString), bundle = in.readBundle(), baseBlob = in.readLong)
   def writeToParcel(out: Parcel, flags: Int) {
     log.debug("writeToParcel PublicPreferences with flags " + flags)
     out.writeString(file.getAbsolutePath)
     out.writeBundle(bundle)
+    out.writeLong(baseBlob)
   }
   def describeContents() = 0
   def unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) =
@@ -82,9 +88,8 @@ class PublicPreferences private (val file: File, val bundle: Bundle)
 }
 
 object PublicPreferences extends Logging {
-  @volatile var preferences: PublicPreferences = null
-  @volatile var preferencesModificationTime = 0L
-  @volatile var onSharedPreferenceChangeListeners: Seq[SharedPreferences.OnSharedPreferenceChangeListener] = Seq()
+  @volatile private[util] var preferences: PublicPreferences = null
+  @volatile private[util] var onSharedPreferenceChangeListeners: Seq[SharedPreferences.OnSharedPreferenceChangeListener] = Seq()
   override protected[lib] val log = Logging.getLogger(this)
   final val CREATOR: Parcelable.Creator[PublicPreferences] = new Parcelable.Creator[PublicPreferences]() {
     def createFromParcel(in: Parcel): PublicPreferences = try {
@@ -97,10 +102,17 @@ object PublicPreferences extends Logging {
     }
     def newArray(size: Int): Array[PublicPreferences] = new Array[PublicPreferences](size)
   }
+  val preferenceFilter = new FilenameFilter() { def accept(file: File, name: String) = name.endsWith(".blob") }
   // allow interprocess notification
-  private val preferencesUpdateReceiver = new BroadcastReceiver() {
+  val preferencesUpdateReceiver = new BroadcastReceiver() {
     def onReceive(context: Context, intent: Intent) = try {
-      log.debug("receive PublicPreferences update notification")
+      val keys = intent.getStringArrayExtra("keys")
+      log.debug("receive PublicPreferences update notification for keys [" + keys.mkString(", ") + "]")
+      for {
+        context <- AppComponent.Context
+        oldPreferences <- Option(preferences)
+        newPreferences <- PublicPreferences(context.getApplicationContext, Some(oldPreferences.file))
+      } onSharedPreferenceChangeListeners.foreach(l => keys.foreach(k => l.onSharedPreferenceChanged(newPreferences, k)))
     } catch {
       case e =>
         log.error(e.getMessage, e)
@@ -118,40 +130,89 @@ object PublicPreferences extends Logging {
   AppComponent.subscribe(stateSubscriber)
   log.debug("alive")
 
-  def apply(context: Context, location: Option[File] = None): Option[PublicPreferences] = {
-    if (preferences != null) {
-      if (preferencesModificationTime == preferences.file.lastModified)
-        return Some(preferences)
-      else
-        preferences = null
-    }
+  def apply(context: Context, location: Option[File] = None): Option[PublicPreferences] = synchronized {
+    if (preferences != null)
+      Option(preferences.file.list(preferenceFilter)).foreach(_.sorted.lastOption match {
+        case Some(latest) if (latest == preferences.blob.get + ".blob") =>
+          log.debug("return cached public preferences " + preferences.blob.get)
+          return Some(preferences)
+        case _ =>
+          preferences = null
+      })
     location orElse getLocation(context) flatMap {
       file =>
-        if (file.length == 0) {
-          log.debug("create new public preferences")
-          preferences = new PublicPreferences(file, new Bundle)
+        // prepare
+        if (!file.isDirectory) {
+          if (file.exists)
+            file.delete
+          file.mkdirs()
+        }
+        // get blob id
+        val preferenceBlob = Option(file.list(preferenceFilter)).flatMap(_.sorted.lastOption) match {
+          case Some(latest) if latest.length > 5 =>
+            try {
+              val blob = latest.takeWhile(_ != '.').toLong
+              log.debug("return latest public preferences " + blob)
+              blob
+            } catch {
+              case e =>
+                log.error(e.getMessage, e)
+                val blob = System.currentTimeMillis
+                log.debug("return new public preferences " + blob)
+                blob
+            }
+          case _ =>
+            val blob = System.currentTimeMillis
+            var shift = 0 // (in future)
+            while (new File(file, blob + ".blob").exists)
+              shift += 1
+            log.debug("return new public preferences " + blob)
+            blob + shift
+        }
+        // open
+        val publicPreferenceBlob = new File(file, preferenceBlob + ".blob")
+        if (!publicPreferenceBlob.exists || publicPreferenceBlob.length == 0) {
+          preferences = new PublicPreferences(file, new Bundle, preferenceBlob)
         } else {
-          val biStream = new BufferedInputStream(new FileInputStream(file))
+          val biStream = new BufferedInputStream(new FileInputStream(publicPreferenceBlob))
           val baoStream = new ByteArrayOutputStream()
           preferences = try {
             Common.writeToStream(biStream, baoStream)
-            Common.unparcelFromArray[PublicPreferences](baoStream.toByteArray).getOrElse({
-              log.error("preferences file " + file.getAbsolutePath + " broken")
-              log.debug("create new public preferences")
-              new PublicPreferences(file, new Bundle)
-            })
+            val result = Common.unparcelFromArray[PublicPreferences](baoStream.toByteArray).getOrElse({
+              log.error("preferences file " + publicPreferenceBlob.getAbsolutePath + " broken")
+              publicPreferenceBlob.delete
+              new PublicPreferences(file, new Bundle, preferenceBlob)
+            }).copy(baseBlob = preferenceBlob)
+            result.blob.set(preferenceBlob)
+            result
           } catch {
             case e =>
-              log.error(e.getMessage, e)
-              log.error("preferences file " + file.getAbsolutePath + " broken")
-              log.debug("create new public preferences")
-              new PublicPreferences(file, new Bundle)
+              log.error("preferences file " + publicPreferenceBlob.getAbsolutePath + " broken: " + e.getMessage, e)
+              publicPreferenceBlob.delete
+              new PublicPreferences(file, new Bundle, preferenceBlob)
           } finally {
             if (biStream != null)
               biStream.close
           }
         }
-        Option(preferences).map(p => { preferencesModificationTime = p.file.lastModified; p })
+        // cleanup
+        val activeFileName = Option(preferences).map(_.blob.get + ".blob").getOrElse(null)
+        for {
+          files <- Option(file.list(preferenceFilter)).map(_.sorted)
+          preferenceFile <- files
+        } try {
+          val blob = preferenceFile.takeWhile(_ != '.').toLong
+          if (preferenceFile != activeFileName && System.currentTimeMillis - blob > 60 * 60 * 1000) {
+            log.debug("delete outdated preference record " + preferenceFile)
+            new File(file, preferenceFile).delete
+          }
+        } catch {
+          case e =>
+            log.error(e.getMessage, e)
+            log.debug("delete broken preference record " + preferenceFile)
+            new File(file, preferenceFile).delete
+        }
+        Option(preferences)
     }
   }
   def getLocation(context: Context): Option[File] = Common.getDirectory(context, ".").flatMap(dir => {
@@ -209,10 +270,23 @@ object PublicPreferences extends Logging {
     try {
       Option(preferences).map {
         p =>
-          log.debug("commit public preferences to \"" + p.file.getAbsolutePath + "\"")
+          val blob = System.currentTimeMillis
+          log.debug("commit public preferences to \"" + p.file.getAbsolutePath + " id " + blob + "\"")
+          val modifiedKeys = (for (key <- changes.keySet)
+            yield if (p.bundle.containsKey(key) && p.bundle.get(key) == changes.get(key))
+            None else Some(key)).flatten
           p.bundle.clear
           p.bundle.putAll(changes)
-          val boStream = new BufferedOutputStream(new FileOutputStream(p.file))
+          // prepare
+          if (!p.file.isDirectory) {
+            if (p.file.exists)
+              p.file.delete
+            p.file.mkdirs()
+          }
+          // save
+          val publicPreferenceBlob = new File(p.file, blob + ".blob")
+          val foStream = new FileOutputStream(publicPreferenceBlob)
+          val boStream = new BufferedOutputStream(foStream)
           val baoStream = new ByteArrayOutputStream()
           try {
             baoStream.write(Common.parcelToArray(p))
@@ -223,12 +297,19 @@ object PublicPreferences extends Logging {
           } finally {
             if (boStream != null)
               boStream.close
+            foStream.flush
+            foStream.close
           }
+          // cleanup
+          val oldBlob = new File(p.file, p.blob.get + ".blob")
+          p.blob.set(blob)
+          if (oldBlob.exists) {
+            log.debug("delete outdated preference record " + oldBlob.getName)
+            oldBlob.delete
+          }
+          // notify
           AppComponent.Context foreach {
             ctx =>
-              val modifiedKeys = (for (key <- changes.keySet)
-                yield if (p.bundle.containsKey(key) && p.bundle.get(key) == changes.get(key))
-                None else Some(key)).flatten
               log.debug("modified keys [" + modifiedKeys.mkString(", ") + "]")
               if (modifiedKeys.nonEmpty) {
                 log.debug("send notification to OnSharedPreferenceChangeListeners")
@@ -248,7 +329,7 @@ object PublicPreferences extends Logging {
         false
     }
   }
-  private class Editor extends SharedPreferences.Editor {
+  private[util] class Editor extends SharedPreferences.Editor {
     val changes = preferences match {
       case p: PublicPreferences => new Bundle(p.bundle)
       case null => new Bundle()

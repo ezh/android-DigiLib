@@ -90,10 +90,12 @@ object Logging extends Publisher[LoggingEvent] {
       "disable ERROR log level"))
     isErrorEnabled = t
   }
-  def offer(record: Record) = queue.offer(record)
+  def offer(record: Record) =
+    queue.offer(record)
   def reset(startWorker: Boolean = true) = synchronized {
     deinit()
-    init(initializationContext.get.get, startWorker) // throw exception initializationContext with ApplicationContext must be always available
+    // if initializationContext.get == None, than there isn't any initialization yet
+    initializationContext.get.foreach(context => init(context, startWorker))
   }
   private[lib] def init(context: Context, startWorker: Boolean = true): Unit = synchronized {
     try {
@@ -124,7 +126,8 @@ object Logging extends Publisher[LoggingEvent] {
     }
   }
   def suspend() = synchronized {
-    loggingThread.interrupt
+    if (loggingThread.isAlive)
+      loggingThread = new Thread() // stub
   }
   def resume() = synchronized {
     if (!loggingThread.isAlive) {
@@ -132,17 +135,12 @@ object Logging extends Publisher[LoggingEvent] {
         this.setDaemon(true)
         @tailrec
         override def run() = {
-          try {
-            if (logger.nonEmpty && !queue.isEmpty) {
-              flushQueue(flushLimit)
-              Thread.sleep(50)
-            } else
-              Thread.sleep(500)
-          } catch {
-            case e: InterruptedException =>
-              Thread.currentThread().interrupt()
-          }
-          if (!isInterrupted)
+          if (logger.nonEmpty && !queue.isEmpty) {
+            flushQueue(flushLimit)
+            Thread.sleep(500)
+          } else
+            Thread.sleep(500)
+          if (loggingThread.getId == this.getId)
             run
         }
       }
