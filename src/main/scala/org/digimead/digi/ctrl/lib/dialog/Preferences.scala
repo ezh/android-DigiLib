@@ -110,8 +110,13 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
     p match {
       case p: ListPreference if key == Preferences.debugLevelListKey =>
         Preferences.setLogLevel(p.getValue.toString, this, notify)(logger, dispatcher)
-      case p: CheckBoxPreference if key == Preferences.debugAndroidLoggingCheckBoxKey =>
-        Preferences.setAndroidLogger(Preferences.getAndroidLogger(this), this, notify)(logger, dispatcher)
+      case p: CheckBoxPreference if key == DOption.DebugAndroidLogger.tag =>
+        if (shared.contains(DOption.DebugAndroidLogger.tag))
+          // DOption.DebugAndroidLogger.tag exists
+          Preferences.DebugAndroidLogger.set(shared.getBoolean(DOption.DebugAndroidLogger.tag, Preferences.DebugAndroidLogger.default), this, notify)(logger, dispatcher)
+        else
+          // DOption.DebugAndroidLogger.tag not exists
+          Preferences.DebugAndroidLogger.set(Preferences.DebugAndroidLogger.get(this), this, notify)(logger, dispatcher)
       case p: ListPreference if key == DOption.PreferredLayoutOrientation.tag =>
         if (shared.contains(DOption.PreferredLayoutOrientation.tag))
           // DOption.PreferredLayoutOrientation.tag exists
@@ -149,12 +154,10 @@ object Preferences extends Logging {
   val debugLevelListKey = "debug_level"
   val defaultLogLevelLevel = 5 // see res/xml/options.xml/ListPreference/android:defaultValue
   @volatile private var lastLogLevelLevel = ""
-  // android logging
-  val debugAndroidLoggingCheckBoxKey = "debug_android"
-  val defaultAndroidLogging = false // see res/xml/options.xml/CheckBoxPreference/android:defaultValue
-  @volatile private var lastAndroidLogging = false
+
   @Loggable
   def initPersistentOptions(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+    DebugAndroidLogger.set(context)(logger, dispatcher)
     PreferredLayoutOrientation.set(context)(logger, dispatcher)
     ShutdownTimeout.set(context)(logger, dispatcher)
     ShowDialogRate.set(context)(logger, dispatcher)
@@ -245,36 +248,58 @@ object Preferences extends Logging {
         log.error("unknown value " + n + " for preference " + debugLevelListKey)
     }
   }
-  @Loggable
-  def getAndroidLogger(context: Context): Boolean = try {
-    PreferenceManager.getDefaultSharedPreferences(context).
-      getBoolean(Preferences.debugAndroidLoggingCheckBoxKey, defaultAndroidLogging)
-  } catch {
-    case e =>
-      log.error(e.getMessage, e)
-      defaultAndroidLogging
-  }
-  @Loggable
-  def setAndroidLogger(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
-    setAndroidLogger(getAndroidLogger(context), context)(logger, dispatcher)
-  @Loggable
-  def setAndroidLogger(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher) {
-    if (lastAndroidLogging == f) {
-      log.info("current android logging already set to " + f)
-      return
-    } else {
-      lastAndroidLogging = f
+  object DebugAndroidLogger extends Logging {
+    @volatile private var lastAndroidLogging = false
+    def default = DOption.DebugAndroidLogger.default.asInstanceOf[Boolean]
+    @Loggable
+    def get(context: Context): Boolean = synchronized {
+      try {
+        val shared = PreferenceManager.getDefaultSharedPreferences(context)
+        val public = Common.getPublicPreferences(context)
+        public.getBoolean(DOption.DebugAndroidLogger.tag, shared.getBoolean(DOption.DebugAndroidLogger.tag, default))
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+          default
+      }
     }
-    val message = if (f) {
-      Logging.addLogger(AndroidLogger)
-      Android.getString(context, "debug_android_on_notify").getOrElse("Android logging facility enabled")
-    } else {
-      Logging.delLogger(AndroidLogger)
-      Android.getString(context, "debug_android_off_notify").getOrElse("Android logging facility disabled")
+    @Loggable
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      set(get(context), context)(logger, dispatcher)
     }
-    if (notify)
-      Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    IAmMumble(message)(logger, dispatcher)
+    @Loggable
+    def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      if (!shared.contains(DOption.DebugAndroidLogger.tag) || public.getBoolean(DOption.DebugAndroidLogger.tag, default) != f) {
+        log.debug("set DebugAndroidLogger shared preference to [%s]".format(f))
+        val sharedEditor = shared.edit
+        sharedEditor.putBoolean(DOption.DebugAndroidLogger.tag, f)
+        sharedEditor.commit
+      }
+      if (!public.contains(DOption.DebugAndroidLogger.tag) || public.getString(DOption.DebugAndroidLogger.tag, default.toString) != f) {
+        log.debug("set DebugAndroidLogger public preference to [%s]".format(f))
+        val publicEditor = public.edit()
+        publicEditor.putBoolean(DOption.DebugAndroidLogger.tag, f)
+        publicEditor.commit()
+      }
+      if (lastAndroidLogging == f) {
+        log.info("current android logging already set to " + f)
+        return
+      } else {
+        lastAndroidLogging = f
+      }
+      val message = if (f) {
+        Logging.addLogger(AndroidLogger)
+        Android.getString(context, "debug_android_on_notify").getOrElse("Android logging facility enabled")
+      } else {
+        Logging.delLogger(AndroidLogger)
+        Android.getString(context, "debug_android_off_notify").getOrElse("Android logging facility disabled")
+      }
+      if (notify)
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+      IAmMumble(message)(logger, dispatcher)
+    }
   }
   object PreferredLayoutOrientation extends Logging {
     def default = DOption.PreferredLayoutOrientation.default.asInstanceOf[String]

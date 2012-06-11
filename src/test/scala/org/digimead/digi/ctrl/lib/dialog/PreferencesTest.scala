@@ -108,7 +108,7 @@ class PreferencesTest
 
     PublicPreferences(activity).contains(DOption.ShowDialogWelcome.tag) should be(true)
 
-    PublicPreferences(activity).getBoolean(DOption.ShowDialogWelcome.tag, Preferences.ShowDialogRate.defaultShow) should equal(true)
+    PublicPreferences(activity).getBoolean(DOption.ShowDialogWelcome.tag, Preferences.ShowDialogWelcome.default) should equal(true)
 
     Preferences.ShowDialogWelcome.get(activity) should equal(true)
 
@@ -201,5 +201,34 @@ class PreferencesTest
     Preferences.PreferredLayoutOrientation.get(activity) should equal(0)
 
     activity.log.warn("testPreferredLayoutOrientation END")
+  }
+  def testDebugAndroidLogger() {
+    activity.log.warn("testDebugAndroidLogger BEGIN")
+
+    PublicPreferences(activity).contains(DOption.DebugAndroidLogger.tag) should be(true)
+
+    PublicPreferences(activity).getBoolean(DOption.DebugAndroidLogger.tag, Preferences.DebugAndroidLogger.default) should equal(false)
+
+    Preferences.DebugAndroidLogger.get(activity) should equal(false)
+
+    Preferences.DebugAndroidLogger.set(true, activity, false)
+
+    Preferences.DebugAndroidLogger.get(activity) should equal(true)
+
+    Preferences.DebugAndroidLogger.set(false, activity, false)
+
+    Preferences.DebugAndroidLogger.get(activity) should equal(false)
+
+    solo.searchText(Android.getString(activity, "preference_debug_android").get) should be(true)
+
+    activity.log.warn("click begin")
+    solo.clickOnText(Android.getString(activity, "preference_debug_android").get)
+    activity.log.warn("click end")
+
+    Thread.sleep(1000)
+
+    Preferences.DebugAndroidLogger.get(activity) should equal(true)
+
+    activity.log.warn("testDebugAndroidLogger END")
   }
 }
