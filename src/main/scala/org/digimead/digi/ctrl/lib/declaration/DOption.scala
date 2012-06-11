@@ -30,9 +30,10 @@ object DOption extends Enumeration {
   val AsRoot: OptVal = Value("as_root", classOf[Boolean], false: java.lang.Boolean)
   val OnBoot: OptVal = Value("on_boot", classOf[Boolean], false: java.lang.Boolean)
   val Port: OptVal = Value("port", classOf[Int], 2222: java.lang.Integer)
-  val ShutdownTimeout: OptVal = Value("shutdown_timeout",  classOf[Int], 300: java.lang.Integer)
+  val ShutdownTimeout: OptVal = Value("shutdown_timeout", classOf[Int], 300: java.lang.Integer)
   val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], true: java.lang.Boolean)
-  val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Int], 0: java.lang.Integer)
+  val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Boolean], true: java.lang.Boolean)
+  val CounterDialogRate: OptVal = Value("counter_dialog_rate", classOf[Int], 0: java.lang.Integer)
   class OptVal(val tag: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, tag) {
     def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
     def description(context: Context) = Android.getString(context, _description).getOrElse(_description)

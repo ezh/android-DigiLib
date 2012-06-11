@@ -111,7 +111,7 @@ object PublicPreferences extends Logging {
       for {
         context <- AppComponent.Context
         oldPreferences <- Option(preferences)
-        newPreferences <- PublicPreferences(context.getApplicationContext, Some(oldPreferences.file))
+        newPreferences <- Option(PublicPreferences(context.getApplicationContext, Some(oldPreferences.file)))
       } onSharedPreferenceChangeListeners.foreach(l => keys.foreach(k => l.onSharedPreferenceChanged(newPreferences, k)))
     } catch {
       case e =>
@@ -130,23 +130,17 @@ object PublicPreferences extends Logging {
   AppComponent.subscribe(stateSubscriber)
   log.debug("alive")
 
-  def apply(context: Context, location: Option[File] = None): Option[PublicPreferences] = synchronized {
+  def apply(context: Context, location: Option[File] = None): PublicPreferences = synchronized {
     if (preferences != null)
       Option(preferences.file.list(preferenceFilter)).foreach(_.sorted.lastOption match {
         case Some(latest) if (latest == preferences.blob.get + ".blob") =>
           log.debug("return cached public preferences " + preferences.blob.get)
-          return Some(preferences)
+          return preferences
         case _ =>
           preferences = null
       })
     location orElse getLocation(context) flatMap {
       file =>
-        // prepare
-        if (!file.isDirectory) {
-          if (file.exists)
-            file.delete
-          file.mkdirs()
-        }
         // get blob id
         val preferenceBlob = Option(file.list(preferenceFilter)).flatMap(_.sorted.lastOption) match {
           case Some(latest) if latest.length > 5 =>
@@ -214,18 +208,26 @@ object PublicPreferences extends Logging {
         }
         Option(preferences)
     }
-  }
-  def getLocation(context: Context): Option[File] = Common.getDirectory(context, ".").flatMap(dir => {
-    // package path,that prevent erase
-    val file = new File(dir.getParentFile.getParentFile, "preferences")
-    if (!file.exists) {
-      if (file.createNewFile)
+  } getOrElse { throw new RuntimeException("public preferences unavailable") }
+  def getLocation(context: Context, forceInternal: Boolean = false): Option[File] =
+    Common.getDirectory(context, ".", forceInternal).flatMap(dir => {
+      // package path,that prevent erase
+      val file = new File(dir.getParentFile.getParentFile, "preferences")
+      if (!file.isDirectory) {
+        if (file.exists)
+          file.delete
+        if (file.mkdirs())
+          Some(file)
+        else
+          None
+      } else
         Some(file)
-      else
-        None
-    } else
-      Some(file)
-  })
+    })
+  def reset(context: Context) = synchronized {
+    getLocation(context, false).foreach(Common.deleteFile)
+    getLocation(context, true).foreach(Common.deleteFile)
+    preferences = null
+  }
   @Loggable
   def registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) = synchronized {
     log.debugWhere("add OnSharedPreferenceChangeListener " + listener, Logging.Where.BEFORE)

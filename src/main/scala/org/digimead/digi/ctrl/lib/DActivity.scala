@@ -116,12 +116,7 @@ trait DActivity extends AnyBase with Logging {
     log.trace("Activity::onDestroyExt")
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
-    onDestroyBase(activity, {
-      if (AnyBase.isLastContext)
-        AppComponent.deinit()
-      else
-        log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
-    })
+    onDestroyBase(activity)
   }
   def onCreateDialogExt(activity: Activity with DActivity, id: Int, args: Bundle): Dialog = {
     log.trace("Activity::onCreateDialogExt")

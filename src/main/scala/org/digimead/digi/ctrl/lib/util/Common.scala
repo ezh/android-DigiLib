@@ -172,7 +172,7 @@ object Common extends Logging {
     directory
   }
   @Loggable
-  def getPublicPreferences(context: Context): Option[PublicPreferences] =
+  def getPublicPreferences(context: Context): PublicPreferences =
     PublicPreferences(context)
   @Loggable
   def listInterfaces(): Seq[String] = {
@@ -360,6 +360,12 @@ object Common extends Logging {
         destination.close()
       }
     }
+  }
+  @Loggable
+  def deleteFile(dfile: File): Unit = {
+    if (dfile.isDirectory)
+      dfile.listFiles.foreach { f => deleteFile(f) }
+    dfile.delete
   }
   @Loggable
   def isSignedWithDebugKey(context: Context, clazz: Class[_], debugKey: String): Boolean = try {

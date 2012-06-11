@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ Copyright 2012 Alexey Aksenov ezh@ezh.msk.ru.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and limitations under the License.
+-->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+
+    <ListPreference
+        android:defaultValue="5"
+        android:dialogIcon="@android:drawable/ic_dialog_info"
+        android:dialogTitle="@string/preference_debug_level"
+        android:enabled="true"
+        android:entries="@array/debugLevelDisplay"
+        android:entryValues="@array/debugLevelValue"
+        android:key="debug_level"
+        android:persistent="true"
+        android:selectable="true"
+        android:summary="@string/preference_debug_level_description"
+        android:title="@string/preference_debug_level" />
+
+    <CheckBoxPreference
+        android:defaultValue="false"
+        android:key="debug_android"
+        android:summaryOff="@string/preference_debug_android_off"
+        android:summaryOn="@string/preference_debug_android_on"
+        android:title="@string/preference_debug_android" />
+
+    <ListPreference
+        android:defaultValue="4"
+        android:dialogIcon="@android:drawable/ic_dialog_info"
+        android:dialogTitle="@string/preference_layout"
+        android:enabled="true"
+        android:entries="@array/layoutDisplay"
+        android:entryValues="@array/layoutValue"
+        android:key="layout"
+        android:persistent="true"
+        android:selectable="true"
+        android:summary="@string/preference_layout_description"
+        android:title="@string/preference_layout" />
+
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:key="show_dialog_welcome"
+        android:summaryOff="@string/preference_show_dialog_welcome_off"
+        android:summaryOn="@string/preference_show_dialog_welcome_on"
+        android:title="@string/preference_show_dialog_welcome" />
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:key="show_dialog_rate"
+        android:summaryOff="@string/preference_show_dialog_rate_off"
+        android:summaryOn="@string/preference_show_dialog_rate_on"
+        android:title="@string/preference_show_dialog_rate" />
+
+    <ListPreference
+        android:defaultValue="300"
+        android:dialogIcon="@android:drawable/ic_dialog_info"
+        android:dialogTitle="@string/preference_shutdown_timeout"
+        android:enabled="true"
+        android:entries="@array/shutdownTimeoutDisplay"
+        android:entryValues="@array/shutdownTimeoutValue"
+        android:key="shutdown_timeout"
+        android:persistent="true"
+        android:selectable="true"
+        android:summary="@string/preference_shutdown_timeout_description"
+        android:title="@string/preference_shutdown_timeout" />
+
+</PreferenceScreen>

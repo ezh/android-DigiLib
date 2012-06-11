@@ -35,11 +35,6 @@ trait DService extends AnyBase with Logging {
    */
   def onDestroyExt(service: Service): Unit = {
     log.trace("Service::onDestroyExt")
-    onDestroyBase(service, {
-      if (AnyBase.isLastContext)
-        AppControl.deinit()
-      else
-        log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
-    })
+    onDestroyBase(service)
   }
 }

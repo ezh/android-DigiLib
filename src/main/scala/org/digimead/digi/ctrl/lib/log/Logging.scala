@@ -137,7 +137,7 @@ object Logging extends Publisher[LoggingEvent] {
         override def run() = {
           if (logger.nonEmpty && !queue.isEmpty) {
             flushQueue(flushLimit)
-            Thread.sleep(500)
+            Thread.sleep(50)
           } else
             Thread.sleep(500)
           if (loggingThread.getId == this.getId)

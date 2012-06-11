@@ -61,7 +61,7 @@ import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.declaration.DState
-import org.digimead.digi.ctrl.lib.dialog.Preference
+import org.digimead.digi.ctrl.lib.dialog.Preferences
 
 import android.app.Activity
 import android.content.Context
@@ -505,7 +505,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
 
   @Loggable
   def deinitializationTimeout(context: Context): Int = {
-    val result = Preference.getShutdownTimeout(context)
+    val result = Preferences.getShutdownTimeout(context)
     log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
     if (result > 0)
       result * 1000

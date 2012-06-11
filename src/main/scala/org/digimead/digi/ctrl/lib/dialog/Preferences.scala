@@ -16,6 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
+import scala.annotation.implicitNotFound
+import scala.annotation.tailrec
+
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DOption
@@ -24,8 +28,10 @@ import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
+import org.digimead.digi.ctrl.lib.message.IAmWarn
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
+import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -40,14 +46,27 @@ import android.preference.PreferenceCategory
 import android.preference.PreferenceManager
 import android.widget.Toast
 
-abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceActivity with Logging with OnSharedPreferenceChangeListener {
+abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceActivity with Logging with OnSharedPreferenceChangeListener {
   implicit protected val logger: RichLogger
   @Loggable
   override def onCreate(savedInstanceState: Bundle) {
     log.trace("Preference::onCreate")
     super.onCreate(savedInstanceState)
+    AnyBase.init(this, false)
+    ExceptionHandler.retry[Unit](1) {
+      try {
+        addPreferencesFromResource(Android.getId(this, "options", "xml"))
+      } catch {
+        case e: ClassCastException =>
+          IAmWarn("reset broken preferences")
+          val shared = PreferenceManager.getDefaultSharedPreferences(this)
+          val editor = shared.edit
+          editor.clear
+          editor.commit
+          throw e
+      }
+    }
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_BEHIND)
-    addPreferencesFromResource(Android.getId(this, "options", "xml"))
     for (i <- 0 until getPreferenceScreen.getPreferenceCount())
       initSummary(getPreferenceScreen.getPreference(i))
   }
@@ -66,6 +85,12 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
     // Unregister the listener whenever a key changes 
     getPreferenceScreen.getSharedPreferences.unregisterOnSharedPreferenceChangeListener(this)
   }
+  @Loggable
+  override def onDestroy() {
+    log.trace("Preference::onDestroy")
+    AnyBase.deinit(this)
+    super.onDestroy()
+  }
   def onSharedPreferenceChanged(sharedPreferences: SharedPreferences, key: String) {
     log.trace("Preference::onSharedPreferenceChanged for " + key)
     updatePrefSummary(findPreference(key), key, true)
@@ -83,23 +108,23 @@ abstract class Preference(implicit dispatcher: Dispatcher) extends PreferenceAct
   protected def updatePrefSummary(p: APreference, key: String, notify: Boolean = false) = {
     log.trace("Preference::updatePrefSummary for " + p.getKey)
     p match {
-      case p: ListPreference if key == Preference.debugLevelListKey =>
-        Preference.setLogLevel(p.getValue.toString, this, notify)(logger, dispatcher)
-      case p: CheckBoxPreference if key == Preference.debugAndroidLoggingCheckBoxKey =>
-        Preference.setAndroidLogger(Preference.getAndroidLogger(this), this, notify)(logger, dispatcher)
-      case p: ListPreference if key == Preference.layoutListKey =>
-        Preference.setPrefferedLayoutOrientation(p.getValue.toString, this, notify)(logger, dispatcher)
+      case p: ListPreference if key == Preferences.debugLevelListKey =>
+        Preferences.setLogLevel(p.getValue.toString, this, notify)(logger, dispatcher)
+      case p: CheckBoxPreference if key == Preferences.debugAndroidLoggingCheckBoxKey =>
+        Preferences.setAndroidLogger(Preferences.getAndroidLogger(this), this, notify)(logger, dispatcher)
+      case p: ListPreference if key == Preferences.layoutListKey =>
+        Preferences.setPrefferedLayoutOrientation(p.getValue.toString, this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if (key == DOption.ShowDialogWelcome.tag) =>
-        Preference.ShowDialogWelcome.set(Preference.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
+        Preferences.ShowDialogWelcome.set(Preferences.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if (key == DOption.ShowDialogRate.tag) =>
-        Preference.ShowDialogRate.set(Preference.ShowDialogRate.get(this) > -1, this, notify)(logger, dispatcher)
-      case p: ListPreference if key == Preference.shutdownTimeoutKey =>
-        Preference.setShutdownTimeout(p.getValue.toString, this, notify)(logger, dispatcher)
+        Preferences.ShowDialogRate.set(Preferences.ShowDialogRate.get(this) > -1, this, notify)(logger, dispatcher)
+      case p: ListPreference if key == Preferences.shutdownTimeoutKey =>
+        Preferences.setShutdownTimeout(p.getValue.toString, this, notify)(logger, dispatcher)
     }
   }
 }
 
-object Preference extends Logging {
+object Preferences extends Logging {
   // log level
   val debugLevelListKey = "debug_level"
   val defaultLogLevelLevel = 5 // see res/xml/options.xml/ListPreference/android:defaultValue
@@ -123,7 +148,7 @@ object Preference extends Logging {
   @Loggable
   def getLogLevel(context: Context): Int = try {
     PreferenceManager.getDefaultSharedPreferences(context).
-      getString(Preference.debugLevelListKey, defaultLogLevelLevel.toString).toInt
+      getString(Preferences.debugLevelListKey, defaultLogLevelLevel.toString).toInt
   } catch {
     case e =>
       log.error(e.getMessage, e)
@@ -208,7 +233,7 @@ object Preference extends Logging {
   @Loggable
   def getAndroidLogger(context: Context): Boolean = try {
     PreferenceManager.getDefaultSharedPreferences(context).
-      getBoolean(Preference.debugAndroidLoggingCheckBoxKey, defaultAndroidLogging)
+      getBoolean(Preferences.debugAndroidLoggingCheckBoxKey, defaultAndroidLogging)
   } catch {
     case e =>
       log.error(e.getMessage, e)
@@ -239,7 +264,7 @@ object Preference extends Logging {
   @Loggable
   def getPrefferedLayoutOrientation(context: Context): Int = try {
     PreferenceManager.getDefaultSharedPreferences(context).
-      getString(Preference.layoutListKey, defaultLayout.toString).toInt
+      getString(Preferences.layoutListKey, defaultLayout.toString).toInt
   } catch {
     case e =>
       log.error(e.getMessage, e)
@@ -286,13 +311,13 @@ object Preference extends Logging {
 
   @Loggable
   def getShutdownTimeout(context: Context): Int = try {
-    Common.getPublicPreferences(context) map {
+    Option(Common.getPublicPreferences(context)) map {
       pref =>
         pref.getInt(DOption.ShutdownTimeout.tag, PreferenceManager.getDefaultSharedPreferences(context).
-          getString(Preference.shutdownTimeoutKey, defaultShutdownTimeout.toString).toInt)
+          getString(Preferences.shutdownTimeoutKey, defaultShutdownTimeout.toString).toInt)
     } getOrElse {
       PreferenceManager.getDefaultSharedPreferences(context).
-        getString(Preference.shutdownTimeoutKey, defaultShutdownTimeout.toString).toInt
+        getString(Preferences.shutdownTimeoutKey, defaultShutdownTimeout.toString).toInt
     }
   } catch {
     case e =>
@@ -304,7 +329,7 @@ object Preference extends Logging {
     setShutdownTimeout(getShutdownTimeout(context).toString, context)(logger, dispatcher)
   @Loggable
   def setShutdownTimeout(timeout: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
-    Common.getPublicPreferences(context) map {
+    Option(Common.getPublicPreferences(context)) map {
       pref =>
         if (pref.getInt(DOption.ShutdownTimeout.tag, defaultShutdownTimeout).toString == timeout) {
           log.info("current 'shutdown timeout' already set to " + timeout)
@@ -323,82 +348,141 @@ object Preference extends Logging {
       None
     }
   }
+  /*
+   * DefaultSharedPreferences - integer counter
+   * PublicPreferences - boolean flag
+   */
   object ShowDialogRate extends Logging {
-    def default = true // DOption.ShowDialogRate.default is Integer
+    def defaultShow = DOption.ShowDialogRate.default.asInstanceOf[Boolean]
+    def defaultCounter = DOption.CounterDialogRate.default.asInstanceOf[Int]
+
     @Loggable
-    def get(context: Context): Int = synchronized {
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Int = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
       try {
-        if (PreferenceManager.getDefaultSharedPreferences(context).getBoolean(DOption.ShowDialogRate.tag, default)) {
-          Common.getPublicPreferences(context) map (_.getInt(DOption.ShowDialogRate.tag, 0)) getOrElse 0
-        } else -1
-      } catch {
-        case e =>
-          log.error(e.getMessage, e)
+        if (public.getBoolean(DOption.ShowDialogRate.tag, shared.getBoolean(DOption.ShowDialogRate.tag, defaultShow)))
+          shared.getInt(DOption.CounterDialogRate.tag, defaultCounter)
+        else
           -1
+      } catch {
+        case e: ClassCastException =>
+          reset(context)(logger, dispatcher)
+          0
       }
     }
     @Loggable
-    def incAndGet(context: Context): Int = synchronized {
-      Common.getPublicPreferences(context) foreach {
-        pref =>
-          val newVal = pref.getInt(DOption.ShowDialogRate.tag, 0) + 1
-          val editor = pref.edit()
-          editor.putInt(DOption.ShowDialogRate.tag, newVal)
+    def incAndGet(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Int = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      try {
+        if (public.getBoolean(DOption.ShowDialogRate.tag, shared.getBoolean(DOption.ShowDialogRate.tag, defaultShow))) {
+          val newVal = public.getInt(DOption.CounterDialogRate.tag, defaultCounter) + 1
+          val editor = public.edit()
+          editor.putInt(DOption.CounterDialogRate.tag, newVal)
           editor.commit()
+          newVal
+        } else
+          -1
+      } catch {
+        case e: ClassCastException =>
+          reset(context)(logger, dispatcher)
+          0
       }
-      get(context)
     }
     @Loggable
     def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
       set(PreferenceManager.getDefaultSharedPreferences(context).
-        getBoolean(DOption.ShowDialogRate.tag, default), context)(logger, dispatcher)
+        getBoolean(DOption.ShowDialogRate.tag, defaultShow), context)(logger, dispatcher)
     @Loggable
-    def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
-      val currentValue = PreferenceManager.getDefaultSharedPreferences(context).
-        getBoolean(DOption.ShowDialogRate.tag, default)
-      val message = if (f)
-        Android.getString(context, "show_dialog_rate_on_notify").getOrElse("Dialog <Rate It> enabled")
-      else
-        Android.getString(context, "show_dialog_rate_off_notify").getOrElse("Dialog <Rate It> disabled")
-      if (notify)
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-      IAmMumble(message)(logger, dispatcher)
+    def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      ExceptionHandler.retry[Unit](1) {
+        try {
+          if (!shared.contains(DOption.ShowDialogRate.tag) || public.getBoolean(DOption.ShowDialogRate.tag, defaultShow) != f) {
+            log.debug("set CounterDialogRate shared preference to [%s]".format(0))
+            val sharedEditor = shared.edit
+            sharedEditor.putBoolean(DOption.ShowDialogRate.tag, f)
+            sharedEditor.commit
+          }
+          if (!public.contains(DOption.ShowDialogRate.tag) || public.getBoolean(DOption.ShowDialogRate.tag, defaultShow) != f) {
+            log.debug("set CounterDialogRate public preference to [%s]".format(f))
+            val publicEditor = public.edit()
+            publicEditor.putBoolean(DOption.ShowDialogRate.tag, f)
+            publicEditor.commit()
+          }
+          if (!public.contains(DOption.CounterDialogRate.tag)) {
+            log.debug("set CounterDialogRate public preference to [%d]".format(defaultCounter))
+            val publicEditor = public.edit()
+            publicEditor.putInt(DOption.CounterDialogRate.tag, defaultCounter)
+            publicEditor.commit()
+          }
+          val message = if (f)
+            Android.getString(context, "show_dialog_rate_on_notify").getOrElse("Dialog <Rate It> enabled")
+          else
+            Android.getString(context, "show_dialog_rate_off_notify").getOrElse("Dialog <Rate It> disabled")
+          if (notify)
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+          IAmMumble(message)(logger, dispatcher)
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            throw e
+        }
+      }
+    }
+    @Loggable
+    private def reset(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+      IAmWarn("reset preference ShowDialogRate")(logger, dispatcher)
       val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
-      sharedEditor.putBoolean(DOption.ShowDialogRate.tag, f)
-      sharedEditor.commit
+      sharedEditor.remove(DOption.ShowDialogRate.tag)
+      sharedEditor.putBoolean(DOption.ShowDialogRate.tag, defaultShow)
+      sharedEditor.commit()
+      val publicEditor = Common.getPublicPreferences(context).edit()
+      publicEditor.remove(DOption.ShowDialogRate.tag)
+      publicEditor.putBoolean(DOption.ShowDialogRate.tag, defaultShow)
+      publicEditor.remove(DOption.CounterDialogRate.tag)
+      publicEditor.putInt(DOption.CounterDialogRate.tag, defaultCounter)
+      publicEditor.commit()
     }
   }
   object ShowDialogWelcome extends Logging {
     def default = DOption.ShowDialogWelcome.default.asInstanceOf[Boolean]
     @Loggable
-    def get(context: Context): Boolean = synchronized {
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
       try {
-        PreferenceManager.getDefaultSharedPreferences(context).getBoolean(DOption.ShowDialogWelcome.tag,
-          Common.getPublicPreferences(context).map(_.getBoolean(DOption.ShowDialogWelcome.tag,
-            default)).getOrElse(default))
+        public.getBoolean(DOption.ShowDialogWelcome.tag, shared.getBoolean(DOption.ShowDialogWelcome.tag, default))
       } catch {
-        case e =>
-          log.error(e.getMessage, e)
+        case e: ClassCastException =>
+          reset(context)(logger, dispatcher)
           default
       }
     }
     @Loggable
     def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
-      set(get(context), context)(logger, dispatcher)
+      set(get(context)(logger, dispatcher), context)(logger, dispatcher)
     }
     @Loggable
     def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
-
-      Common.getPublicPreferences(context) map {
-        pref =>
-          log.debug("modify ShowDialogWelcome preference from [%s] to [%s]".
-            format(pref.getBoolean(DOption.ShowDialogWelcome.tag, default), f))
-          val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
-          sharedEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
-          sharedEditor.commit
-          val publicEditor = pref.edit()
-          publicEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
-          publicEditor.commit()
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      ExceptionHandler.retry[Unit](1) {
+        try {
+          if (!shared.contains(DOption.ShowDialogWelcome.tag) || shared.getBoolean(DOption.ShowDialogWelcome.tag, default) != f) {
+            log.debug("set ShowDialogWelcome shared preference to [%d]".format(0))
+            val sharedEditor = shared.edit
+            sharedEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
+            sharedEditor.commit
+          }
+          if (!public.contains(DOption.ShowDialogWelcome.tag) || public.getBoolean(DOption.ShowDialogWelcome.tag, default) != f) {
+            log.debug("set ShowDialogWelcome public preference to [%s]".format(f))
+            val publicEditor = public.edit()
+            publicEditor.putBoolean(DOption.ShowDialogWelcome.tag, f)
+            publicEditor.commit()
+          }
           val message = if (f)
             Android.getString(context, "show_dialog_welcome_on_notify").getOrElse("Dialog <Welcome> enabled")
           else
@@ -406,10 +490,25 @@ object Preference extends Logging {
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
-      } orElse {
-        log.fatal("unable to get public preferences with context" + context)
-        None
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            throw e
+        }
       }
+    }
+    @Loggable
+    private def reset(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+      IAmWarn("reset preference ShowDialogWelcome")(logger, dispatcher)
+
+      val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
+      sharedEditor.remove(DOption.ShowDialogWelcome.tag)
+      sharedEditor.putBoolean(DOption.ShowDialogWelcome.tag, default)
+      sharedEditor.commit()
+      val publicEditor = Common.getPublicPreferences(context).edit()
+      publicEditor.remove(DOption.ShowDialogWelcome.tag)
+      publicEditor.putBoolean(DOption.ShowDialogWelcome.tag, default)
+      publicEditor.commit()
     }
   }
 }
