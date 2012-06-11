@@ -134,7 +134,6 @@ object PublicPreferences extends Logging {
     if (preferences != null)
       Option(preferences.file.list(preferenceFilter)).foreach(_.sorted.lastOption match {
         case Some(latest) if (latest == preferences.blob.get + ".blob") =>
-          log.debug("return cached public preferences " + preferences.blob.get)
           return preferences
         case _ =>
           preferences = null
@@ -304,6 +303,7 @@ object PublicPreferences extends Logging {
           }
           // cleanup
           val oldBlob = new File(p.file, p.blob.get + ".blob")
+          log.debug("update preference record from " + p.blob.get + " to " + blob)
           p.blob.set(blob)
           if (oldBlob.exists) {
             log.debug("delete outdated preference record " + oldBlob.getName)

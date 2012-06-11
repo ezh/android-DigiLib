@@ -48,6 +48,7 @@ import android.widget.Toast
 
 abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceActivity with Logging with OnSharedPreferenceChangeListener {
   implicit protected val logger: RichLogger
+  private lazy val shared = PreferenceManager.getDefaultSharedPreferences(this)
   @Loggable
   override def onCreate(savedInstanceState: Bundle) {
     log.trace("Preference::onCreate")
@@ -59,7 +60,6 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
       } catch {
         case e: ClassCastException =>
           IAmWarn("reset broken preferences")
-          val shared = PreferenceManager.getDefaultSharedPreferences(this)
           val editor = shared.edit
           editor.clear
           editor.commit
@@ -117,7 +117,12 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
       case p: CheckBoxPreference if (key == DOption.ShowDialogWelcome.tag) =>
         Preferences.ShowDialogWelcome.set(Preferences.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if (key == DOption.ShowDialogRate.tag) =>
-        Preferences.ShowDialogRate.set(Preferences.ShowDialogRate.get(this) > -1, this, notify)(logger, dispatcher)
+        if (shared.contains(DOption.ShowDialogRate.tag))
+          // DOption.ShowDialogRate.tag exists
+          Preferences.ShowDialogRate.set(shared.getBoolean(DOption.ShowDialogRate.tag, Preferences.ShowDialogRate.defaultShow), this, notify)(logger, dispatcher)
+        else
+          // DOption.ShowDialogRate.tag not exists
+          Preferences.ShowDialogRate.set(Preferences.ShowDialogRate.get(this) > -1, this, notify)(logger, dispatcher)
       case p: ListPreference if key == Preferences.shutdownTimeoutKey =>
         Preferences.setShutdownTimeout(p.getValue.toString, this, notify)(logger, dispatcher)
     }
@@ -348,10 +353,6 @@ object Preferences extends Logging {
       None
     }
   }
-  /*
-   * DefaultSharedPreferences - integer counter
-   * PublicPreferences - boolean flag
-   */
   object ShowDialogRate extends Logging {
     def defaultShow = DOption.ShowDialogRate.default.asInstanceOf[Boolean]
     def defaultCounter = DOption.CounterDialogRate.default.asInstanceOf[Int]
@@ -362,7 +363,7 @@ object Preferences extends Logging {
       val public = Common.getPublicPreferences(context)
       try {
         if (public.getBoolean(DOption.ShowDialogRate.tag, shared.getBoolean(DOption.ShowDialogRate.tag, defaultShow)))
-          shared.getInt(DOption.CounterDialogRate.tag, defaultCounter)
+          public.getInt(DOption.CounterDialogRate.tag, defaultCounter)
         else
           -1
       } catch {
@@ -391,9 +392,12 @@ object Preferences extends Logging {
       }
     }
     @Loggable
-    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit =
-      set(PreferenceManager.getDefaultSharedPreferences(context).
-        getBoolean(DOption.ShowDialogRate.tag, defaultShow), context)(logger, dispatcher)
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      set(public.getBoolean(DOption.ShowDialogRate.tag, shared.getBoolean(DOption.ShowDialogRate.tag, defaultShow)),
+        context)(logger, dispatcher)
+    }
     @Loggable
     def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
@@ -401,13 +405,13 @@ object Preferences extends Logging {
       ExceptionHandler.retry[Unit](1) {
         try {
           if (!shared.contains(DOption.ShowDialogRate.tag) || public.getBoolean(DOption.ShowDialogRate.tag, defaultShow) != f) {
-            log.debug("set CounterDialogRate shared preference to [%s]".format(0))
+            log.debug("set ShowDialogRate shared preference to [%s]".format(0))
             val sharedEditor = shared.edit
             sharedEditor.putBoolean(DOption.ShowDialogRate.tag, f)
             sharedEditor.commit
           }
           if (!public.contains(DOption.ShowDialogRate.tag) || public.getBoolean(DOption.ShowDialogRate.tag, defaultShow) != f) {
-            log.debug("set CounterDialogRate public preference to [%s]".format(f))
+            log.debug("set ShowDialogRate public preference to [%s]".format(f))
             val publicEditor = public.edit()
             publicEditor.putBoolean(DOption.ShowDialogRate.tag, f)
             publicEditor.commit()
