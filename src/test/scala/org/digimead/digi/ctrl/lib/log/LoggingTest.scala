@@ -17,13 +17,15 @@
 package org.digimead.digi.ctrl.lib.log
 
 import java.util.Date
-import org.digimead.digi.ctrl.lib.base.AppComponent
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
+
 import org.digimead.RobotEsTrick
-import org.scalatest.matchers.ShouldMatchers._
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
+import org.scalatest.matchers.ShouldMatchers._
+
 import android.os.Bundle
 
 class LoggingTestBeforeInit_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {

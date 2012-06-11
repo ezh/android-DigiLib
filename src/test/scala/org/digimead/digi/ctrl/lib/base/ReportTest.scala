@@ -16,14 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import org.digimead.RobotEsTrick
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.log.ConsoleLogger
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.RobotEsTrick
-import org.scalatest.matchers.ShouldMatchers._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
+import org.scalatest.matchers.ShouldMatchers._
+
 import android.os.Bundle
 
 class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {

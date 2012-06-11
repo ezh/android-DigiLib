@@ -115,7 +115,12 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
       case p: ListPreference if key == Preferences.layoutListKey =>
         Preferences.setPrefferedLayoutOrientation(p.getValue.toString, this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if (key == DOption.ShowDialogWelcome.tag) =>
-        Preferences.ShowDialogWelcome.set(Preferences.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
+        if (shared.contains(DOption.ShowDialogWelcome.tag))
+          // DOption.ShowDialogWelcome.tag exists
+          Preferences.ShowDialogWelcome.set(shared.getBoolean(DOption.ShowDialogWelcome.tag, Preferences.ShowDialogWelcome.default), this, notify)(logger, dispatcher)
+        else
+          // DOption.ShowDialogWelcome.tag not exists
+          Preferences.ShowDialogWelcome.set(Preferences.ShowDialogWelcome.get(this), this, notify)(logger, dispatcher)
       case p: CheckBoxPreference if (key == DOption.ShowDialogRate.tag) =>
         if (shared.contains(DOption.ShowDialogRate.tag))
           // DOption.ShowDialogRate.tag exists

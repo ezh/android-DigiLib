@@ -36,6 +36,7 @@ class PreferencesTest
   with JUnitSuite with ShouldMatchersForJUnit {
   @volatile private var solo: Solo = null
   @volatile private var activity: PreferencesTestActivity = null
+  implicit lazy val logger = activity.log
 
   override def setUp() {
     super.setUp()
@@ -65,8 +66,6 @@ class PreferencesTest
   }
   def testDialogRate() {
     activity.log.warn("TEST testDialogRate BEGIN")
-
-    implicit val logger = activity.log
 
     PublicPreferences(activity).contains(DOption.ShowDialogRate.tag) should be(true)
 
@@ -98,10 +97,35 @@ class PreferencesTest
     solo.clickOnText(Android.getString(activity, "preference_show_dialog_rate").get)
     activity.log.warn("click end")
 
-    Thread.sleep(10000)
-
     Preferences.ShowDialogRate.get(activity) should equal(-1)
 
     activity.log.warn("TEST testDialogRate END")
+  }
+  def testDialogWelcome() {
+    activity.log.warn("TEST testDialogWelcome BEGIN")
+
+    PublicPreferences(activity).contains(DOption.ShowDialogWelcome.tag) should be(true)
+
+    PublicPreferences(activity).getBoolean(DOption.ShowDialogWelcome.tag, Preferences.ShowDialogRate.defaultShow) should equal(true)
+
+    Preferences.ShowDialogWelcome.get(activity) should equal(true)
+
+    Preferences.ShowDialogWelcome.set(false, activity, false)
+
+    Preferences.ShowDialogWelcome.get(activity) should equal(false)
+
+    Preferences.ShowDialogWelcome.set(true, activity, false)
+
+    Preferences.ShowDialogWelcome.get(activity) should equal(true)
+
+    solo.searchText(Android.getString(activity, "preference_show_dialog_welcome").get) should be(true)
+
+    activity.log.warn("click begin")
+    solo.clickOnText(Android.getString(activity, "preference_show_dialog_welcome").get)
+    activity.log.warn("click end")
+
+    Preferences.ShowDialogWelcome.get(activity) should equal(false)
+
+    activity.log.warn("TEST testDialogWelcome END")
   }
 }

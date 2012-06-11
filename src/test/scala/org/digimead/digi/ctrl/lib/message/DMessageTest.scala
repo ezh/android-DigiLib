@@ -16,14 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.message
 
-import org.scalatest.FunSuite
-import org.scalatest.BeforeAndAfter
 import org.digimead.RobotEsTrick
-import org.digimead.digi.ctrl.lib.log.Logging
-import android.os.Parcel
 import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.log.ConsoleLogger
+import org.digimead.digi.ctrl.lib.log.Logging
+import org.scalatest.BeforeAndAfter
+import org.scalatest.FunSuite
+
 import android.os.Bundle
+import android.os.Parcel
 
 class DMessageTest_IAmMumble_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
   lazy val roboClassHandler = RobotEsTrick.classHandler
