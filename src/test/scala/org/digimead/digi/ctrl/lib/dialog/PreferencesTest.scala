@@ -65,7 +65,7 @@ class PreferencesTest
     Thread.sleep(1000)
   }
   def testDialogRate() {
-    activity.log.warn("TEST testDialogRate BEGIN")
+    activity.log.warn("testDialogRate BEGIN")
 
     PublicPreferences(activity).contains(DOption.ShowDialogRate.tag) should be(true)
 
@@ -97,12 +97,14 @@ class PreferencesTest
     solo.clickOnText(Android.getString(activity, "preference_show_dialog_rate").get)
     activity.log.warn("click end")
 
+    Thread.sleep(1000)
+
     Preferences.ShowDialogRate.get(activity) should equal(-1)
 
-    activity.log.warn("TEST testDialogRate END")
+    activity.log.warn("testDialogRate END")
   }
   def testDialogWelcome() {
-    activity.log.warn("TEST testDialogWelcome BEGIN")
+    activity.log.warn("testDialogWelcome BEGIN")
 
     PublicPreferences(activity).contains(DOption.ShowDialogWelcome.tag) should be(true)
 
@@ -124,8 +126,45 @@ class PreferencesTest
     solo.clickOnText(Android.getString(activity, "preference_show_dialog_welcome").get)
     activity.log.warn("click end")
 
+    Thread.sleep(1000)
+
     Preferences.ShowDialogWelcome.get(activity) should equal(false)
 
-    activity.log.warn("TEST testDialogWelcome END")
+    activity.log.warn("testDialogWelcome END")
+  }
+  def testShutdownTimeout() {
+    activity.log.warn("testShutdownTimeout BEGIN")
+
+    PublicPreferences(activity).contains(DOption.ShutdownTimeout.tag) should be(true)
+
+    PublicPreferences(activity).getInt(DOption.ShutdownTimeout.tag, Preferences.ShutdownTimeout.default) should equal(300)
+
+    Preferences.ShutdownTimeout.get(activity) should equal(300)
+
+    Preferences.ShutdownTimeout.set("600", activity, false)
+
+    Preferences.ShutdownTimeout.get(activity) should equal(600)
+
+    Preferences.ShutdownTimeout.set("300", activity, false)
+
+    Preferences.ShutdownTimeout.get(activity) should equal(300)
+
+    solo.searchText(Android.getString(activity, "preference_shutdown_timeout").get) should be(true)
+
+    activity.log.warn("click begin")
+    solo.clickOnText(Android.getString(activity, "preference_shutdown_timeout").get)
+
+    Thread.sleep(1000)
+
+    solo.searchText("1 minute") should be(true)
+
+    solo.clickOnText("1 minute")
+    activity.log.warn("click end")
+
+    Thread.sleep(1000)
+
+    Preferences.ShutdownTimeout.get(activity) should equal(60)
+
+    activity.log.warn("testShutdownTimeout END")
   }
 }
