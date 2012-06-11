@@ -42,7 +42,7 @@
         android:enabled="true"
         android:entries="@array/layoutDisplay"
         android:entryValues="@array/layoutValue"
-        android:key="layout"
+        android:key="preffered_layout_orientation"
         android:persistent="true"
         android:selectable="true"
         android:summary="@string/preference_layout_description"

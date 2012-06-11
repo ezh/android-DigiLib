@@ -137,7 +137,7 @@ class PreferencesTest
 
     PublicPreferences(activity).contains(DOption.ShutdownTimeout.tag) should be(true)
 
-    PublicPreferences(activity).getInt(DOption.ShutdownTimeout.tag, Preferences.ShutdownTimeout.default) should equal(300)
+    PublicPreferences(activity).getString(DOption.ShutdownTimeout.tag, Preferences.ShutdownTimeout.default).toInt should equal(300)
 
     Preferences.ShutdownTimeout.get(activity) should equal(300)
 
@@ -166,5 +166,40 @@ class PreferencesTest
     Preferences.ShutdownTimeout.get(activity) should equal(60)
 
     activity.log.warn("testShutdownTimeout END")
+  }
+  def testPreferredLayoutOrientation() {
+    activity.log.warn("testPreferredLayoutOrientation BEGIN")
+
+    PublicPreferences(activity).contains(DOption.PreferredLayoutOrientation.tag) should be(true)
+
+    PublicPreferences(activity).getString(DOption.PreferredLayoutOrientation.tag, Preferences.PreferredLayoutOrientation.default).toInt should equal(4)
+
+    Preferences.PreferredLayoutOrientation.get(activity) should equal(4)
+
+    Preferences.PreferredLayoutOrientation.set("8", activity, false)
+
+    Preferences.PreferredLayoutOrientation.get(activity) should equal(8)
+
+    Preferences.PreferredLayoutOrientation.set("4", activity, false)
+
+    Preferences.PreferredLayoutOrientation.get(activity) should equal(4)
+
+    solo.searchText(Android.getString(activity, "preference_layout").get) should be(true)
+
+    activity.log.warn("click begin")
+    solo.clickOnText(Android.getString(activity, "preference_layout").get)
+
+    Thread.sleep(1000)
+
+    solo.searchText("Landscape") should be(true)
+
+    solo.clickOnText("Landscape")
+    activity.log.warn("click end")
+
+    Thread.sleep(1000)
+
+    Preferences.PreferredLayoutOrientation.get(activity) should equal(0)
+
+    activity.log.warn("testPreferredLayoutOrientation END")
   }
 }
