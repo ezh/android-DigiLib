@@ -231,4 +231,39 @@ class PreferencesTest
 
     activity.log.warn("testDebugAndroidLogger END")
   }
+  def testDebugLogLevel() {
+    activity.log.warn("testDebugLogLevel BEGIN")
+
+    PublicPreferences(activity).contains(DOption.DebugLogLevel.tag) should be(true)
+
+    PublicPreferences(activity).getString(DOption.DebugLogLevel.tag, Preferences.DebugLogLevel.default).toInt should equal(5)
+
+    Preferences.DebugLogLevel.get(activity) should equal(5)
+
+    Preferences.DebugLogLevel.set("4", activity, false)
+
+    Preferences.DebugLogLevel.get(activity) should equal(4)
+
+    Preferences.DebugLogLevel.set("5", activity, false)
+
+    Preferences.DebugLogLevel.get(activity) should equal(5)
+
+    solo.searchText(Android.getString(activity, "preference_debug_level").get) should be(true)
+
+    activity.log.warn("click begin")
+    solo.clickOnText(Android.getString(activity, "preference_debug_level").get)
+
+    Thread.sleep(1000)
+
+    solo.searchText("The WARN level designates potentially harmful situations") should be(true)
+
+    solo.clickOnText("The WARN level designates potentially harmful situations")
+    activity.log.warn("click end")
+
+    Thread.sleep(1000)
+
+    Preferences.DebugLogLevel.get(activity) should equal(2)
+
+    activity.log.warn("testDebugLogLevel END")
+  }
 }

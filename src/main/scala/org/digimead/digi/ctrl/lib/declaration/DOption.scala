@@ -30,8 +30,9 @@ object DOption extends Enumeration {
   val AsRoot: OptVal = Value("as_root", classOf[Boolean], false: java.lang.Boolean)
   val OnBoot: OptVal = Value("on_boot", classOf[Boolean], false: java.lang.Boolean)
   val Port: OptVal = Value("port", classOf[Int], 2222: java.lang.Integer)
+  val DebugLogLevel: OptVal = Value("debug_log_level", classOf[String], "5")
   val DebugAndroidLogger: OptVal = Value("debug_android_logger", classOf[Boolean], false: java.lang.Boolean)
-  val PreferredLayoutOrientation: OptVal = Value("preffered_layout_orientation", classOf[String], "4") // SCREEN_ORIENTATION_SENSOR
+  val PreferredLayoutOrientation: OptVal = Value("preferred_layout_orientation", classOf[String], "4") // SCREEN_ORIENTATION_SENSOR
   val ShutdownTimeout: OptVal = Value("shutdown_timeout", classOf[String], "300")
   val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], true: java.lang.Boolean)
   val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Boolean], true: java.lang.Boolean)
