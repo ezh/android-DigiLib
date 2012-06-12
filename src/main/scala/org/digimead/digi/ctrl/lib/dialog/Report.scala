@@ -99,7 +99,7 @@ object Report extends Logging {
                         }
                       }
                   })
-                  val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
+                  val file = new File(info.reportPathInternal, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
                   file.createNewFile()
                   writer = new PrintWriter(file)
                   val time = System.currentTimeMillis
@@ -190,7 +190,7 @@ object Report extends Logging {
         val bitmap = Bitmap.createBitmap(content.getWidth, content.getHeight, Config.ARGB_8888)
         val canvas = new Canvas(bitmap)
         content.draw(canvas)
-        val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".png")
+        val file = new File(info.reportPathInternal, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".png")
         file.createNewFile()
         ostream = new FileOutputStream(file)
         bitmap.compress(CompressFormat.PNG, 100, ostream)
@@ -207,9 +207,8 @@ object Report extends Logging {
     info =>
       if (searchAndSubmitLock.compareAndSet(false, true)) {
         Thread.sleep(DTimeout.short) // take it gently ;-)
-        log.info("looking for stack trace reports in: " + info.reportPath)
-        val dir = new File(info.reportPath + "/")
-        val reports = Option(dir.list()).getOrElse(Array[String]())
+        log.info("looking for stack trace reports in: " + info.reportPathInternal)
+        val reports = Option(info.reportPathInternal.list()).getOrElse(Array[String]())
         if (reports.exists(_.endsWith(org.digimead.digi.ctrl.lib.base.Report.traceFileExtension)))
           submit(activity, Some("stack trace detected"))
       }

@@ -270,21 +270,24 @@ object AnyBase extends Logging {
       }
     }
   }
-  case class Info(val reportPath: File,
+  case class Info(val reportPathInternal: File,
+    val reportPathExternal: File,
     val appVersion: String,
     val appBuild: String,
     val appPackage: String,
     val phoneModel: String,
     val androidVersion: String,
     val write: Boolean) {
-    log.debug("reportPath: " + reportPath)
+    log.debug("reportPathInternal: " + reportPathInternal)
+    log.debug("reportPathExternal: " + reportPathExternal)
     log.debug("appVersion: " + appVersion)
     log.debug("appBuild: " + appBuild)
     log.debug("appPackage: " + appPackage)
     log.debug("phoneModel: " + phoneModel)
     log.debug("androidVersion: " + androidVersion)
     log.debug("write to storage: " + write)
-    override def toString = "reportPath: " + reportPath +
+    override def toString = "reportPathInternal: " + reportPathInternal +
+      ", reportPathExternal: " + reportPathExternal +
       ", appVersion: " + appVersion + ", appBuild: " + appBuild +
       ", appPackage: " + appPackage + ", phoneModel: " + phoneModel +
       ", androidVersion: " + androidVersion
@@ -297,7 +300,8 @@ object AnyBase extends Logging {
         val pi = pm.getPackageInfo(context.getPackageName(), 0)
         val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
         val writeReport = pref.getBoolean(pi.packageName, true)
-        val info = new AnyBase.Info(reportPath = Common.getDirectory(context, reportDirectory, false, 755).get,
+        val info = new AnyBase.Info(reportPathInternal = Common.getDirectory(context, reportDirectory, true, 755).get,
+          reportPathExternal = Common.getDirectory(context, reportDirectory, false, 755).get,
           appVersion = pi.versionName,
           appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,

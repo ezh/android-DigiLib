@@ -87,7 +87,7 @@ object FileLogger extends Logger with Logging {
     deinit
     // open new
     file = AnyBase.info.get.flatMap(info => {
-      val file = new File(info.reportPath, getLogFileName)
+      val file = new File(info.reportPathInternal, getLogFileName)
       if (file.exists) {
         log.warn("log file " + file + " already exists")
         Some(file)

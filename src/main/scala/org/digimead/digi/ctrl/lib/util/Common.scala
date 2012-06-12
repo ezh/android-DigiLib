@@ -363,10 +363,9 @@ object Common extends Logging {
       log.error(e.getMessage, e)
   }
   @Loggable
-  def copyFile(sourceFile: File, destFile: File) {
-    if (!destFile.exists()) {
-      destFile.createNewFile();
-    }
+  def copyFile(sourceFile: File, destFile: File): Boolean = {
+    if (!destFile.exists())
+      destFile.createNewFile()
     var source: FileChannel = null
     var destination: FileChannel = null
     try {
@@ -381,6 +380,7 @@ object Common extends Logging {
         destination.close()
       }
     }
+    sourceFile.length == destFile.length
   }
   @Loggable
   def deleteFile(dfile: File): Unit = {
