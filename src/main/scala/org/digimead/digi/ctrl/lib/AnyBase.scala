@@ -39,30 +39,30 @@ import android.app.Service
 import android.content.Context
 
 private[lib] trait AnyBase extends Logging {
-  protected def onCreateBase(context: Context, callSuper: => Any = {}) = synchronized {
+  protected def onCreateBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onCreateBase")
     callSuper
     AnyBase.init(context)
   }
-  protected def onStartBase(context: Context) = synchronized {
+  protected def onStartBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onStartBase")
     AnyBase.reset(context, "onStart")
     if (AppComponent.Inner == null)
       AnyBase.init(context)
   }
-  protected def onResumeBase(context: Context) = synchronized {
+  protected def onResumeBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onResumeBase")
     AnyBase.stopOnShutdownTimer(context, "onResume")
   }
-  protected def onPauseBase(context: Context) = synchronized {
+  protected def onPauseBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onPauseBase")
     AnyBase.stopOnShutdownTimer(context, "onPause")
   }
-  protected def onStopBase(context: Context, shutdownIfActive: Boolean) = synchronized {
+  protected def onStopBase(context: Context, shutdownIfActive: Boolean) = AnyBase.synchronized {
     log.trace("AnyBase::onStopBase")
     AnyBase.startOnShutdownTimer(context, shutdownIfActive)
   }
-  protected def onDestroyBase(context: Context, callSuper: => Any = {}) = synchronized {
+  protected def onDestroyBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onDestroyBase")
     callSuper
     AnyBase.deinit(context)

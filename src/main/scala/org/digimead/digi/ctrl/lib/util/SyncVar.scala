@@ -50,15 +50,15 @@ class SyncVar[A] extends Logging {
    * Waits `timeout` millis. If `timeout <= 0` just returns 0. If the system clock
    *  went backward, it will return 0, so it never returns negative results.
    */
-  protected def waitMeasuringElapsed(timeout: Long): Long = if (timeout <= 0) 0 else {
+  protected def waitMeasuringElapsed(fName: String, timeout: Long): Long = if (timeout <= 0) 0 else {
     val start = System.currentTimeMillis
     value.synchronized {
-      log.traceWhere(this + " get(" + timeout + ") waiting", -4)
+      log.traceWhere(this + " " + fName + "(" + timeout + ") waiting", -4)
       value.wait(timeout)
     }
     val elapsed = System.currentTimeMillis - start
     val result = if (elapsed < 0) 0 else elapsed
-    log.traceWhere(this + " get(" + timeout + ") running, reserve " + (timeout - result), -4)
+    log.traceWhere(this + " " + fName + "(" + timeout + ") running, reserve " + (timeout - result), -4)
     result
   }
 
@@ -84,7 +84,7 @@ class SyncVar[A] extends Logging {
          *  by counting time elapsed directly.  Loop required
          *  to deal with spurious wakeups.
          */
-        val elapsed = waitMeasuringElapsed(rest)
+        val elapsed = waitMeasuringElapsed("get", rest)
         rest -= elapsed
       }
       value.get
@@ -112,7 +112,7 @@ class SyncVar[A] extends Logging {
          *  by counting time elapsed directly.  Loop required
          *  to deal with spurious wakeups.
          */
-        val elapsed = waitMeasuringElapsed(rest)
+        val elapsed = waitMeasuringElapsed("get", rest)
         rest -= elapsed
       }
       value.get
@@ -182,8 +182,7 @@ class SyncVar[A] extends Logging {
            *  by counting time elapsed directly.  Loop required
            *  to deal with spurious wakeups.
            */
-          rest -= waitMeasuringElapsed(rest)
-          log.traceWhere(this + " put(...) running", Logging.Where.BEFORE)
+          rest -= waitMeasuringElapsed("put", rest)
         }
     } else if (value.compareAndSet(None, Some(x)))
       value.synchronized {
@@ -204,5 +203,23 @@ class SyncVar[A] extends Logging {
       else
         value.notify
     }
+  }
+
+  def waitUnset(timeout: Long): Boolean = {
+    if (timeout > 0) {
+      var rest = timeout
+      while ((if (value.get == None) return true else true) && rest >= 0)
+        value.synchronized {
+          log.traceWhere(this + " waitUnset(...) waiting, current value is " + value, Logging.Where.BEFORE)
+          /**
+           * Defending against the system clock going backward
+           *  by counting time elapsed directly.  Loop required
+           *  to deal with spurious wakeups.
+           */
+          rest -= waitMeasuringElapsed("waitUnset", rest)
+          if (value.get == None) return true
+        }
+      false
+    } else isSet
   }
 }

@@ -18,38 +18,28 @@ package org.digimead.digi.ctrl.lib
 
 import org.digimead.digi.ctrl.lib.log.AndroidLogger
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.scalatest.junit.JUnitSuite
+import org.scalatest.junit.ShouldMatchersForJUnit
 
 import com.jayway.android.robotium.solo.Solo
 
 import android.test.ActivityInstrumentationTestCase2
 
 class DigiLibTest
-  extends ActivityInstrumentationTestCase2[DigiLibTestActivity]("org.digimead.digi.ctrl.lib", classOf[DigiLibTestActivity]) {
+  extends ActivityInstrumentationTestCase2[DigiLibTestActivity]("org.digimead.digi.ctrl.lib", classOf[DigiLibTestActivity])
+  with JUnitSuite with ShouldMatchersForJUnit {
   @volatile private var solo: Solo = null
   @volatile private var activity: DigiLibTestActivity = null
-  def testHelloWorld() {
-    android.util.Log.i("DigiLibTest", "TEST testHelloWorld BEGIN")
-    activity.log.warn("TEST testHelloWorld BEGIN")
-    activity.log.warn("TEST testHelloWorld END")
-    android.util.Log.i("DigiLibTest", "TEST testHelloWorld END")
-  }
   override def setUp() {
     super.setUp()
     Logging.reset(true)
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
-    activity.log.info("setUp")
     Logging.addLogger(AndroidLogger)
-    android.util.Log.i("DigiLibTest", "setUp")
-  }
-  def testLogin() {
-    android.util.Log.i("DigiLibTest", "TEST testLogin BEGIN")
-    activity.log.warn("TEST testLogin BEGIN")
-    activity.log.warn("TEST testLogin END")
-    android.util.Log.i("DigiLibTest", "TEST testLogin END")
+    activity.log.info("setUp")
   }
   override def tearDown() = {
-    android.util.Log.i("DigiLibTest", "tearDown")
+    activity.log.info("tearDown")
     try {
       solo.finalize()
     } catch {
@@ -59,5 +49,14 @@ class DigiLibTest
     activity.finish()
     super.tearDown()
     Thread.sleep(1000)
+  }
+  def testHelloWorld() {
+    android.util.Log.i("DigiLibTest", "testHelloWorld BEGIN")
+    activity.log.warn("testHelloWorld BEGIN")
+
+    true should be(true)
+
+    activity.log.warn("testHelloWorld END")
+    android.util.Log.i("DigiLibTest", "testHelloWorld END")
   }
 }

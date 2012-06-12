@@ -45,12 +45,12 @@ object Logging extends Publisher[LoggingEvent] {
   @volatile private[log] var isInfoEnabled = true
   @volatile private[log] var isWarnEnabled = true
   @volatile private[log] var isErrorEnabled = true
+  @volatile private[log] var loggingThread = new Thread() // stub
   private[log] val flushLimit = 1000
   private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
   private[log] val queue = new ConcurrentLinkedQueue[Record]
   private[log] var logger = new HashSet[Logger]()
   private[log] var richLogger = new HashMap[String, RichLogger]()
-  private[log] var loggingThread = new Thread() // stub
   private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
   private[log] var shutdownHook: Thread = null
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
@@ -125,27 +125,35 @@ object Logging extends Publisher[LoggingEvent] {
       shutdownHook = null
     }
   }
-  def suspend() = synchronized {
+  def suspend() = {
+    // non blocking check
     if (loggingThread.isAlive)
-      loggingThread = new Thread() // stub
+      synchronized {
+        if (loggingThread.isAlive)
+          loggingThread = new Thread() // stub
+      }
   }
-  def resume() = synchronized {
-    if (!loggingThread.isAlive) {
-      loggingThread = new Thread("GenericLogger for " + Logging.getClass.getName) {
-        this.setDaemon(true)
-        @tailrec
-        override def run() = {
-          if (logger.nonEmpty && !queue.isEmpty) {
-            flushQueue(flushLimit)
-            Thread.sleep(50)
-          } else
-            Thread.sleep(500)
-          if (loggingThread.getId == this.getId)
-            run
+  def resume() = {
+    // non blocking check
+    if (!loggingThread.isAlive)
+      synchronized {
+        if (!loggingThread.isAlive) {
+          loggingThread = new Thread("GenericLogger for " + Logging.getClass.getName) {
+            this.setDaemon(true)
+            @tailrec
+            override def run() = {
+              if (logger.nonEmpty && !queue.isEmpty) {
+                flushQueue(flushLimit)
+                Thread.sleep(50)
+              } else
+                Thread.sleep(500)
+              if (loggingThread.getId == this.getId)
+                run
+            }
+          }
+          loggingThread.start
         }
       }
-      loggingThread.start
-    }
   }
   def flush() = synchronized {
     while (flushQueue(flushLimit) != 0)
@@ -166,7 +174,12 @@ object Logging extends Publisher[LoggingEvent] {
       }
       records = records :+ record
       count += 1;
-      publish(record)
+      try {
+        publish(record)
+      } catch {
+        case e =>
+          offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, e.getMessage, Some(e)))
+      }
     }
     logger.foreach(_(records))
     count

@@ -34,13 +34,11 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.Date
-
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
 import scala.util.control.ControlThrowable
-
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConnection
@@ -53,7 +51,6 @@ import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.ICtrlComponent
-
 import android.app.Activity
 import android.app.Dialog
 import android.content.pm.PackageManager
@@ -63,9 +60,11 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.Environment
 import android.os.IBinder
+import java.io.BufferedWriter
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
+  @volatile private[util] var externalStorageDisabled: Option[Boolean] = None
   log.debug("alive")
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
@@ -85,7 +84,7 @@ object Common extends Logging {
     var isExternal = true
     var isNew = false
     log.debug("get working directory, mode 'force internal': " + forceInternal)
-    if (!forceInternal) {
+    if (!forceInternal && externalStorageDisabled != Some(true)) {
       // try to use external storage
       try {
         directory = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
@@ -119,6 +118,28 @@ object Common extends Logging {
               if (!baseFiles.mkdir) {
                 log.error("mkdir '" + baseFiles + "' failed")
                 baseReady = false
+              }
+            }
+            if (externalStorageDisabled == None) {
+              try {
+                log.debug("test external storage")
+                val testFile = new File(baseFiles, "testExternalStorage.tmp")
+                val testContent = (for (i <- 0 until 1024) yield i).mkString // about 2.9 kB
+                val out = new BufferedWriter(new FileWriter(testFile))
+                out.write(testContent)
+                out.close()
+                assert(testFile.length == testContent.length)
+                if (scala.io.Source.fromFile(testFile).getLines.mkString == testContent) {
+                  log.debug("external storge test successful")
+                  externalStorageDisabled = Some(false)
+                } else {
+                  log.debug("external storge test failed")
+                  externalStorageDisabled = Some(true)
+                }
+              } catch {
+                case e =>
+                  log.debug("external storge test failed, " + e.getMessage)
+                  externalStorageDisabled = Some(true)
               }
             }
             if (baseReady)
@@ -171,7 +192,7 @@ object Common extends Logging {
       try { Android.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
     directory
   }
-  @Loggable
+  @Loggable(result = false)
   def getPublicPreferences(context: Context): PublicPreferences =
     PublicPreferences(context)
   @Loggable

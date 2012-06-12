@@ -507,7 +507,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
 
   @Loggable
   def deinitializationTimeout(context: Context): Int = {
-    implicit val dispatcher = new Dispatcher() {def process(message: DMessage): Unit = {}}
+    implicit val dispatcher = new Dispatcher() { def process(message: DMessage): Unit = {} }
     // dispatch messages of Preferences.ShutdownTimeout to the void, noWhere is the destiny 
     val result = Preferences.ShutdownTimeout.get(context)
     log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
@@ -590,7 +590,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppComponent for " + packageName)
-    publish(Event.Shutdown)
+    try { publish(Event.Shutdown) } catch { case e => log.error(e.getMessage, e) }
     assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
@@ -800,7 +800,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         super.set(newState, signalAll)
       }
       log.debugWhere("set status to " + newState, Logging.Where.BEFORE)
-      publish(newState)
+      try { publish(newState) } catch { case e => log.error(e.getMessage, e) }
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     override def get() = super.get match {

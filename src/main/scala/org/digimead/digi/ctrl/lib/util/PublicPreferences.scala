@@ -246,7 +246,10 @@ object PublicPreferences extends Logging {
           }
       }
     }
-    onSharedPreferenceChangeListeners = onSharedPreferenceChangeListeners :+ listener
+    if (onSharedPreferenceChangeListeners.contains(listener))
+      log.fatal("onSharedPreferenceChangeListener already exists " + listener)
+    else
+      onSharedPreferenceChangeListeners = onSharedPreferenceChangeListeners :+ listener
   }
   @Loggable
   def unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) = synchronized {

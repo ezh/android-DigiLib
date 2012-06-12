@@ -157,6 +157,7 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
 object Preferences extends Logging {
   @Loggable
   def initPersistentOptions(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+    DebugLogLevel.set(context)(logger, dispatcher)
     DebugAndroidLogger.set(context)(logger, dispatcher)
     PreferredLayoutOrientation.set(context)(logger, dispatcher)
     ShutdownTimeout.set(context)(logger, dispatcher)
@@ -299,7 +300,7 @@ object Preferences extends Logging {
         sharedEditor.putBoolean(DOption.DebugAndroidLogger.tag, f)
         sharedEditor.commit
       }
-      if (!public.contains(DOption.DebugAndroidLogger.tag) || public.getString(DOption.DebugAndroidLogger.tag, default.toString) != f) {
+      if (!public.contains(DOption.DebugAndroidLogger.tag) || public.getBoolean(DOption.DebugAndroidLogger.tag, default) != f) {
         log.debug("set DebugAndroidLogger public preference to [%s]".format(f))
         val publicEditor = public.edit()
         publicEditor.putBoolean(DOption.DebugAndroidLogger.tag, f)
