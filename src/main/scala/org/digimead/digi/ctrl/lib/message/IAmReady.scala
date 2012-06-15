@@ -28,7 +28,7 @@ case class IAmReady(val origin: Origin, val message: String,
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceEnabled)
+    if (logger.isTraceWhereEnabled)
       logger.infoWhere("IAmReady " + message + " ts#" + ts, Logging.Where.ALL)
     else
       logger.info("IAmReady " + message + " ts#" + ts)

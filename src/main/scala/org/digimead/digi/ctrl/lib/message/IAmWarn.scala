@@ -29,7 +29,7 @@ case class IAmWarn(val origin: Origin, val message: String, @transient val onCli
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceEnabled)
+    if (logger.isTraceWhereEnabled)
       logger.warnWhere("IAmWarn " + message + " ts#" + ts, Logging.Where.ALL)
     else
       logger.warn("IAmWarn " + message + " ts#" + ts)

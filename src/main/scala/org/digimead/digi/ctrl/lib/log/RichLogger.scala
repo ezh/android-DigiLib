@@ -47,6 +47,7 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
     error(msg, t)
   }
   // trace
+  def isTraceWhereEnabled(): Boolean = Logging.isTraceWhereEnabled
   /* @see org.slf4j.Logger#isTraceEnabled() */
   def isTraceEnabled(): Boolean = Logging.isTraceEnabled
   def trace(msg: String) = if (Logging.isTraceEnabled)

@@ -79,7 +79,8 @@ object Common extends Logging {
   }
   // -rwx--x--x 711
   @Loggable
-  def getDirectory(context: Context, name: String, forceInternal: Boolean = false, chmod: Int = 711): Option[File] = {
+  def getDirectory(context: Context, name: String, forceInternal: Boolean,
+    allRead: Option[Boolean], allWrite: Option[Boolean], allExecute: Option[Boolean]): Option[File] = {
     var directory: Option[File] = None
     var isExternal = true
     var isNew = false
@@ -188,8 +189,23 @@ object Common extends Logging {
           directory = None
       }
     }
-    if (directory != None && isNew && !isExternal)
-      try { Android.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
+    if (directory != None && isNew && !isExternal) {
+      allRead match {
+        case Some(true) => directory.get.setReadable(true, false)
+        case Some(false) => directory.get.setReadable(true, true)
+        case None => directory.get.setReadable(false, false)
+      }
+      allWrite match {
+        case Some(true) => directory.get.setWritable(true, false)
+        case Some(false) => directory.get.setWritable(true, true)
+        case None => directory.get.setWritable(false, false)
+      }
+      allExecute match {
+        case Some(true) => directory.get.setExecutable(true, false)
+        case Some(false) => directory.get.setExecutable(true, true)
+        case None => directory.get.setExecutable(false, false)
+      }
+    }
     directory
   }
   @Loggable(result = false)
@@ -383,7 +399,9 @@ object Common extends Logging {
     sourceFile.length == destFile.length
   }
   @Loggable
-  def deleteFile(dfile: File): Unit = {
+  def deleteFile(dfile: File): Unit =
+    if (dfile.isDirectory) deleteFileRecursive(dfile) else dfile.delete
+  private def deleteFileRecursive(dfile: File) {
     if (dfile.isDirectory)
       dfile.listFiles.foreach { f => deleteFile(f) }
     dfile.delete

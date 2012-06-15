@@ -194,6 +194,7 @@ object Report extends Logging {
         file.createNewFile()
         ostream = new FileOutputStream(file)
         bitmap.compress(CompressFormat.PNG, 100, ostream)
+        file.setReadable(true, false)
       } catch {
         case e =>
           log.error(e.getMessage, e)

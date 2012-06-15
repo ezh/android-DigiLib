@@ -300,8 +300,12 @@ object AnyBase extends Logging {
         val pi = pm.getPackageInfo(context.getPackageName(), 0)
         val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
         val writeReport = pref.getBoolean(pi.packageName, true)
-        val info = new AnyBase.Info(reportPathInternal = Common.getDirectory(context, reportDirectory, true, 755).get,
-          reportPathExternal = Common.getDirectory(context, reportDirectory, false, 755).get,
+        // 755
+        val info = new AnyBase.Info(reportPathInternal = Common.getDirectory(context, reportDirectory, true,
+          Some(true), Some(false), Some(true)).get,
+          // 755
+          reportPathExternal = Common.getDirectory(context, reportDirectory, false,
+            Some(true), Some(false), Some(true)).get,
           appVersion = pi.versionName,
           appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,

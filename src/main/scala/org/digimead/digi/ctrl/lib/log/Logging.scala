@@ -40,6 +40,7 @@ sealed trait LoggingEvent
 
 object Logging extends Publisher[LoggingEvent] {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
+  @volatile private[log] var isTraceWhereEnabled = false
   @volatile private[log] var isTraceEnabled = true
   @volatile private[log] var isDebugEnabled = true
   @volatile private[log] var isInfoEnabled = true

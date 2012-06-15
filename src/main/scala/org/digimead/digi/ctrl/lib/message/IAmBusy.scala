@@ -28,7 +28,7 @@ case class IAmBusy(val origin: Origin, val message: String,
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceEnabled)
+    if (logger.isTraceWhereEnabled)
       logger.infoWhere("IAmBusy " + message + " ts#" + ts, Logging.Where.ALL)
     else
       logger.info("IAmBusy " + message + " ts#" + ts)

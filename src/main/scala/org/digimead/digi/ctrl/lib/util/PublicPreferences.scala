@@ -209,7 +209,7 @@ object PublicPreferences extends Logging {
     }
   } getOrElse { throw new RuntimeException("public preferences unavailable") }
   def getLocation(context: Context, forceInternal: Boolean = false): Option[File] =
-    Common.getDirectory(context, ".", forceInternal).flatMap(dir => {
+    Common.getDirectory(context, ".", forceInternal, Some(true), Some(false), Some(true)).flatMap(dir => {
       // package path,that prevent erase
       val file = new File(dir.getParentFile.getParentFile, "preferences")
       if (!file.isDirectory) {

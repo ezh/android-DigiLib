@@ -76,13 +76,13 @@ class CommonTest
 
     logSubscriber.lockAfterMatch.set(true)
     Logging.suspend
-    Common.getDirectory(activity, "test")
+    Common.getDirectory(activity, "test", false, Some(true), Some(true), Some(true))
     assertLog("get working directory, mode 'force internal': false", _ == _, 10000)
     assertLog("try SD storage directory", _.startsWith(_), 10000)
     assertLog("test external storage", _ == _, 10000)
     logResult.unset()
-    
-    Common.externalStorageDisabled should be (Some(false))
+
+    Common.externalStorageDisabled should be(Some(false))
 
     activity.log.warn("testGetDirectory END")
   }

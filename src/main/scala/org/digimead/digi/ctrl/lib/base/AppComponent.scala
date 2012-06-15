@@ -83,8 +83,9 @@ protected class AppComponent private () extends Actor with Logging {
   lazy val state = new AppComponent.StateContainer
   lazy val internalStorage = AppComponent.Context.flatMap(ctx => Option(ctx.getFilesDir()))
   // -rwx--x--x 711
-  lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
-  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, 700))
+  lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, Some(false), Some(false), Some(true)))
+  // -rwx------ 711
+  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, Some(false), Some(false), Some(true)))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
     AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
