@@ -155,15 +155,6 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
 }
 // default values are also duplicated at res/xml/options.xml/.../android:defaultValue
 object Preferences extends Logging {
-  @Loggable
-  def initPersistentOptions(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
-    DebugLogLevel.set(context)(logger, dispatcher)
-    DebugAndroidLogger.set(context)(logger, dispatcher)
-    PreferredLayoutOrientation.set(context)(logger, dispatcher)
-    ShutdownTimeout.set(context)(logger, dispatcher)
-    ShowDialogRate.set(context)(logger, dispatcher)
-    ShowDialogWelcome.set(context)(logger, dispatcher)
-  }
   object DebugLogLevel extends Logging {
     @volatile private var lastLogLevelLevel = ""
     def default = DOption.DebugLogLevel.default.asInstanceOf[String]

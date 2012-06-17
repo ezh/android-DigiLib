@@ -615,12 +615,12 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
   def Inner = inner
   def Context = AnyBase.getContext
   object LazyInit {
-    // priority -> Seq(functions)
-    @volatile private var pool: LongMap[Seq[() => Any]] = LongMap()
-    private val timeout = DTimeout.long
-    def apply(description: String, priority: Long = 0)(f: => Any)(implicit log: RichLogger) = synchronized {
-      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[() => Any]()
-      pool = pool + (priority -> (storedFunc :+ (() => {
+    // priority -> Seq((timeout, function))
+    @volatile private var pool: LongMap[Seq[(Int, () => Any)]] = LongMap()
+    private val defaultTimeout = DTimeout.long
+    def apply(description: String, priority: Long = 0, timeout: Int = defaultTimeout)(f: => Any)(implicit log: RichLogger) = synchronized {
+      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[(Int, () => Any)]()
+      pool = pool + (priority -> (storedFunc :+ (timeout, () => {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
         val tsBegin = System.currentTimeMillis
@@ -633,12 +633,18 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     def init() = synchronized {
       for (prio <- pool.keys.toSeq.sorted) {
         log.debug("running " + pool(prio).size + " LazyInit routine(s) at priority level " + prio)
-        val futures = pool(prio).map(f => future {
-          try {
-            f()
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+        var timeout = 0
+        val futures = pool(prio).map(t => {
+          val fTimeout = t._1
+          val f = t._2
+          timeout = scala.math.max(timeout, fTimeout)
+          future {
+            try {
+              f()
+            } catch {
+              case e =>
+                log.error(e.getMessage, e)
+            }
           }
         })
         awaitAll(timeout, futures: _*)

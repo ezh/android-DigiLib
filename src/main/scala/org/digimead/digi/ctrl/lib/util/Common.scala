@@ -399,12 +399,17 @@ object Common extends Logging {
     sourceFile.length == destFile.length
   }
   @Loggable
-  def deleteFile(dfile: File): Unit =
+  def deleteFile(dfile: File): Boolean =
     if (dfile.isDirectory) deleteFileRecursive(dfile) else dfile.delete
-  private def deleteFileRecursive(dfile: File) {
+  private def deleteFileRecursive(dfile: File): Boolean = {
     if (dfile.isDirectory)
-      dfile.listFiles.foreach { f => deleteFile(f) }
-    dfile.delete
+      dfile.listFiles.foreach { f => deleteFileRecursive(f) }
+    dfile.delete match {
+      case true => true
+      case false =>
+        log.error("unable to delete \"" + dfile + "\"")
+        false
+    }
   }
   @Loggable
   def isSignedWithDebugKey(context: Context, clazz: Class[_], debugKey: String): Boolean = try {
@@ -416,7 +421,7 @@ object Common extends Logging {
       log.debug("package " + c.getPackageName() + " has been signed with the debug key")
       true
     } else {
-      log.debug("package " + c.getPackageName() + "signed with a key other than the debug key")
+      log.debug("package " + c.getPackageName() + " signed with a key other than the debug key")
       false
     }
   } catch {
