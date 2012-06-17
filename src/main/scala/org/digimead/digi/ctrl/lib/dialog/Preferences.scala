@@ -427,7 +427,7 @@ object Preferences extends Logging {
             publicEditor.putString(DOption.ShutdownTimeout.tag, timeout)
             publicEditor.commit()
           }
-          val message = Android.getString(context, "shutdown_timeout_on_notify").getOrElse("Set timeout to %s seconds").format(timeout)
+          val message = Android.getString(context, "set_shutdown_timeout_notify").getOrElse("Set timeout to %s seconds").format(timeout)
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -626,6 +626,80 @@ object Preferences extends Logging {
       val publicEditor = Common.getPublicPreferences(context).edit()
       publicEditor.remove(DOption.ShowDialogWelcome.tag)
       publicEditor.putBoolean(DOption.ShowDialogWelcome.tag, default)
+      publicEditor.commit()
+    }
+  }
+  object CachePeriod extends Preference[Int](DOption.CachePeriod, (s) => s.toInt,
+    "set_cache_period_notify", "Set cache period to %s seconds") {}
+  object CacheFolder extends Preference[String](DOption.CacheFolder, (s) => s,
+    "set_cache_folder_notify", "Set cache folder to \"%s\"") {
+    override def default = AppComponent.Context.get.getCacheDir.getAbsolutePath + "/"
+  }
+  object CacheClass extends Preference[String](DOption.CacheClass, (s) => s,
+    "set_cache_class_notify", "Set cache class to \"%s\"") {}
+  abstract class Preference[T](option: DOption.OptVal, convert: String => T, messageID: String, messageFallBack: String) {
+    def default = option.default.asInstanceOf[String]
+    @Loggable
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): T = synchronized {
+      try {
+        val shared = PreferenceManager.getDefaultSharedPreferences(context)
+        val public = Common.getPublicPreferences(context)
+        try {
+          convert(public.getString(option.tag, shared.getString(option.tag, default.toString)))
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            convert(default)
+        }
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+          convert(default)
+      }
+    }
+    @Loggable
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      set(get(context)(logger, dispatcher).toString, context)(logger, dispatcher)
+    }
+    @Loggable
+    def set(value: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      ExceptionHandler.retry[Unit](1) {
+        try {
+          if (!shared.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
+            log.debug("set %s shared preference to [%s]".format(option.toString, value))
+            val sharedEditor = shared.edit
+            sharedEditor.putString(option.tag, value)
+            sharedEditor.commit
+          }
+          if (!public.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
+            log.debug("set %s public preference to [%s]".format(option.toString, value))
+            val publicEditor = public.edit()
+            publicEditor.putString(option.tag, value)
+            publicEditor.commit()
+          }
+          val message = Android.getString(context, messageID).getOrElse(messageFallBack).format(value)
+          if (notify)
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+          IAmMumble(message)(logger, dispatcher)
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            throw e
+        }
+      }
+    }
+    @Loggable
+    private def reset(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+      IAmWarn("reset preference " + option)(logger, dispatcher)
+      val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
+      sharedEditor.remove(option.tag)
+      sharedEditor.putString(option.tag, default.toString)
+      sharedEditor.commit()
+      val publicEditor = Common.getPublicPreferences(context).edit()
+      publicEditor.remove(option.tag)
+      publicEditor.putString(option.tag, default.toString)
       publicEditor.commit()
     }
   }

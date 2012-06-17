@@ -90,7 +90,7 @@ case class PublicPreferences private (val file: File, val bundle: Bundle, baseBl
 object PublicPreferences extends Logging {
   @volatile private[util] var preferences: PublicPreferences = null
   @volatile private[util] var onSharedPreferenceChangeListeners: Seq[SharedPreferences.OnSharedPreferenceChangeListener] = Seq()
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[PublicPreferences] = new Parcelable.Creator[PublicPreferences]() {
     def createFromParcel(in: Parcel): PublicPreferences = try {
       log.debug("createFromParcel new PublicPreferences")
@@ -257,13 +257,7 @@ object PublicPreferences extends Logging {
     if (onSharedPreferenceChangeListeners.isEmpty)
       AppComponent.Context foreach {
         ctx =>
-          val context = ctx.getApplicationContext
-          try {
-            context.unregisterReceiver(preferencesUpdateReceiver)
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
-          }
+          ctx.getApplicationContext.unregisterReceiver(preferencesUpdateReceiver)
       }
   }
   @Loggable

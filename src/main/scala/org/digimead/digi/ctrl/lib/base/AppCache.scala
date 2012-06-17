@@ -34,19 +34,18 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 
 import scala.actors.Actor
-import scala.annotation.elidable
-import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.SynchronizedMap
 import scala.ref.SoftReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DConstant
-import org.digimead.digi.ctrl.lib.declaration.DOption
-import org.digimead.digi.ctrl.lib.declaration.DPreference
+import org.digimead.digi.ctrl.lib.dialog.Preferences
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.message.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 
 import android.content.Context
-import annotation.elidable.ASSERTION
 
 trait AppCacheT[K, V] {
   def get(namespace: scala.Enumeration#Value, key: K): Option[V]
@@ -300,10 +299,10 @@ object AppCache extends Actor with Logging {
     } else
       log.info("initialize AppCache for " + context.getPackageName())
     contextPackageName = context.getPackageName()
-    val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
-    period = pref.getLong(DOption.CachePeriod.tag, period)
-    cachePath = pref.getString(DOption.CacheFolder.tag, context.getCacheDir + "/")
-    cacheClass = pref.getString(DOption.CacheClass.tag, cacheClass)
+    implicit val dispatcher = new Dispatcher() { def process(message: DMessage): Unit = {} }
+    period = Preferences.CachePeriod.get(context)
+    cachePath = Preferences.CacheFolder.get(context)
+    cacheClass = Preferences.CacheClass.get(context)
     if (innerCache != null) {
       inner = innerCache
     } else {
@@ -321,6 +320,7 @@ object AppCache extends Actor with Logging {
         log.fatal("cannot create directory: " + cacheFolder)
         inner = new NilCache()
       }
+    log.info("set cache timeout to \"" + period + "\"")
     log.info("set cache directory to \"" + cachePath + "\"")
     log.info("set cache implementation to \"" + inner.getClass.getName() + "\"")
     start()

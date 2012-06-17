@@ -46,7 +46,7 @@ class DMessageTest_IAmMumble_j1 extends FunSuite with BeforeAndAfter with RobotE
     //activity.onCreate(null)
     Logging.init(activity)
     Logging.addLogger(ConsoleLogger)
-    val logger = Logging.getLogger("TESTL")
+    val logger = Logging.getRichLogger("TESTL")
     val dispatcher = new Dispatcher { def process(message: DMessage) {} }
     val a = IAmMumble("Hello")(logger, dispatcher)
     val parcel = Parcel.obtain

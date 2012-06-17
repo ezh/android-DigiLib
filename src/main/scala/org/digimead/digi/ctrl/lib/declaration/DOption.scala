@@ -21,7 +21,7 @@ import android.content.Context
 import scala.runtime.Boxed
 
 object DOption extends Enumeration {
-  val CachePeriod: OptVal = Value("cache_period", classOf[Int], (1000 * 60 * 10): java.lang.Integer) // 10 minutes
+  val CachePeriod: OptVal = Value("cache_period", classOf[String], (1000 * 60 * 10).toString) // 10 minutes
   val CacheFolder: OptVal = Value("cache_dir", classOf[String], ".")
   val CacheClass: OptVal = Value("cache_class", classOf[String], DConstant.prefix + "lib.base.AppCache")
   val ConfirmConn: OptVal = Value("confirm_connection", classOf[Boolean], true: java.lang.Boolean)

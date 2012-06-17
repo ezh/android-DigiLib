@@ -71,7 +71,7 @@ case class ExecutableState(val id: Int,
 }
 
 object ExecutableState extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableState] = new Parcelable.Creator[ExecutableState]() {
     def createFromParcel(in: Parcel): ExecutableState = try {
       log.debug("createFromParcel new ExecutableState")

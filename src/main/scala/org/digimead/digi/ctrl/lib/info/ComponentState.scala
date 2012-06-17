@@ -59,7 +59,7 @@ case class ComponentState(val componentPackage: String,
 }
 
 object ComponentState extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentState] = new Parcelable.Creator[ComponentState]() {
     def createFromParcel(in: Parcel): ComponentState = try {
       log.debug("createFromParcel new ComponentState")

@@ -29,10 +29,7 @@ case class IAmMumble(val origin: Origin, val message: String, @transient val onC
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceWhereEnabled)
-      logger.infoWhere("IAmMumble " + message + " ts#" + ts, Logging.Where.ALL)
-    else
-      logger.info("IAmMumble " + message + " ts#" + ts)
+    logger.infoWhere("IAmMumble " + message + " ts#" + ts, Logging.Where.ALL)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),

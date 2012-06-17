@@ -194,7 +194,7 @@ case class ComponentInfo(val id: String, // unique string / primary key
 }
 
 object ComponentInfo extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentInfo] = new Parcelable.Creator[ComponentInfo]() {
     def createFromParcel(in: Parcel): ComponentInfo = try {
       log.debug("createFromParcel new ComponentInfo")

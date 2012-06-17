@@ -37,7 +37,7 @@ case class UserInfo(name: String, password: String, home: String, enabled: Boole
 }
 
 object UserInfo extends Logging {
-  override val log = Logging.getLogger(this)
+  override val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[UserInfo] = new Parcelable.Creator[UserInfo]() {
     def createFromParcel(in: Parcel): UserInfo = try {
       log.debug("createFromParcel new SSHDUsers.User")

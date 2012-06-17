@@ -99,7 +99,7 @@ case class ExecutableInfo(val executableID: Int,
 }
 
 object ExecutableInfo extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {
     def createFromParcel(in: Parcel): ExecutableInfo = try {
       log.debug("createFromParcel new ExecutableInfo")

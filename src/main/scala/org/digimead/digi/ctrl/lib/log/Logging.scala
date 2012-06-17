@@ -22,9 +22,10 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import scala.Array.canBuildFrom
 import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
-import scala.collection.immutable.HashMap
 import scala.collection.immutable.HashSet
+import scala.collection.mutable.HashMap
 import scala.collection.mutable.Publisher
+import scala.collection.mutable.SynchronizedMap
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.util.Common
@@ -33,14 +34,14 @@ import org.slf4j.LoggerFactory
 import android.content.Context
 
 trait Logging {
-  implicit protected[lib] val log: RichLogger = Logging.getLogger(this)
+  implicit protected[lib] val log: RichLogger = Logging.getRichLogger(this)
 }
 
 sealed trait LoggingEvent
 
 object Logging extends Publisher[LoggingEvent] {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  @volatile private[log] var isTraceWhereEnabled = false
+  @volatile private[log] var isWhereEnabled = false
   @volatile private[log] var isTraceEnabled = true
   @volatile private[log] var isDebugEnabled = true
   @volatile private[log] var isInfoEnabled = true
@@ -50,8 +51,8 @@ object Logging extends Publisher[LoggingEvent] {
   private[log] val flushLimit = 1000
   private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
   private[log] val queue = new ConcurrentLinkedQueue[Record]
+  private[log] val richLogger = new HashMap[String, RichLogger]() with SynchronizedMap[String, RichLogger]
   private[log] var logger = new HashSet[Logger]()
-  private[log] var richLogger = new HashMap[String, RichLogger]()
   private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
   private[log] var shutdownHook: Thread = null
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
@@ -209,7 +210,7 @@ object Logging extends Publisher[LoggingEvent] {
     l.flush
     l.deinit
   }
-  def getLogger(obj: Logging): RichLogger = synchronized {
+  def getRichLogger(obj: Logging): RichLogger = {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
     val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)
       stackArray(1) else stackArray(2)
@@ -222,15 +223,17 @@ object Logging extends Publisher[LoggingEvent] {
       logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"
     else
       logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed
-    getLogger(loggerName)
+    getRichLogger(loggerName)
   }
-  def getLogger(name: String): RichLogger = {
+  def getRichLogger(name: String): RichLogger = richLogger.synchronized {
     if (richLogger.isDefinedAt(name))
       return richLogger(name)
     val newLogger = new RichLogger(name)
-    richLogger = richLogger + (name -> newLogger)
+    richLogger(name) = newLogger
     newLogger
   }
+  def findRichLogger(f: ((String, RichLogger)) => Boolean): Option[(String, RichLogger)] =
+    richLogger.find(f)
   case class Record(val date: Date,
     val tid: Long,
     val level: Level,

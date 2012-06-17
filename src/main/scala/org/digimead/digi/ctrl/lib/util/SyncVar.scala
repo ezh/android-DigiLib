@@ -174,7 +174,7 @@ class SyncVar[A] extends Logging {
         false
       }
       else
-        true) && rest >= 0)
+        true) && rest > 0)
         value.synchronized {
           log.traceWhere(this + " put(...) waiting, current value is " + value, Logging.Where.BEFORE)
           /**
@@ -208,7 +208,7 @@ class SyncVar[A] extends Logging {
   def waitUnset(timeout: Long): Boolean = {
     if (timeout > 0) {
       var rest = timeout
-      while ((if (value.get == None) return true else true) && rest >= 0)
+      while ((if (value.get == None) return true else true) && rest > 0)
         value.synchronized {
           log.traceWhere(this + " waitUnset(...) waiting, current value is " + value, Logging.Where.BEFORE)
           /**

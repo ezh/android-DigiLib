@@ -50,7 +50,7 @@ case class DConnection(
 }
 
 object DConnection extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[DConnection] = new Parcelable.Creator[DConnection]() {
     def createFromParcel(in: Parcel): DConnection = try {
       log.debug("createFromParcel new DConnection")

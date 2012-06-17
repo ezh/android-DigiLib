@@ -47,7 +47,7 @@ class ReportTest_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
     AnyBase.info.get should not be (None)
     Logging.addLogger(ConsoleLogger)
     AppComponent.LazyInit.init
-    val log = Logging.getLogger("test")
+    val log = Logging.getRichLogger("test")
     val t = new Throwable
     t.fillInStackTrace
     log.error("test trowable", t)
