@@ -71,7 +71,8 @@ case class ExecutableInfo(val executableID: Int,
     license = in.readString,
     project = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
-    ExecutableInfo.log.debug("writeToParcel ExecutableInfo with flags " + flags)
+    if (ExecutableInfo.log.isTraceExtraEnabled)
+      ExecutableInfo.log.trace("writeToParcel ExecutableInfo with flags " + flags)
     out.writeInt(executableID)
     commandLine match {
       case Some(commandLine) =>
@@ -102,7 +103,8 @@ object ExecutableInfo extends Logging {
   override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableInfo] = new Parcelable.Creator[ExecutableInfo]() {
     def createFromParcel(in: Parcel): ExecutableInfo = try {
-      log.debug("createFromParcel new ExecutableInfo")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new ExecutableInfo")
       new ExecutableInfo(in)
     } catch {
       case e =>

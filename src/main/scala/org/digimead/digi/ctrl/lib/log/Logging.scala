@@ -41,7 +41,7 @@ sealed trait LoggingEvent
 
 object Logging extends Publisher[LoggingEvent] {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
-  @volatile private[log] var isWhereEnabled = false
+  @volatile private[log] var isTraceExtraEnabled = false
   @volatile private[log] var isTraceEnabled = true
   @volatile private[log] var isDebugEnabled = true
   @volatile private[log] var isInfoEnabled = true
@@ -167,13 +167,7 @@ object Logging extends Publisher[LoggingEvent] {
     var count = 0
     var records: Seq[Record] = Seq()
     while (count < n && !queue.isEmpty()) {
-      val record = queue.poll() match {
-        case record: Record =>
-          record
-        case other =>
-          Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, commonLogger.getName,
-            "unknown record '" + other + "'")
-      }
+      val record = queue.poll().asInstanceOf[Record]
       records = records :+ record
       count += 1;
       try {

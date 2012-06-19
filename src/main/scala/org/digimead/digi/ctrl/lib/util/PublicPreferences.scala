@@ -60,7 +60,8 @@ case class PublicPreferences private (val file: File, val bundle: Bundle, baseBl
   def this(in: Parcel) =
     this(file = new File(in.readString), bundle = in.readBundle(), baseBlob = in.readLong)
   def writeToParcel(out: Parcel, flags: Int) {
-    log.debug("writeToParcel PublicPreferences with flags " + flags)
+    if (log.isTraceExtraEnabled)
+      log.trace("writeToParcel PublicPreferences with flags " + flags)
     out.writeString(file.getAbsolutePath)
     out.writeBundle(bundle)
     out.writeLong(baseBlob)
@@ -93,7 +94,8 @@ object PublicPreferences extends Logging {
   override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[PublicPreferences] = new Parcelable.Creator[PublicPreferences]() {
     def createFromParcel(in: Parcel): PublicPreferences = try {
-      log.debug("createFromParcel new PublicPreferences")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new PublicPreferences")
       new PublicPreferences(in)
     } catch {
       case e =>
@@ -118,8 +120,8 @@ object PublicPreferences extends Logging {
         log.error(e.getMessage, e)
     }
   }
-  // AppComponent state subscriber
-  val stateSubscriber = new Subscriber[AppComponentEvent, AppComponent.type#Pub] {
+  // AppComponent global state subscriber
+  val globalStateSubscriber = new Subscriber[AppComponentEvent, AppComponent.type#Pub] {
     def notify(pub: AppComponent.type#Pub, event: AppComponentEvent) = event match {
       case AppComponent.Event.Shutdown =>
         log.debug("receive shutdown event, unregister OnSharedPreferenceChangeListeners")
@@ -127,7 +129,7 @@ object PublicPreferences extends Logging {
       case _ =>
     }
   }
-  AppComponent.subscribe(stateSubscriber)
+  AppComponent.subscribe(globalStateSubscriber)
   log.debug("alive")
 
   def apply(context: Context, location: Option[File] = None): PublicPreferences = synchronized {

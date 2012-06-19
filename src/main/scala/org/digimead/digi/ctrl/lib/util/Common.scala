@@ -379,6 +379,9 @@ object Common extends Logging {
       log.error(e.getMessage, e)
   }
   @Loggable
+  def removeCachedComponentServices() =
+    AppComponent.Inner.bindedICtrlPool.keys.foreach(removeCachedComponentService)
+  @Loggable
   def copyFile(sourceFile: File, destFile: File): Boolean = {
     if (!destFile.exists())
       destFile.createNewFile()

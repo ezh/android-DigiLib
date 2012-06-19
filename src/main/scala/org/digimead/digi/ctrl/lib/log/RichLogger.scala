@@ -46,6 +46,7 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
     t.fillInStackTrace()
     error(msg, t)
   }
+  def isTraceExtraEnabled(): Boolean = Logging.isTraceExtraEnabled
   // trace
   /* @see org.slf4j.Logger#isTraceEnabled() */
   def isTraceEnabled(): Boolean = Logging.isTraceEnabled
@@ -67,12 +68,12 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
   def trace(msg: String, t: Throwable) = if (Logging.isTraceEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Trace, name, msg, Some(t)))
   def traceWhere(msg: String): Unit = if (Logging.isTraceEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, trace, trace)(-2)
     else
       trace(msg)
   def traceWhere(msg: String, stackLine: Int): Unit = if (Logging.isTraceEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, trace, trace)(stackLine)
     else
       trace(msg)
@@ -97,12 +98,12 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
   def debug(msg: String, t: Throwable) = if (Logging.isDebugEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, name, msg, Some(t)))
   def debugWhere(msg: String): Unit = if (Logging.isDebugEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, debug, debug)(-2)
     else
       debug(msg)
   def debugWhere(msg: String, stackLine: Int): Unit = if (Logging.isDebugEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, debug, debug)(stackLine)
     else
       debug(msg)
@@ -127,12 +128,12 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
   def info(msg: String, t: Throwable) = if (Logging.isInfoEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, name, msg, Some(t)))
   def infoWhere(msg: String): Unit = if (Logging.isInfoEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, info, info)(-2)
     else
       info(msg)
   def infoWhere(msg: String, stackLine: Int = 4): Unit = if (Logging.isInfoEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, info, info)(stackLine)
     else
       info(msg)
@@ -157,12 +158,12 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
   def warn(msg: String, t: Throwable) = if (Logging.isWarnEnabled)
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Warn, name, msg, Some(t)))
   def warnWhere(msg: String): Unit = if (Logging.isWarnEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, warn, warn)(-2)
     else
       warn(msg)
   def warnWhere(msg: String, stackLine: Int = 4): Unit = if (Logging.isWarnEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, warn, warn)(stackLine)
     else
       warn(msg)
@@ -191,12 +192,12 @@ class RichLogger(val _name: String) extends MarkerIgnoringBase {
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, name, msg, Some(t)))
   }
   def errorWhere(msg: String): Unit = if (Logging.isErrorEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, error, error)(-2)
     else
       error(msg)
   def errorWhere(msg: String, stackLine: Int): Unit = if (Logging.isErrorEnabled)
-    if (Logging.isWhereEnabled)
+    if (Logging.isTraceExtraEnabled)
       logWhere(msg, error, error)(stackLine)
     else
       error(msg)

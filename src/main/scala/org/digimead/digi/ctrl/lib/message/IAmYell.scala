@@ -42,7 +42,8 @@ case class IAmYell(val origin: Origin, val message: String, val stackTrace: Stri
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
     message = in.readString, stackTrace = in.readString, onClickCallback = None, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
-    IAmYell.log.debug("writeToParcel IAmYell with flags " + flags)
+    if (IAmYell.log.isTraceExtraEnabled)
+      IAmYell.log.trace("writeToParcel IAmYell with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
     out.writeString(stackTrace)
@@ -54,7 +55,8 @@ case class IAmYell(val origin: Origin, val message: String, val stackTrace: Stri
 object IAmYell extends Logging {
   final val CREATOR: Parcelable.Creator[IAmYell] = new Parcelable.Creator[IAmYell]() {
     def createFromParcel(in: Parcel): IAmYell = try {
-      log.debug("createFromParcel new IAmYell")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new IAmYell")
       val dispatcher = new Dispatcher { def process(message: DMessage) {} }
       new IAmYell(in)(null, dispatcher)
     } catch {

@@ -27,7 +27,8 @@ case class UserInfo(name: String, password: String, home: String, enabled: Boole
     home = in.readString,
     enabled = (in.readByte == 1))
   def writeToParcel(out: Parcel, flags: Int) {
-    UserInfo.log.debug("writeToParcel SSHDUsers.User with flags " + flags)
+    if (UserInfo.log.isTraceExtraEnabled)
+      UserInfo.log.trace("writeToParcel SSHDUsers.UserInfo with flags " + flags)
     out.writeString(name)
     out.writeString(password)
     out.writeString(home)
@@ -40,7 +41,8 @@ object UserInfo extends Logging {
   override val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[UserInfo] = new Parcelable.Creator[UserInfo]() {
     def createFromParcel(in: Parcel): UserInfo = try {
-      log.debug("createFromParcel new SSHDUsers.User")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new SSHDUsers.UserInfo")
       new UserInfo(in)
     } catch {
       case e =>

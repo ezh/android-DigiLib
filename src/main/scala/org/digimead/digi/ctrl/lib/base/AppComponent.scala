@@ -552,6 +552,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
+      try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, waiting...")
@@ -571,7 +572,9 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
           deinitializationLock.unset()
         future {
           try {
-            deinitializationLock.get(deinitializationTimeout(context)) match {
+            val timeout = deinitializationTimeout(context)
+            try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            deinitializationLock.get(timeout) match {
               case Some(false) =>
                 log.info("deinitialization AppComponent for " + packageName + " canceled")
               case _ =>
@@ -615,6 +618,8 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
   def Inner = inner
   def Context = AnyBase.getContext
   object LazyInit {
+    @volatile private[base] var hookBefore: (String) => Any = null
+    @volatile private[base] var hookAfter: (String) => Any = null
     // priority -> Seq((timeout, function))
     @volatile private var pool: LongMap[Seq[(Int, () => Any)]] = LongMap()
     private val defaultTimeout = DTimeout.long
@@ -625,7 +630,9 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
         val tsBegin = System.currentTimeMillis
         log.debug("begin LazyInit block \"" + description + "\"")
+        if (hookBefore != null) hookBefore(description)
         f
+        if (hookAfter != null) hookAfter(description)
         log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat / 1000) + "s")
         scheduler.shutdownNow
       })))
@@ -843,6 +850,8 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     def resetBusyCounter() = { busyCounter = 0 }
   }
   object Event {
+    case class Suspend(timeout: Long) extends AppComponentEvent
+    object Resume extends AppComponentEvent
     object Shutdown extends AppComponentEvent
   }
 }

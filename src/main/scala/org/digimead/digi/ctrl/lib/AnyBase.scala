@@ -233,7 +233,7 @@ object AnyBase extends Logging {
   @Loggable
   private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
     log.debug("start startOnShutdownTimer")
-    if (onShutdownTimer.get(0) == Some(null))
+    if (onShutdownTimer.get(0) != Some(null))
       onShutdownTimer.set(null)
     future {
       onShutdownTimer.get(5000, _ != null) match {

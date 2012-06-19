@@ -46,7 +46,8 @@ case class ComponentState(val componentPackage: String,
     dataPath = in.readString,
     enabled = (in.readByte == 1))
   def writeToParcel(out: Parcel, flags: Int) {
-    ComponentState.log.debug("writeToParcel ComponentState with flags " + flags)
+    if (ComponentState.log.isTraceExtraEnabled)
+      ComponentState.log.trace("writeToParcel ComponentState with flags " + flags)
     out.writeString(componentPackage)
     out.writeParcelableArray(executableState.toArray, 0)
     out.writeInt(state.id)
@@ -62,7 +63,8 @@ object ComponentState extends Logging {
   override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentState] = new Parcelable.Creator[ComponentState]() {
     def createFromParcel(in: Parcel): ComponentState = try {
-      log.debug("createFromParcel new ComponentState")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new ComponentState")
       new ComponentState(in)
     } catch {
       case e =>

@@ -28,7 +28,8 @@ case class Origin private (val code: Int, val name: String,
   def this(in: Parcel) =
     this(code = in.readInt, name = in.readString, packageName = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
-    Origin.log.debug("writeToParcel Origin with flags " + flags)
+    if (Origin.log.isTraceExtraEnabled)
+      Origin.log.trace("writeToParcel Origin with flags " + flags)
     out.writeInt(code)
     out.writeString(name)
     out.writeString(packageName)
@@ -40,7 +41,8 @@ object Origin extends Logging {
   implicit def anyRefToOrigin(obj: AnyRef): Origin = Origin(obj.hashCode, obj.getClass.getName())
   final val CREATOR: Parcelable.Creator[Origin] = new Parcelable.Creator[Origin]() {
     def createFromParcel(in: Parcel): Origin = try {
-      log.debug("createFromParcel new Origin")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new Origin")
       new Origin(in)
     } catch {
       case e =>
