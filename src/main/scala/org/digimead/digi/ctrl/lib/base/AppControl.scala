@@ -65,7 +65,6 @@ protected class AppControl private () extends Logging {
     }
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
-  private val actorSecondLevelLock: AnyRef = new Object
   private val uiThreadID = Looper.getMainLooper.getThread.getId
   log.debug("alive")
 
@@ -335,18 +334,12 @@ object AppControl extends Logging {
     }
   }
   private[lib] def resurrect() = {
-    if (deinitializationLock.get(0) != Some(false)) {
+    if (deinitializationInProgressLock.get) {
+      log.debug("deinitialization in progress, resurrect ignored...")
+    } else if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppControl core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
-    }
-    if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, waiting...")
-      deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get)
-          deinitializationInProgressLock.wait
-      }
-      // deinitialization complete
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
@@ -379,6 +372,7 @@ object AppControl extends Logging {
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppControl for " + packageName)
     assert(inner != null)
+    inner.unbind
     inner = null
     if (AnyBase.isLastContext && AppComponent.Inner != null) {
       log.info("AppControl hold last context. Clear.")

@@ -548,20 +548,15 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
-    if (deinitializationLock.get(0) != Some(false)) {
+    if (deinitializationInProgressLock.get) {
+      log.debug("deinitialization in progress, resurrect ignored...")
+    } else if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
       try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
-    if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, waiting...")
-      deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get)
-          deinitializationInProgressLock.wait
-      }
-      // deinitialization complete
-    }
+
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
     AnyBase.getContext map {
@@ -598,11 +593,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
-    if (AnyBase.isLastContext && AppControl.Inner != null) {
-      log.info("AppComponent hold last context. Clear.")
-      AppControl.deinitRoutine(packageName)
-    }
-    // unbind services from bindedICtrlPool
+    // unbind services from bindedICtrlPool and finish stopped activities
     AnyBase.getContext.foreach {
       context =>
         savedInner.bindedICtrlPool.keys.foreach(key => {
@@ -611,6 +602,12 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
             record._1.unbindService(record._2)
           })
         })
+        if (context.isInstanceOf[Activity])
+          context.asInstanceOf[Activity].finish
+    }
+    if (AnyBase.isLastContext && AppControl.Inner != null) {
+      log.info("AppComponent hold last context. Clear.")
+      AppControl.deinitRoutine(packageName)
     }
     AppCache.deinit()
     AnyBase.shutdownApp(packageName, true)
