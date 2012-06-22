@@ -501,7 +501,7 @@ sealed trait AppComponentEvent
 
 object AppComponent extends Logging with Publisher[AppComponentEvent] {
   @volatile private var inner: AppComponent = null
-  private val deinitializationLock = new SyncVar[Boolean]()
+  private[base] val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
   deinitializationLock.set(false)
   log.debug("alive")
@@ -547,16 +547,20 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     }
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
+  private[lib] def resurrect(caller: Context): Boolean = deinitializationInProgressLock.synchronized {
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, resurrect ignored...")
+      false
     } else if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
-      try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+      if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+        try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+      true
+    } else {
+      true
     }
-
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
     AnyBase.getContext map {
@@ -568,7 +572,8 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         future {
           try {
             val timeout = deinitializationTimeout(context)
-            try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+              try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
             deinitializationLock.get(timeout) match {
               case Some(false) =>
                 log.info("deinitialization AppComponent for " + packageName + " canceled")
@@ -593,6 +598,10 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
+    if (AnyBase.isLastContext && AppControl.Inner != null) {
+      log.info("AppComponent hold last context. Clear.")
+      AppControl.deinitRoutine(packageName)
+    }
     // unbind services from bindedICtrlPool and finish stopped activities
     AnyBase.getContext.foreach {
       context =>
@@ -605,15 +614,14 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         if (context.isInstanceOf[Activity])
           context.asInstanceOf[Activity].finish
     }
-    if (AnyBase.isLastContext && AppControl.Inner != null) {
-      log.info("AppComponent hold last context. Clear.")
-      AppControl.deinitRoutine(packageName)
-    }
     AppCache.deinit()
     AnyBase.shutdownApp(packageName, true)
   }
+  def isSuspend = deinitializationLock.get(0) == None
   def Inner = inner
   def Context = AnyBase.getContext
+  override protected[base] def publish(event: AppComponentEvent) =
+    super.publish(event)
   object LazyInit {
     @volatile private[base] var hookBefore: (String) => Any = null
     @volatile private[base] var hookAfter: (String) => Any = null

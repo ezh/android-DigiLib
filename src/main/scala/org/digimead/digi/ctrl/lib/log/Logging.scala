@@ -192,17 +192,19 @@ object Logging extends Publisher[LoggingEvent] {
     if (!logger.contains(l) || force) {
       initializationContext.get.foreach(l.init)
       logger = logger + l
+      offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "add logger " + l))
     }
-    offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "add logger " + l))
   }
   def delLogger(s: Seq[Logger]): Unit =
     synchronized { s.foreach(l => delLogger(l)) }
   def delLogger(l: Logger) = synchronized {
-    offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "delete logger " + l))
-    logger = logger - l
-    flush
-    l.flush
-    l.deinit
+    if (logger.contains(l)) {
+      offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "delete logger " + l))
+      logger = logger - l
+      flush
+      l.flush
+      l.deinit
+    }
   }
   def getRichLogger(obj: Logging): RichLogger = {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)

@@ -310,11 +310,26 @@ protected class AppControl private () extends Logging {
       }
     }
   }
+  @Loggable(result = false)
+  def callUpdateShutdownTimer(componentPackage: String, remain_mseconds: Long, allowCallFromUI: Boolean = false): Future[Unit] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("callUpdateShutdownTimer AppControl function from UI thread")
+    val t = new Throwable("Intospecting callUpdateShutdownTimer")
+    t.fillInStackTrace()
+    future {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.update_shutdown_timer(componentPackage, remain_mseconds)
+        case None =>
+          None
+      }
+    }
+  }
 }
 
 object AppControl extends Logging {
   @volatile private var inner: AppControl = null
-  private val deinitializationLock = new SyncVar[Boolean]()
+  private[base] val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
   deinitializationLock.set(false)
   log.debug("alive")
@@ -333,13 +348,19 @@ object AppControl extends Logging {
       inner = new AppControl()
     }
   }
-  private[lib] def resurrect() = {
+  private[lib] def resurrect(): Boolean = deinitializationInProgressLock.synchronized {
     if (deinitializationInProgressLock.get) {
       log.debug("deinitialization in progress, resurrect ignored...")
+      false
     } else if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppControl core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
+      if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
+        try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+      true
+    } else {
+      true
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
@@ -351,7 +372,10 @@ object AppControl extends Logging {
           deinitializationLock.unset()
         future {
           try {
-            deinitializationLock.get(AppComponent.deinitializationTimeout(context)) match {
+            val timeout = AppComponent.deinitializationTimeout(context)
+            if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
+              try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            deinitializationLock.get(timeout) match {
               case Some(false) =>
                 log.info("deinitialization AppControl for " + packageName + " canceled")
               case _ =>
@@ -381,6 +405,14 @@ object AppControl extends Logging {
   }
   def Inner = inner
   def ICtrlHost = inner.get()
+  def isSuspend = deinitializationLock.get(0) == None
+  @Loggable
+  def isICtrlHostInstalled(ctx: Context): Boolean = {
+    val pm = ctx.getPackageManager()
+    val intent = new Intent(DIntent.HostService)
+    val info = pm.resolveService(intent, 0);
+    info != null
+  }
   private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]], stackTrace: Throwable = null): Option[ICtrlHost] = {
     if (timeout == -1) {
       if (!throwError)
@@ -448,6 +480,7 @@ object AppControl extends Logging {
       serviceInstance.get match {
         case Some(service) =>
           log.info("unbind from service " + DIntent.HostService)
+          service.update_shutdown_timer(caller.getPackageName(), 0)
           caller.unbindService(ctrlConnection)
         case None =>
           log.info("unbind from unexists service " + DIntent.HostService)
@@ -455,12 +488,5 @@ object AppControl extends Logging {
       serviceInstance.unset()
     } else
       log.warn("service " + DIntent.HostService + " already unbinded")
-  }
-  @Loggable
-  def isICtrlHostInstalled(ctx: Context): Boolean = {
-    val pm = ctx.getPackageManager()
-    val intent = new Intent(DIntent.HostService)
-    val info = pm.resolveService(intent, 0);
-    info != null
   }
 }

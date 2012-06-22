@@ -29,4 +29,5 @@ interface ICtrlHost {
   boolean disconnect(in String componentPackage, in int packageID, in int connectionID);
   List<String> interfaces(in String componentPackage);
   List<Intent> pending_connections(in String componentPackage);
+  void update_shutdown_timer(in String componentPackage, in long remain_seconds);
 }
