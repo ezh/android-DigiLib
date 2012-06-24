@@ -32,13 +32,15 @@ class DigiLibTest
   @volatile private var activity: DigiLibTestActivity = null
   override def setUp() {
     super.setUp()
-    Logging.reset(true)
+    Logging.reset()
+    Logging.resume()
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
     Logging.addLogger(AndroidLogger)
     activity.log.info("setUp")
   }
   override def tearDown() = {
+    Logging.resume()
     activity.log.info("tearDown")
     try {
       solo.finalize()

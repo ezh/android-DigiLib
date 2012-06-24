@@ -40,7 +40,8 @@ class PreferencesTest
 
   override def setUp() {
     super.setUp()
-    Logging.reset(true)
+    Logging.reset()
+    Logging.resume()
     if (activity == null) {
       PublicPreferences.reset(getInstrumentation.getContext)
       val editor = PreferenceManager.getDefaultSharedPreferences(getInstrumentation.getContext).edit
@@ -53,6 +54,7 @@ class PreferencesTest
     Logging.addLogger(AndroidLogger)
   }
   override def tearDown() = {
+    Logging.resume()
     activity.log.info("tearDown")
     try {
       solo.finalize()

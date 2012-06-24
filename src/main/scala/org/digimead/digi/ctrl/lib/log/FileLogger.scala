@@ -33,7 +33,7 @@ object FileLogger extends Logger with Logging {
   private val fileLimit = 102400 // 100kB
   private val checkEveryNLines = 1000
   private var counter = 0
-  protected var f = (records: Seq[Logging.Record]) => synchronized {
+  protected var f = (records: Array[Logging.Record]) => synchronized {
     // rotate
     for {
       output <- output

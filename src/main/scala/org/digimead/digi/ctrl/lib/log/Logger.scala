@@ -19,11 +19,11 @@ package org.digimead.digi.ctrl.lib.log
 import android.content.Context
 
 trait Logger {
-  protected var f: (Seq[Logging.Record]) => Unit
+  protected var f: (Array[Logging.Record]) => Unit
   def init(context: Context) {}
-  def apply(r: Seq[Logging.Record]) = f(r)
+  def apply(r: Array[Logging.Record]) = f(r)
   def deinit() {}
   def flush() {}
   def getF() = synchronized { f }
-  def setF(_f: (Seq[Logging.Record]) => Unit) = synchronized { f = _f }
+  def setF(_f: (Array[Logging.Record]) => Unit) = synchronized { f = _f }
 }

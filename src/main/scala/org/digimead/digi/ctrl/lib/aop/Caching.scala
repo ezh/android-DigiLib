@@ -46,7 +46,7 @@ abstract class Caching extends LLogging {
     } else
       longSignature.hashCode() + " " + args.map(_.hashCode()).mkString(" ")
     log.trace(shortSignature + " with namespace id " + annotation.namespace)
-    AppCache !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
+    AppCache.actor !? AppCache.Message.GetByID(annotation.namespace(), key, annotation.period()) match {
       case r @ Some(retVal) =>
         log.trace("HIT, key " + key + " found, returning cached value")
         return r
@@ -61,22 +61,22 @@ abstract class Caching extends LLogging {
     invoker.invoke() match {
       case r @ Traversable =>
         // process collection
-        AppCache ! AppCache.Message.UpdateByID(namespaceID, key, r)
+        AppCache.actor ! AppCache.Message.UpdateByID(namespaceID, key, r)
         log.trace("key " + key + " updated")
         r
       case Nil =>
         // process Nil
-        AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
+        AppCache.actor ! AppCache.Message.RemoveByID(namespaceID, key)
         log.trace("key " + key + "  removed, original method return Nil value")
         Nil
       case r @ Some(retVal) =>
         // process option
-        AppCache ! AppCache.Message.UpdateByID(namespaceID, key, retVal)
+        AppCache.actor ! AppCache.Message.UpdateByID(namespaceID, key, retVal)
         log.trace("key " + key + " updated")
         r
       case None =>
         // process None
-        AppCache ! AppCache.Message.RemoveByID(namespaceID, key)
+        AppCache.actor ! AppCache.Message.RemoveByID(namespaceID, key)
         log.trace("key " + key + " removed, original return None value")
         None
     }

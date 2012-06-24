@@ -55,7 +55,9 @@ object Logging extends Publisher[LoggingEvent] {
   private[log] var logger = new HashSet[Logger]()
   private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
   private[log] var shutdownHook: Thread = null
+  private val loggingThreadRecords = new Array[Record](flushLimit)
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
+  resume()
 
   def setTraceEnabled(t: Boolean) {
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
@@ -92,20 +94,22 @@ object Logging extends Publisher[LoggingEvent] {
       "disable ERROR log level"))
     isErrorEnabled = t
   }
-  def offer(record: Record) =
+  def offer(record: Record) = queue.synchronized {
     queue.offer(record)
-  def reset(startWorker: Boolean = true) = synchronized {
-    deinit()
-    // if initializationContext.get == None, than there isn't any initialization yet
-    initializationContext.get.foreach(context => init(context, startWorker))
+    queue.notifyAll
   }
-  private[lib] def init(context: Context, startWorker: Boolean = true): Unit = synchronized {
+  def reset() = synchronized {
+    deinit()
+    queue.clear()
+    // if initializationContext.get == None, than there isn't any initialization yet
+    initializationContext.get.foreach(context => init(context))
+  }
+  private[lib] def init(context: Context): Unit = synchronized {
     try {
       initializationContext = new WeakReference(context.getApplicationContext)
       shutdownHook = new Thread() { override def run() = deinit }
       Runtime.getRuntime().addShutdownHook(shutdownHook)
       logger.foreach(_.init(context.getApplicationContext))
-      if (startWorker) resume()
       offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "initialize logging"))
     } catch {
       case e => try {
@@ -121,7 +125,7 @@ object Logging extends Publisher[LoggingEvent] {
     offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "deinitialize logging"))
     flush()
     delLogger(logger.toSeq)
-    suspend()
+    queue.clear()
     if (shutdownHook != null) {
       Runtime.getRuntime().removeShutdownHook(shutdownHook)
       shutdownHook = null
@@ -148,7 +152,7 @@ object Logging extends Publisher[LoggingEvent] {
                 flushQueue(flushLimit)
                 Thread.sleep(50)
               } else
-                Thread.sleep(500)
+                queue.synchronized { queue.wait }
               if (loggingThread.getId == this.getId)
                 run
             }
@@ -157,28 +161,38 @@ object Logging extends Publisher[LoggingEvent] {
         }
       }
   }
-  def flush() = synchronized {
-    while (flushQueue(flushLimit) != 0)
-      Thread.sleep(100)
+  def flush(): Int = synchronized {
+    if (logger.isEmpty)
+      return -1
+    val flushed = flushQueue()
     logger.foreach(_.flush)
+    flushed
   }
-  private def flushQueue(): Int = flushQueue(java.lang.Integer.MAX_VALUE)
-  private def flushQueue(n: Int): Int = synchronized {
-    var count = 0
-    var records: Seq[Record] = Seq()
-    while (count < n && !queue.isEmpty()) {
-      val record = queue.poll().asInstanceOf[Record]
-      records = records :+ record
-      count += 1;
-      try {
-        publish(record)
-      } catch {
-        case e =>
-          offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, e.getMessage, Some(e)))
+  private def flushQueue(): Int = flushQueue(Int.MaxValue)
+  @tailrec
+  private[log] def flushQueue(n: Int, accumulator: Int = 0): Int = {
+    var records = 0
+    loggingThreadRecords.synchronized {
+      val limit = if (n <= flushLimit) (n - accumulator) else flushLimit
+      while (records < limit && !queue.isEmpty()) {
+        loggingThreadRecords(records) = queue.poll().asInstanceOf[Record]
+        try {
+          publish(loggingThreadRecords(records))
+        } catch {
+          case e =>
+            offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, e.getMessage, Some(e)))
+        }
+        records += 1
       }
+      logger.foreach(_(loggingThreadRecords.take(records)))
     }
-    logger.foreach(_(records))
-    count
+    if (records == flushLimit) {
+      if (records == n)
+        return accumulator + records
+    } else
+      return accumulator + records
+    Thread.sleep(100)
+    flushQueue(n, accumulator + records)
   }
   def dump() =
     ("queue size: " + queue.size + ", loggers: " + logger.mkString(",") + " thread: " + loggingThread.isAlive) +: queue.toArray.map(_.toString)

@@ -57,7 +57,8 @@ class PublicPreferencesTest
 
   override def setUp() {
     super.setUp()
-    Logging.reset(true)
+    Logging.reset()
+    Logging.resume()
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
     activity.log.info("setUp")
@@ -65,6 +66,7 @@ class PublicPreferencesTest
     Logging.subscribe(logSubscriber)
   }
   override def tearDown() = {
+    Logging.resume()
     activity.log.info("tearDown")
     try {
       solo.finalize()
@@ -107,7 +109,6 @@ class PublicPreferencesTest
 
     Logging.suspend
     editor.commit()
-    assertLog("writeToParcel PublicPreferences with flags 0", _ == _, 10000)
 
     preference.file should be('directory)
 

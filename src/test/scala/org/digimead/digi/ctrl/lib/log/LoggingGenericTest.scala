@@ -34,13 +34,16 @@ class LoggingGenericTest
 
   override def setUp() {
     super.setUp()
-    Logging.reset(true)
+    Logging.reset()
+    Logging.resume()
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
     activity.log.info("setUp")
     Logging.addLogger(AndroidLogger)
   }
   override def tearDown() = {
+    Logging.removeSubscriptions()
+    Logging.resume()
     activity.log.info("tearDown")
     try {
       solo.finalize()
@@ -65,7 +68,7 @@ class LoggingGenericTest
     Logging.richLogger should not be (null)
 
     Logging.loggingThread should not be (null)
-    Logging.loggingThread.isAlive should be(false)
+    Logging.loggingThread.isAlive should be(true)
 
     Logging.initializationContext should not be (null)
     Logging.initializationContext.get.map(_.getClass) should be === Some(classOf[android.app.Application])
@@ -75,7 +78,7 @@ class LoggingGenericTest
     /*
      * init
      */
-    Logging.init(Logging.initializationContext.get.get, false)
+    Logging.init(Logging.initializationContext.get.get)
 
     Logging.queue should have size (1)
 
@@ -85,7 +88,7 @@ class LoggingGenericTest
     Logging.richLogger should not be (null)
 
     Logging.loggingThread should not be (null)
-    Logging.loggingThread.isAlive should be(false)
+    Logging.loggingThread.isAlive should be(true)
 
     Logging.initializationContext should not be (null)
     Logging.initializationContext.get.map(_.getClass) should be === Some(classOf[android.app.Application])
@@ -99,24 +102,27 @@ class LoggingGenericTest
 
     Logging.queue should have size (2)
 
-    Logging.flush
+    Logging.flush should be(-1)
 
-    Logging.queue should have size (0)
+    Logging.queue should have size (2)
+    
+    Logging.reset
 
     /*
      * add record
      */
     activity.log.info("message to void")
 
-    Logging.queue should have size (1)
+    Logging.queue should have size (2)
 
-    Logging.reset(false)
+    Logging.reset()
 
     Logging.queue should have size (1)
   }
   def testAddRemoveLogger() {
-    Logging.reset(false)
-
+    Logging.suspend
+    Logging.delLogger(AndroidLogger)
+    Logging.reset
     Logging.addLogger(AndroidLogger)
 
     Logging.logger should have size (1)
@@ -130,7 +136,6 @@ class LoggingGenericTest
     Logging.queue should have size (0)
   }
   def testPublishSubscribe() {
-    Logging.reset(false)
     Logging.removeSubscriptions
     val eventResult = new SyncVar[Boolean]()
     val subscriber = new Logging.Sub {
@@ -151,5 +156,37 @@ class LoggingGenericTest
     Logging.flush()
 
     eventResult.get(0) should equal(Some(true))
+  }
+  def testFlush() {
+    Logging.suspend()
+
+    Logging.loggingThread.isAlive should be(false)
+
+    activity.log.debug("1111")
+
+    Logging.flush should be(1)
+
+    for (i <- 0 until Logging.flushLimit + 1)
+      activity.log.debug("" + i)
+
+    Logging.flush should be(Logging.flushLimit + 1)
+
+    Logging.queue should have size (0)
+
+    activity.log.debug("1")
+
+    activity.log.debug("2")
+
+    activity.log.debug("3")
+
+    Logging.queue should have size (3)
+
+    Logging.flushQueue(1) should be(1)
+
+    Logging.queue should have size (2)
+
+    Logging.queue.poll.message should be("2")
+
+    Logging.queue.poll.message should be("3")
   }
 }

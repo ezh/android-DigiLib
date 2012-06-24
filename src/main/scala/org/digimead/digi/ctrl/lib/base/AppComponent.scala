@@ -28,8 +28,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 import scala.Array.canBuildFrom
 import scala.actors.OutputChannel
-import scala.actors.Futures.future
-import scala.actors.Futures.awaitAll
+import scala.actors.Futures
 import scala.actors.Actor
 import scala.annotation.elidable
 import scala.annotation.implicitNotFound
@@ -78,7 +77,7 @@ import android.net.Uri
 
 import annotation.elidable.ASSERTION
 
-protected class AppComponent private () extends Actor with Logging {
+protected class AppComponent private () extends Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
   lazy val state = new AppComponent.StateContainer
   lazy val internalStorage = AppComponent.Context.flatMap(ctx => Option(ctx.getFilesDir()))
@@ -157,16 +156,6 @@ protected class AppComponent private () extends Actor with Logging {
   log.debug("disable safe dialogs")
   log.debug("alive")
 
-  def act = {
-    loop {
-      react {
-        case message: AnyRef =>
-          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
-        case message =>
-          log.errorWhere("skip unknown message " + message)
-      }
-    }
-  }
   def showDialogSafe(activity: Activity, tag: String, id: Int): Unit =
     showDialogSafe(activity, tag, id, null)
   def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle): Unit =
@@ -243,7 +232,7 @@ protected class AppComponent private () extends Actor with Logging {
     isSafeDialogEnabled.synchronized { isSafeDialogEnabled.notifyAll }
   }
   @Loggable
-  def disableSafeDialogs() = future {
+  def disableSafeDialogs() = Futures.future {
     log.debug("disable safe dialogs")
     isSafeDialogEnabled.set(None)
     isSafeDialogEnabled.synchronized { isSafeDialogEnabled.notifyAll }
@@ -291,12 +280,12 @@ protected class AppComponent private () extends Actor with Logging {
     }): Option[ComponentInfo] = AppComponent.synchronized {
     applicationManifest.flatMap {
       appManifest =>
-        AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
+        AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
           case Some(info) =>
             Some(info.asInstanceOf[ComponentInfo])
           case None =>
             val result = getComponentInfo(locale, localeLanguage, iconExtractor)
-            result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
+            result.foreach(r => AppCache.actor ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
             result
         }
     }
@@ -323,12 +312,12 @@ protected class AppComponent private () extends Actor with Logging {
     for {
       appManifest <- applicationManifest
     } yield {
-      AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
+      AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
         case Some(info) =>
           Some(info.asInstanceOf[ComponentInfo])
         case None =>
           val result = ComponentInfo(appManifest, locale, localeLanguage, iconExtractor)
-          result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString, r))
+          result.foreach(r => AppCache.actor ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString, r))
           result
       }
     }
@@ -363,29 +352,31 @@ protected class AppComponent private () extends Actor with Logging {
   def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
       if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
-        // DigiControl unavailable and state already broken, submit and return
+        log.warn("DigiControl unavailable and state already broken")
         if (onFinish != null) onFinish(DState.Broken)
         return
       }
-      AppControl.Inner.callStatus(activity.getPackageName)() match {
-        case Right(componentState) =>
-          val appState = componentState.state match {
-            case DState.Active =>
-              AppComponent.State(DState.Active)
-            case DState.Broken =>
-              AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
-            case _ =>
-              AppComponent.State(DState.Passive)
-          }
-          AppComponent.this.state.set(appState)
-          if (onFinish != null) onFinish(DState.Passive)
-        case Left(error) =>
-          val appState = if (error == "error_digicontrol_not_found")
-            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
-          else
-            AppComponent.State(DState.Broken, Seq(error))
-          AppComponent.this.state.set(appState)
-          if (onFinish != null) onFinish(DState.Broken)
+      Futures.future {
+        AppControl.Inner.callStatus(activity.getPackageName)() match {
+          case Right(componentState) =>
+            val appState = componentState.state match {
+              case DState.Active =>
+                AppComponent.State(DState.Active)
+              case DState.Broken =>
+                AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+              case _ =>
+                AppComponent.State(DState.Passive)
+            }
+            AppComponent.this.state.set(appState)
+            if (onFinish != null) onFinish(DState.Passive)
+          case Left(error) =>
+            val appState = if (error == "error_digicontrol_not_found")
+              AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
+            else
+              AppComponent.State(DState.Broken, Seq(error))
+            AppComponent.this.state.set(appState)
+            if (onFinish != null) onFinish(DState.Broken)
+        }
       }
   }
   @Loggable
@@ -569,7 +560,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         log.info("deinitializing AppComponent for " + packageName)
         if (deinitializationLock.isSet)
           deinitializationLock.unset()
-        future {
+        Futures.future {
           try {
             val timeout = deinitializationTimeout(context)
             if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
@@ -623,34 +614,35 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
   override protected[base] def publish(event: AppComponentEvent) =
     super.publish(event)
   object LazyInit {
-    @volatile private[base] var hookBefore: (String) => Any = null
-    @volatile private[base] var hookAfter: (String) => Any = null
     // priority -> Seq((timeout, function))
-    @volatile private var pool: LongMap[Seq[(Int, () => Any)]] = LongMap()
+    @volatile private var pool: LongMap[Seq[(Int, () => String)]] = LongMap()
     private val defaultTimeout = DTimeout.long
     def apply(description: String, priority: Long = 0, timeout: Int = defaultTimeout)(f: => Any)(implicit log: RichLogger) = synchronized {
-      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[(Int, () => Any)]()
+      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[(Int, () => String)]()
       pool = pool + (priority -> (storedFunc :+ (timeout, () => {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
         val tsBegin = System.currentTimeMillis
         log.debug("begin LazyInit block \"" + description + "\"")
-        if (hookBefore != null) hookBefore(description)
         f
-        if (hookAfter != null) hookAfter(description)
-        log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat / 1000) + "s")
+        val message = "\"" + description + "\" " + (System.currentTimeMillis - tsBegin) + "ms"
+        log.debug("end LazyInit block " + message)
         scheduler.shutdownNow
+        message
       })))
     }
     def init() = synchronized {
+      val begin = System.currentTimeMillis
+      log.debug("running " + (pool.keys.foldLeft(0) { (total, key) => pool(key).size + total }) + " LazyInit routine(s)")
       for (prio <- pool.keys.toSeq.sorted) {
+        val levelBegin = System.currentTimeMillis
         log.debug("running " + pool(prio).size + " LazyInit routine(s) at priority level " + prio)
         var timeout = 0
         val futures = pool(prio).map(t => {
           val fTimeout = t._1
           val f = t._2
           timeout = scala.math.max(timeout, fTimeout)
-          future {
+          Futures.future {
             try {
               f()
             } catch {
@@ -659,8 +651,12 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
             }
           }
         })
-        awaitAll(timeout, futures: _*)
+        val results = Futures.awaitAll(timeout, futures: _*).asInstanceOf[List[Option[String]]].flatten
+        log.debug((("complete " + pool(prio).size + " LazyInit routine(s) at priority level " + prio +
+          " within " + (System.currentTimeMillis - levelBegin) + "ms") +: results).mkString("\n"))
       }
+      log.debug("complete LazyInit, " + (pool.keys.foldLeft(0) { (total, key) => pool(key).size + total }) +
+        "f " + (System.currentTimeMillis - begin) + "ms")
       pool = LongMap()
     }
     def isEmpty = synchronized { pool.isEmpty }

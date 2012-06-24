@@ -16,9 +16,9 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.Calendar
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicInteger
 
 import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
@@ -32,7 +32,6 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -50,7 +49,7 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 
-class SupportBlock(val context: Activity,
+class SupportBlock(val context: Context,
   val projectUri: Uri,
   val issuesUri: Uri,
   val emailTo: String,
@@ -66,7 +65,8 @@ class SupportBlock(val context: Activity,
   val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat via Skype, VoIP, ..."),
     Android.getString(context, "block_support_chat_description").getOrElse("please call from 06:00 to 18:00 UTC"), "ic_block_support_chat")
   val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
-  private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
+    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   SupportBlock.block = Some(this)
   @Loggable
@@ -182,7 +182,7 @@ class SupportBlock(val context: Activity,
             try {
               val message = Android.getString(context, "block_support_copy_voice_call").
                 getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
-              context.runOnUiThread(new Runnable {
+              Block.handler.post(new Runnable {
                 def run = try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(voicePhone)
@@ -203,7 +203,7 @@ class SupportBlock(val context: Activity,
             try {
               val message = Android.getString(context, "block_support_copy_skype_call").
                 getOrElse("Copy to clipboard skype account \"" + skypeUser + "\"")
-              context.runOnUiThread(new Runnable {
+              Block.handler.post(new Runnable {
                 def run = try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(skypeUser)
@@ -240,9 +240,9 @@ object SupportBlock extends Logging {
     def apply(name: String, description: String) = new Item(counter.getAndIncrement)(name, description)
     def apply(name: String, description: String, icon: String) = new Item(counter.getAndIncrement)(name, description, icon)
   }
-  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item])
+  class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item])
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getLayoutInflater
+    private var inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {

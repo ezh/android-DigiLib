@@ -47,7 +47,8 @@ class CommonTest
   }
   override def setUp() {
     super.setUp()
-    Logging.reset(true)
+    Logging.reset()
+    Logging.resume()
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
     Logging.subscribe(logSubscriber)
@@ -56,6 +57,7 @@ class CommonTest
     logResult.unset()
   }
   override def tearDown() = {
+    Logging.resume()
     logResult.unset()
     activity.log.info("tearDown")
     Logging.removeSubscriptions

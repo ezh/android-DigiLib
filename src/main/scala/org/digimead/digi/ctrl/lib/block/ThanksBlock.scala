@@ -24,9 +24,10 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
-import android.app.Activity
+import android.content.Context
 import android.text.Html
 import android.text.Spanned
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.ListView
 import android.widget.SimpleAdapter
@@ -34,10 +35,11 @@ import android.widget.TextView
 
 // TODO check apk key (debug/release): ask + market link or respect
 // TODO list of contributor
-class ThanksBlock(val context: Activity) extends Block[ThanksBlock.Item] with Logging {
+class ThanksBlock(val context: Context) extends Block[ThanksBlock.Item] with Logging {
   val items = Seq(
     ThanksBlock.Item("Someone", "For everything"))
-  private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
+    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SimpleAdapter(context, ThanksBlock.getListValues(items), android.R.layout.simple_list_item_2,
     Array(ThanksBlock.name, ThanksBlock.description), Array(android.R.id.text1, android.R.id.text2))
   @Loggable

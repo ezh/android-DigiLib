@@ -637,6 +637,8 @@ object Preferences extends Logging {
   }
   object CacheClass extends Preference[String](DOption.CacheClass, (s) => s,
     "set_cache_class_notify", "set cache class to \"%s\"") {}
+  object DebugFlag extends Preference[String](DOption.DebugFlag, (s) => s,
+    "set_debug_flag_notify", "set debug flag to \"%s\"") {}
   abstract class Preference[T](option: DOption.OptVal, convert: String => T, messageID: String, messageFallBack: String) {
     def default = option.default.asInstanceOf[String]
     @Loggable

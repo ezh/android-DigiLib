@@ -52,6 +52,7 @@ object Report extends Logging {
   val logFilePrefix = "d"
   val logFileExtension = "log" // d(z)log, z - compressed
   val traceFileExtension = "trc"
+  @volatile private var cleanThread: Option[Thread] = None
 
   def reportPrefix = "U" + android.os.Process.myUid + "-" + Common.dateFile(new Date()) + "-P" + android.os.Process.myPid
   private[lib] def init(context: Context): Unit = synchronized {
@@ -149,73 +150,71 @@ object Report extends Logging {
   } getOrElse false
   @Loggable
   def clean(): Unit = synchronized {
+    if (cleanThread.nonEmpty) {
+      log.warn("cleaning in progress, skip")
+      return
+    }
     for {
       info <- AnyBase.info.get
       context <- AppComponent.Context
     } {
-      if (info.reportPathInternal != info.reportPathExternal) {
-        val cleanInternal = Futures.future { clean(info.reportPathInternal) }
-        val cleanExternal = Futures.future { clean(info.reportPathExternal) }
-        Futures.awaitAll(DTimeout.long, cleanInternal, cleanExternal)
-      } else
-        clean(info.reportPathInternal)
+      cleanThread = Some(new Thread("report cleaner for " + Report.getClass.getName) {
+        log.debug("new report cleaner thread %s alive".format(this.getId.toString))
+        this.setDaemon(true)
+        override def run() = try {
+          (if (info.reportPathInternal != info.reportPathExternal)
+            clean(info.reportPathInternal) ++ clean(info.reportPathExternal)
+          else
+            clean(info.reportPathInternal)).foreach(_.delete)
+        } catch {
+          case e =>
+            log.error(e.getMessage, e)
+        } finally {
+          cleanThread = None
+        }
+      })
     }
   }
-  private def clean(dir: File) = {
-    try {
-      // delete description files
-      Option(dir.list(new FilenameFilter {
-        def accept(dir: File, name: String) =
-          name.toLowerCase.endsWith(".description")
-      })).getOrElse(Array[String]()).foreach(name => {
-        val report = new File(dir, name)
-        log.info("delete outdated description file " + report.getName)
-        report.delete
-      })
-      // delete png files
-      Option(dir.list(new FilenameFilter {
-        def accept(dir: File, name: String) =
-          name.toLowerCase.endsWith("png")
-      })).getOrElse(Array[String]()).foreach(name => {
-        val report = new File(dir, name)
-        log.info("delete outdated png file " + report.getName)
-        report.delete
-      })
-      // delete log files
-      val logFiles = Option(dir.list(new FilenameFilter {
-        def accept(dir: File, name: String) =
-          name.toLowerCase.endsWith(logFileExtension)
-      })).getOrElse(Array[String]()).sorted.reverse
-      // keep all log files with PID == last run
-      val logKeep = logFiles.take(keepLogFiles).map(_ match {
-        case compressed if compressed.endsWith("z" + logFileExtension) =>
-          // for example "-P0000.dzlog"
-          Array(compressed.substring(compressed.length - logFilePrefix.length - logFileExtension.length - 8))
-        case plain =>
-          // for example "-P0000.dlog"
-          Array(plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7),
-            plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
-              "." + logFilePrefix + "z" + logFileExtension)
-      }).flatten.distinct
-      log.debug("keep log files with suffixes: " + logKeep.mkString(", "))
-      logFiles.drop(keepLogFiles).foreach(name => if (!logKeep.exists(name.endsWith)) {
-        val report = new File(dir, name)
-        log.info("delete outdated log file " + report.getName)
-        report.delete
-      })
-      // delete trc files
-      Option(dir.list(new FilenameFilter {
-        def accept(dir: File, name: String) =
-          name.toLowerCase.endsWith(traceFileExtension)
-      })).getOrElse(Array[String]()).toSeq.sorted.reverse.drop(keepTrcFiles).foreach(name => {
-        val trace = new File(dir, name)
-        log.info("delete outdated stacktrace file " + trace.getName)
-        trace.delete
-      })
-    } catch {
-      case e =>
-        log.error(e.getMessage, e)
+  private def clean(dir: File): Seq[File] = try {
+    var result: Seq[File] = Seq()
+    val files = Option(dir.listFiles()).getOrElse(Array[File]()).map(f => f.getName.toLowerCase -> f)
+    files.filter(_._1.endsWith(traceFileExtension)).sortBy(_._1).reverse.drop(keepTrcFiles).foreach {
+      case (name, file) =>
+        log.info("delete outdated stacktrace file " + name)
+        result = result :+ file
     }
+    files.filter(_._1.endsWith(".description")).foreach {
+      case (name, file) =>
+        log.info("delete outdated description file " + name)
+        result = result :+ file
+    }
+    files.filter(_._1.endsWith(".png")).foreach {
+      case (name, file) =>
+        log.info("delete outdated png file " + name)
+        result = result :+ file
+    }
+    // delete log files
+    val logFiles = files.filter(_._1.endsWith(logFileExtension)).sortBy(_._1).reverse
+    // keep all log files with PID == last run
+    val logKeep = logFiles.take(keepLogFiles).map(_._1 match {
+      case compressed if compressed.endsWith("z" + logFileExtension) =>
+        // for example "-P0000.dzlog"
+        Array(compressed.substring(compressed.length - logFilePrefix.length - logFileExtension.length - 8))
+      case plain =>
+        // for example "-P0000.dlog"
+        Array(plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7),
+          plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
+            "." + logFilePrefix + "z" + logFileExtension)
+    }).flatten.distinct
+    log.debug("keep log files with suffixes: " + logKeep.mkString(", "))
+    logFiles.drop(keepLogFiles).foreach {
+      case (name, file) =>
+        if (!logKeep.exists(name.endsWith)) {
+          log.info("delete outdated log file " + name)
+          result = result :+ file
+        }
+    }
+    result
   }
   @Loggable
   def cleanAfterReview(): Unit = synchronized {

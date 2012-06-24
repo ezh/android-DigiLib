@@ -68,15 +68,6 @@ object Common extends Logging {
   log.debug("alive")
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
-  @Loggable
-  def onCreateDialog(id: Int, activity: Activity with DActivity)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = id match {
-    case id if id == InstallControl.getId(activity) =>
-      InstallControl.createDialog(activity)(logger, dispatcher)
-    case id if id == FailedMarket.getId(activity) =>
-      FailedMarket.createDialog(activity)
-    case _ =>
-      null
-  }
   // -rwx--x--x 711
   @Loggable
   def getDirectory(context: Context, name: String, forceInternal: Boolean,
@@ -379,8 +370,11 @@ object Common extends Logging {
       log.error(e.getMessage, e)
   }
   @Loggable
-  def removeCachedComponentServices() =
-    AppComponent.Inner.bindedICtrlPool.keys.foreach(removeCachedComponentService)
+  def removeCachedComponentServices() = AppComponent.Inner match {
+    case null =>
+    case inner =>
+      inner.bindedICtrlPool.keys.foreach(removeCachedComponentService)
+  }
   @Loggable
   def copyFile(sourceFile: File, destFile: File): Boolean = {
     if (!destFile.exists())

@@ -28,10 +28,10 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
+import android.os.Handler
 import android.text.ClipboardManager
 import android.text.Html
 import android.view.ContextMenu
@@ -41,7 +41,7 @@ import android.widget.ListView
 import android.widget.Toast
 
 trait Block[T <: Block.Item] {
-  val context: Activity
+  val context: Context
   def items: Seq[T]
   def appendTo(adapter: MergeAdapter)
   def onListItemClick(l: ListView, v: View, item: T)
@@ -52,6 +52,7 @@ trait Block[T <: Block.Item] {
 }
 
 object Block {
+  val handler = new Handler()
   trait Item {
     @volatile var view: WeakReference[View] = new WeakReference(null) // android built in cache may sporadically give us junk :-/
   }
@@ -67,15 +68,13 @@ object Block {
       }
     }
   }
-  def copyLink(context: Activity, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+  def copyLink(context: Context, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
     try {
       val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
       clipboard.setText(copyText)
       val message = Android.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
-      context.runOnUiThread(new Runnable {
-        def run = Toast.makeText(context, message, DConstant.toastTimeout).show()
-      })
+      handler.post(new Runnable { def run = Toast.makeText(context, message, DConstant.toastTimeout).show() })
       true
     } catch {
       case e =>
@@ -83,7 +82,7 @@ object Block {
         false
     }
   }
-  def sendLink(context: Activity, item: Item, subjectText: CharSequence, bodyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+  def sendLink(context: Context, item: Item, subjectText: CharSequence, bodyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
     try {
       val intent = new Intent(Intent.ACTION_SEND)
       intent.setType("text/plain")
