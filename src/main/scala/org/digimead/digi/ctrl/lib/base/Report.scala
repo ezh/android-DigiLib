@@ -55,27 +55,33 @@ object Report extends Logging {
   @volatile private var cleanThread: Option[Thread] = None
 
   def reportPrefix = "U" + android.os.Process.myUid + "-" + Common.dateFile(new Date()) + "-P" + android.os.Process.myPid
+  @Loggable
   private[lib] def init(context: Context): Unit = synchronized {
     try {
       // create report directory in Common.getDirectory and add LazyInit
       AnyBase.info.get foreach {
         info =>
           AppComponent.LazyInit("move report to SD, clean outdated") {
-            // move reports from internal to external storage
+            // move files other than dlog and dtrc from internal to external storage
             if (info.reportPathInternal != info.reportPathExternal) {
               log.debug("move reports from " + info.reportPathInternal + " to " + info.reportPathExternal)
-              Report.compress
               info.reportPathInternal.listFiles.filter(f => !f.getName.endsWith("dlog") && !f.getName.endsWith("dtrc")).foreach {
                 fileFrom =>
-                  log.debug("move " + fileFrom.getName)
-                  val fileTo = new File(info.reportPathExternal, fileFrom.getName)
-                  if (Common.copyFile(fileFrom, fileTo))
+                  if (fileFrom.length == 0) {
+                    log.debug("delete empty file " + fileFrom.getName)
                     fileFrom.delete
-                  else
-                    fileTo.delete
+                  } else {
+                    log.debug("move " + fileFrom.getName)
+                    val fileTo = new File(info.reportPathExternal, fileFrom.getName)
+                    if (Common.copyFile(fileFrom, fileTo))
+                      fileFrom.delete
+                    else
+                      fileTo.delete
+                  }
               }
             }
             clean()
+            // reportPathInternal -> compress -> reportPathExternal
             compress()
           }
       }
@@ -173,6 +179,7 @@ object Report extends Logging {
           cleanThread = None
         }
       })
+      cleanThread.get.start
     }
   }
   private def clean(dir: File): Seq[File] = try {

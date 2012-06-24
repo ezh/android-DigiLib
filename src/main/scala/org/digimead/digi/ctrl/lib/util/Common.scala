@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.util
 
+import java.io.BufferedWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -30,42 +31,40 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.util.Date
+
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
 import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
 import scala.util.control.ControlThrowable
+
+import org.digimead.digi.ctrl.ICtrlComponent
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConnection
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
-import org.digimead.digi.ctrl.lib.dialog.FailedMarket
-import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.log.RichLogger
-import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.ICtrlComponent
-import android.app.Activity
-import android.app.Dialog
-import android.content.pm.PackageManager
+
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Environment
 import android.os.IBinder
-import java.io.BufferedWriter
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
   @volatile private[util] var externalStorageDisabled: Option[Boolean] = None
+  AnyBase // init AnyBase before Common
   log.debug("alive")
+
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
   // -rwx--x--x 711

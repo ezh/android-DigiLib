@@ -28,6 +28,7 @@ import scala.collection.mutable.Publisher
 import scala.collection.mutable.SynchronizedMap
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.util.Common
 import org.slf4j.LoggerFactory
 
@@ -57,7 +58,7 @@ object Logging extends Publisher[LoggingEvent] {
   private[log] var shutdownHook: Thread = null
   private val loggingThreadRecords = new Array[Record](flushLimit)
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
-  resume()
+  AnyBase // init AnyBase before Logging
 
   def setTraceEnabled(t: Boolean) {
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
@@ -105,12 +106,19 @@ object Logging extends Publisher[LoggingEvent] {
     initializationContext.get.foreach(context => init(context))
   }
   private[lib] def init(context: Context): Unit = synchronized {
-    try {
+    def initCommon = {
       initializationContext = new WeakReference(context.getApplicationContext)
       shutdownHook = new Thread() { override def run() = deinit }
       Runtime.getRuntime().addShutdownHook(shutdownHook)
       logger.foreach(_.init(context.getApplicationContext))
       offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "initialize logging"))
+    }
+    try {
+      if (initializationContext.get == None) {
+        initCommon
+        resume
+      } else
+        initCommon
     } catch {
       case e => try {
         System.err.println(e.getMessage + "\n" + e.getStackTraceString)

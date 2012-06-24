@@ -615,7 +615,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     super.publish(event)
   object LazyInit {
     // priority -> Seq((timeout, function))
-    @volatile private var pool: LongMap[Seq[(Int, () => String)]] = LongMap()
+    @volatile private[base] var pool: LongMap[Seq[(Int, () => String)]] = LongMap()
     private val defaultTimeout = DTimeout.long
     def apply(description: String, priority: Long = 0, timeout: Int = defaultTimeout)(f: => Any)(implicit log: RichLogger) = synchronized {
       val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[(Int, () => String)]()
