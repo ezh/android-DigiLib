@@ -98,6 +98,16 @@ object Logging extends Publisher[LoggingEvent] {
   def offer(record: Record) = queue.synchronized {
     queue.offer(record)
     queue.notifyAll
+    try {
+      publish(Event.Incoming(record))
+    } catch {
+      case e =>
+        queue.offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName,
+          e.getMessage match {
+            case null => ""
+            case message => message
+          }, Some(e)))
+    }
   }
   def reset() = synchronized {
     deinit()
@@ -185,10 +195,14 @@ object Logging extends Publisher[LoggingEvent] {
       while (records < limit && !queue.isEmpty()) {
         loggingThreadRecords(records) = queue.poll().asInstanceOf[Record]
         try {
-          publish(loggingThreadRecords(records))
+          publish(Event.Outgoing(loggingThreadRecords(records)))
         } catch {
           case e =>
-            offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, e.getMessage, Some(e)))
+            offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName,
+              e.getMessage match {
+                case null => ""
+                case message => message
+              }, Some(e)))
         }
         records += 1
       }
@@ -258,9 +272,10 @@ object Logging extends Publisher[LoggingEvent] {
     val tag: String,
     val message: String,
     val throwable: Option[Throwable] = None,
-    val pid: Int = Logging.pid) extends LoggingEvent {
+    val pid: Int = Logging.pid) {
     override def toString = "%s P%05d T%05d %s %-24s %s".format(Common.dateString(date), pid, tid, level.toString.charAt(0), tag + ":", message)
   }
+
   sealed trait Level
   object Level {
     case object Trace extends Level
@@ -273,5 +288,9 @@ object Logging extends Publisher[LoggingEvent] {
     val ALL = -1
     val HERE = -2
     val BEFORE = -3
+  }
+  object Event {
+    case class Incoming(record: Record) extends LoggingEvent
+    case class Outgoing(record: Record) extends LoggingEvent
   }
 }

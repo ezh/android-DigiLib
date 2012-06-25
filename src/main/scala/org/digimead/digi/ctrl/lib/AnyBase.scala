@@ -88,8 +88,8 @@ object AnyBase extends Logging {
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
     log.debug("initialize AnyBase context " + context.getClass.getName)
     reset(context, "init")
-    if (!AppComponent.resurrect(context) || !AppControl.resurrect())
-      return // shutdown in progress
+    AppComponent.resurrect()
+    AppControl.resurrect()
     context match {
       case activity: DActivity =>
         if (!contextPool.exists(_.get == Some(context))) {
@@ -125,10 +125,12 @@ object AnyBase extends Logging {
     }
   }
   def deinit(context: Context): Unit = synchronized {
+    log.debug("context pool are " + contextPool.flatMap(_.get).mkString(", "))
+    if (!contextPool.contains(context))
+      return // shutdown in progress/this context already cleared
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
     // reset
-    if (reset(context, "deinit"))
-      return // shutdown in progress
+    reset(context, "deinit")
     // start deinit sequence
     if (AnyBase.isLastContext)
       AppControl.deinit()
@@ -227,9 +229,14 @@ object AnyBase extends Logging {
       case Some(service) if service.isInstanceOf[Service] => 2
       case _ => 3
     })
-    contextPool.headOption.foreach(currentContext = _)
-    log.debug("update primary context to " + currentContext)
-    currentContext.get
+    if (contextPool.nonEmpty) {
+      contextPool.headOption.foreach(currentContext = _)
+      log.debug("update primary context to " + currentContext)
+      currentContext.get
+    } else {
+      currentContext = new WeakReference(null)
+      None
+    }
   }
   @Loggable
   private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
@@ -255,15 +262,15 @@ object AnyBase extends Logging {
   }
   // true - ok, false - shutdown in progress
   @Loggable
-  private def stopOnShutdownTimer(context: Context, reason: String): Boolean = {
+  private def stopOnShutdownTimer(context: Context, reason: String): Unit = {
     onShutdownTimer.set(reason)
-    AppComponent.resurrect(context)
+    AppComponent.resurrect()
+    AppControl.resurrect()
   }
   // true - ok,  false - shutdown in progress
   @Loggable
-  private def reset(context: Context, reason: String): Boolean = {
-    if (AnyBase.stopOnShutdownTimer(context, reason))
-      return false
+  private def reset(context: Context, reason: String): Unit = {
+    AnyBase.stopOnShutdownTimer(context, reason)
     if (AppComponent.Inner != null) {
       AppComponent.Inner.state.resetBusyCounter
       context match {
@@ -273,7 +280,6 @@ object AnyBase extends Logging {
         case _ =>
       }
     }
-    true
   }
   case class Info(val reportPathInternal: File,
     val reportPathExternal: File,

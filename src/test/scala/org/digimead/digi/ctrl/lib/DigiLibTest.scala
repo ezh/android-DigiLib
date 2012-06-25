@@ -30,6 +30,17 @@ class DigiLibTest
   with JUnitSuite with ShouldMatchersForJUnit {
   @volatile private var solo: Solo = null
   @volatile private var activity: DigiLibTestActivity = null
+
+  def testHelloWorld() {
+    android.util.Log.i("DigiLibTest", "testHelloWorld BEGIN")
+    activity.log.warn("testHelloWorld BEGIN")
+
+    true should be(true)
+
+    activity.log.warn("testHelloWorld END")
+    android.util.Log.i("DigiLibTest", "testHelloWorld END")
+  }
+  
   override def setUp() {
     super.setUp()
     Logging.reset()
@@ -51,14 +62,5 @@ class DigiLibTest
     activity.finish()
     super.tearDown()
     Thread.sleep(1000)
-  }
-  def testHelloWorld() {
-    android.util.Log.i("DigiLibTest", "testHelloWorld BEGIN")
-    activity.log.warn("testHelloWorld BEGIN")
-
-    true should be(true)
-
-    activity.log.warn("testHelloWorld END")
-    android.util.Log.i("DigiLibTest", "testHelloWorld END")
   }
 }

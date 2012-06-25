@@ -492,6 +492,7 @@ sealed trait AppComponentEvent
 
 object AppComponent extends Logging with Publisher[AppComponentEvent] {
   @volatile private var inner: AppComponent = null
+  @volatile private[base] var shutdown = true
   private[base] val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
   deinitializationLock.set(false)
@@ -538,19 +539,22 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     }
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect(caller: Context): Boolean = deinitializationInProgressLock.synchronized {
-    if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, resurrect ignored...")
-      false
-    } else if (deinitializationLock.get(0) != Some(false)) {
+  private[lib] def resurrect(): Unit = deinitializationInProgressLock.synchronized {
+    if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
       if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
         try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
-      true
-    } else {
-      true
+    }
+    if (deinitializationInProgressLock.get) {
+      Thread.sleep(100) // unoffending delay
+      deinitializationInProgressLock.synchronized {
+        while (deinitializationInProgressLock.get) {
+          log.debug("deinitialization in progress, waiting...")
+          deinitializationInProgressLock.wait
+        }
+      }
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
@@ -606,7 +610,9 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
           context.asInstanceOf[Activity].finish
     }
     AppCache.deinit()
-    AnyBase.shutdownApp(packageName, true)
+    log.info("shutdown (" + shutdown + ")")
+    if (shutdown)
+      AnyBase.shutdownApp(packageName, true)
   }
   def isSuspend = deinitializationLock.get(0) == None
   def Inner = inner

@@ -197,7 +197,7 @@ class AppCache extends AppCacheT[String, Any] with Logging {
 
 object AppCache extends Logging {
   @volatile private var contextPackageName = ""
-  private var inner: AppCacheT[String, Any] = null
+  private[base] var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
   private var cacheClass = DConstant.prefix + "lib.base.AppCache"
   private var cachePath = "."

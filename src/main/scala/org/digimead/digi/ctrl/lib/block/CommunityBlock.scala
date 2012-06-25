@@ -170,6 +170,7 @@ object CommunityBlock {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
+          view.setBackgroundDrawable(Block.Resources.noviceDrawable)
           item.view = new WeakReference(view)
           view
         case Some(view) =>

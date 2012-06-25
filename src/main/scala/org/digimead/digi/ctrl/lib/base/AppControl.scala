@@ -348,19 +348,22 @@ object AppControl extends Logging {
       inner = new AppControl()
     }
   }
-  private[lib] def resurrect(): Boolean = deinitializationInProgressLock.synchronized {
-    if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, resurrect ignored...")
-      false
-    } else if (deinitializationLock.get(0) != Some(false)) {
+  private[lib] def resurrect(): Unit = deinitializationInProgressLock.synchronized {
+    if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppControl core subsystem")
       deinitializationLock.set(false) // try to cancel
       // deinitialization canceled
       if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
         try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
-      true
-    } else {
-      true
+    }
+    if (deinitializationInProgressLock.get) {
+      Thread.sleep(100) // unoffending delay
+      deinitializationInProgressLock.synchronized {
+        while (deinitializationInProgressLock.get) {
+          log.debug("deinitialization in progress, waiting...")
+          deinitializationInProgressLock.wait
+        }
+      }
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
