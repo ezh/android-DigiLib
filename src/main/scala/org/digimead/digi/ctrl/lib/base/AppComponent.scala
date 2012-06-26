@@ -637,14 +637,19 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         message
       })))
     }
-    def init() = synchronized {
+    def init() = {
+      val initpool = LazyInit.synchronized {
+        val saved = pool
+        pool = LongMap()
+        saved
+      }
       val begin = System.currentTimeMillis
-      log.debug("running " + (pool.keys.foldLeft(0) { (total, key) => pool(key).size + total }) + " LazyInit routine(s)")
-      for (prio <- pool.keys.toSeq.sorted) {
+      log.debug("running " + (initpool.keys.foldLeft(0) { (total, key) => initpool(key).size + total }) + " LazyInit routine(s)")
+      for (prio <- initpool.keys.toSeq.sorted) {
         val levelBegin = System.currentTimeMillis
-        log.debug("running " + pool(prio).size + " LazyInit routine(s) at priority level " + prio)
+        log.debug("running " + initpool(prio).size + " LazyInit routine(s) at priority level " + prio)
         var timeout = 0
-        val futures = pool(prio).map(t => {
+        val futures = initpool(prio).map(t => {
           val fTimeout = t._1
           val f = t._2
           timeout = scala.math.max(timeout, fTimeout)
@@ -658,12 +663,11 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
           }
         })
         val results = Futures.awaitAll(timeout, futures: _*).asInstanceOf[List[Option[String]]].flatten
-        log.debug((("complete " + pool(prio).size + " LazyInit routine(s) at priority level " + prio +
+        log.debug((("complete " + initpool(prio).size + " LazyInit routine(s) at priority level " + prio +
           " within " + (System.currentTimeMillis - levelBegin) + "ms") +: results).mkString("\n"))
       }
-      log.debug("complete LazyInit, " + (pool.keys.foldLeft(0) { (total, key) => pool(key).size + total }) +
+      log.debug("complete LazyInit, " + (initpool.keys.foldLeft(0) { (total, key) => initpool(key).size + total }) +
         "f " + (System.currentTimeMillis - begin) + "ms")
-      pool = LongMap()
     }
     def isEmpty = synchronized { pool.isEmpty }
     def nonEmpty = synchronized { pool.nonEmpty }

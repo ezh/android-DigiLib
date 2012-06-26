@@ -78,8 +78,8 @@ object AnyBase extends Logging {
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
-  System.setProperty("actors.corePoolSize", "32")
-  System.setProperty("actors.maxPoolSize", "32")
+  System.setProperty("actors.corePoolSize", "16")
+  System.setProperty("actors.maxPoolSize", "16")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
   log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
     + weakScheduler.get.get.toString + "[name,priority,group]")
