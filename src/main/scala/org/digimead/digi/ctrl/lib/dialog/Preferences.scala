@@ -48,12 +48,13 @@ import android.widget.Toast
 
 abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceActivity with Logging with OnSharedPreferenceChangeListener {
   implicit protected val logger: RichLogger
-  private lazy val shared = PreferenceManager.getDefaultSharedPreferences(this)
+  protected lazy val shared = PreferenceManager.getDefaultSharedPreferences(this)
   @Loggable
   override def onCreate(savedInstanceState: Bundle) {
     log.trace("Preference::onCreate")
     super.onCreate(savedInstanceState)
     AnyBase.init(this, false)
+    AnyBase.preventShutdown(this)
     ExceptionHandler.retry[Unit](1) {
       try {
         addPreferencesFromResource(Android.getId(this, "options", "xml"))
@@ -639,7 +640,7 @@ object Preferences extends Logging {
     "set_cache_class_notify", "set cache class to \"%s\"") {}
   object DebugFlag extends Preference[String](DOption.DebugFlag, (s) => s,
     "set_debug_flag_notify", "set debug flag to \"%s\"") {}
-  abstract class Preference[T](option: DOption.OptVal, convert: String => T, messageID: String, messageFallBack: String) {
+  abstract class Preference[T](option: DOption#OptVal, convert: String => T, messageID: String, messageFallBack: String) {
     def default = option.default.asInstanceOf[String]
     @Loggable
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): T = synchronized {

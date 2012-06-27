@@ -344,16 +344,13 @@ protected class AppComponent private () extends Logging {
       intent.putExtras(data)
       sendPrivateBroadcast(intent)
   }
-  /*
-   *  true - all ok
-   *  false - we need some work
-   */
+  // onFinish(component state, service state, service isBusy flag) => Unit
   @Loggable
-  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
+  def synchronizeStateWithICtrlHost(onFinish: (DState.Value, DState.Value, Boolean) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
       if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
         log.warn("DigiControl unavailable and state already broken")
-        if (onFinish != null) onFinish(DState.Broken)
+        if (onFinish != null) onFinish(DState.Broken, DState.Unknown, false)
         return
       }
       Futures.future {
@@ -368,14 +365,14 @@ protected class AppComponent private () extends Logging {
                 AppComponent.State(DState.Passive)
             }
             AppComponent.this.state.set(appState)
-            if (onFinish != null) onFinish(DState.Passive)
+            if (onFinish != null) onFinish(DState.Passive, componentState.serviceState, componentState.serviceBusy)
           case Left(error) =>
             val appState = if (error == "error_digicontrol_not_found")
               AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
             else
               AppComponent.State(DState.Broken, Seq(error))
             AppComponent.this.state.set(appState)
-            if (onFinish != null) onFinish(DState.Broken)
+            if (onFinish != null) onFinish(DState.Broken, DState.Unknown, false)
         }
       }
   }

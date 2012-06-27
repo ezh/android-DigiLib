@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib
 import java.io.File
 import java.util.Date
 
+import scala.Option.option2Iterable
 import scala.actors.Futures.future
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
@@ -37,6 +38,7 @@ import org.digimead.digi.ctrl.lib.util.SyncVar
 import android.app.Activity
 import android.app.Service
 import android.content.Context
+import android.os.Handler
 
 private[lib] trait AnyBase extends Logging {
   protected def onCreateBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
@@ -74,7 +76,9 @@ object AnyBase extends Logging {
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile private var reportDirectory = "report"
+  @volatile private var onShutdownProtect = new WeakReference[Activity](null)
   private val onShutdownTimer = new SyncVar[String]() // string - cancel reason
+  val handler = new Handler() // bound to the current thread (UI)
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -126,7 +130,7 @@ object AnyBase extends Logging {
   }
   def deinit(context: Context): Unit = synchronized {
     log.debug("context pool are " + contextPool.flatMap(_.get).mkString(", "))
-    if (!contextPool.contains(context))
+    if (!contextPool.exists(_.get == Some(context)))
       return // shutdown in progress/this context already cleared
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
     // reset
@@ -161,6 +165,8 @@ object AnyBase extends Logging {
     case None => updateContext()
     case result: Some[_] => result
   }
+  def preventShutdown(activity: Activity) =
+    onShutdownProtect = new WeakReference(activity)
   /**
    * Shutdown the app either safely or quickly. The app is killed safely by
    * killing the virtual machine that the app runs in after finalizing all
@@ -231,7 +237,7 @@ object AnyBase extends Logging {
     })
     if (contextPool.nonEmpty) {
       contextPool.headOption.foreach(currentContext = _)
-      log.debug("update primary context to " + currentContext)
+      log.debug("update primary context to " + currentContext.get)
       currentContext.get
     } else {
       currentContext = new WeakReference(null)
@@ -239,8 +245,17 @@ object AnyBase extends Logging {
     }
   }
   @Loggable
-  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = synchronized {
+  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean): Unit = synchronized {
     log.debug("start startOnShutdownTimer")
+    if (onShutdownProtect.get match {
+      case Some(activity) =>
+        if (!activity.isFinishing && activity.getWindow != null) {
+          log.debug("prevent start onShutdown timer - protector in use " + activity)
+          true
+        } else false
+      case None =>
+        false
+    }) return
     if (onShutdownTimer.get(0) != Some(null))
       onShutdownTimer.set(null)
     future {

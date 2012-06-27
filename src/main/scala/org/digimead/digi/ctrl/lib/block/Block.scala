@@ -16,9 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
+import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -30,13 +31,10 @@ import com.commonsware.cwac.merge.MergeAdapter
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
-import android.os.Handler
 import android.text.ClipboardManager
 import android.text.Html
 import android.view.ContextMenu
-import android.view.LayoutInflater
 import android.view.MenuItem
 import android.view.View
 import android.widget.ListView
@@ -54,7 +52,8 @@ trait Block[T <: Block.Item] {
 }
 
 object Block extends Logging {
-  val handler = new Handler()
+  log.debug("alive")
+
   trait Item {
     @volatile var view: WeakReference[View] = new WeakReference(null) // android built in cache may sporadically give us junk :-/
   }
@@ -76,7 +75,7 @@ object Block extends Logging {
       clipboard.setText(copyText)
       val message = Android.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
-      handler.post(new Runnable { def run = Toast.makeText(context, message, DConstant.toastTimeout).show() })
+      AnyBase.handler.post(new Runnable { def run = Toast.makeText(context, message, DConstant.toastTimeout).show() })
       true
     } catch {
       case e =>
@@ -96,41 +95,6 @@ object Block extends Logging {
       case e =>
         IAmYell("Unable 'send link' description for " + item, e)(logger, dispatcher)
         false
-    }
-  }
-  object Resources {
-    lazy val inflater = AppComponent.Context.map {
-      context => context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
-    } getOrElse { log.fatal("unable to get infater"); null }
-    lazy val noviceDrawable = AppComponent.Context.flatMap {
-      context => Option(context.getApplicationContext.getResources.getDrawable(Android.getId(context, "novice_mark", "drawable")))
-    } match {
-      case Some(drawable) =>
-        drawable.setAlpha(50)
-        drawable
-      case None =>
-        log.fatal("unable to get drawable novice_mark")
-        new ColorDrawable()
-    }
-    lazy val intermediateDrawable = AppComponent.Context.flatMap {
-      context => Option(context.getApplicationContext.getResources.getDrawable(Android.getId(context, "intermediate_mark", "drawable")))
-    } match {
-      case Some(drawable) =>
-        drawable.setAlpha(50)
-        drawable
-      case None =>
-        log.fatal("unable to get drawable intermediate_mark")
-        new ColorDrawable()
-    }
-    lazy val professionalDrawable = AppComponent.Context.flatMap {
-      context => Option(context.getApplicationContext.getResources.getDrawable(Android.getId(context, "professional_mark", "drawable")))
-    } match {
-      case Some(drawable) =>
-        drawable.setAlpha(70)
-        drawable
-      case None =>
-        log.fatal("unable to get drawable professional_mark")
-        new ColorDrawable()
     }
   }
 }

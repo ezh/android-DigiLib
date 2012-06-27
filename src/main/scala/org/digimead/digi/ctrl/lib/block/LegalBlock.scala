@@ -124,7 +124,7 @@ object LegalBlock {
   }
   class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {

@@ -151,7 +151,7 @@ object CommunityBlock {
   case class Item(name: String, description: String, icon: String = "") extends Block.Item
   class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item])
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {
@@ -170,7 +170,7 @@ object CommunityBlock {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
-          view.setBackgroundDrawable(Block.Resources.noviceDrawable)
+          Level.novice(view)
           item.view = new WeakReference(view)
           view
         case Some(view) =>

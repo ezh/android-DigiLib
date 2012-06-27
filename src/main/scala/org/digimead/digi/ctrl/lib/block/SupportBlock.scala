@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
@@ -182,7 +183,7 @@ class SupportBlock(val context: Context,
             try {
               val message = Android.getString(context, "block_support_copy_voice_call").
                 getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
-              Block.handler.post(new Runnable {
+              AnyBase.handler.post(new Runnable {
                 def run = try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(voicePhone)
@@ -203,7 +204,7 @@ class SupportBlock(val context: Context,
             try {
               val message = Android.getString(context, "block_support_copy_skype_call").
                 getOrElse("Copy to clipboard skype account \"" + skypeUser + "\"")
-              Block.handler.post(new Runnable {
+              AnyBase.handler.post(new Runnable {
                 def run = try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(skypeUser)
@@ -242,7 +243,7 @@ object SupportBlock extends Logging {
   }
   class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item])
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {
@@ -261,7 +262,7 @@ object SupportBlock extends Logging {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
-          view.setBackgroundDrawable(Block.Resources.noviceDrawable)
+          Level.novice(view)
           item.view = new WeakReference(view)
           view
         case Some(view) =>

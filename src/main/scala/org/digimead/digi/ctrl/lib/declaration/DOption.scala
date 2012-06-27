@@ -17,10 +17,22 @@
 package org.digimead.digi.ctrl.lib.declaration
 
 import org.digimead.digi.ctrl.lib.util.Android
-import android.content.Context
-import scala.runtime.Boxed
 
-object DOption extends Enumeration {
+import android.content.Context
+
+trait DOption extends Enumeration {
+  class OptVal(val tag: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, tag) {
+    def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
+    def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
+  }
+  final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
+    val name = if (_name != null) _name else "option_" + id + "_name"
+    val description = if (_description != null) _description else "option_" + id + "_description"
+    new OptVal(id, kind, default, name, description)
+  }
+}
+
+object DOption extends DOption {
   val ACLConnection: OptVal = Value("acl_connection_allow", classOf[Boolean], true: java.lang.Boolean)
   val AsRoot: OptVal = Value("as_root", classOf[Boolean], false: java.lang.Boolean)
   val CachePeriod: OptVal = Value("cache_period", classOf[String], (1000 * 60 * 10).toString) // 10 minutes
@@ -38,13 +50,4 @@ object DOption extends Enumeration {
   val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], true: java.lang.Boolean)
   val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Boolean], true: java.lang.Boolean)
   val WriteConnLog: OptVal = Value("write_connection_log", classOf[Boolean], false: java.lang.Boolean)
-  class OptVal(val tag: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, tag) {
-    def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
-    def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
-  }
-  final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
-    val name = if (_name != null) _name else "option_" + id + "_name"
-    val description = if (_description != null) _description else "option_" + id + "_description"
-    new OptVal(id, kind, default, name, description)
-  }
 }
