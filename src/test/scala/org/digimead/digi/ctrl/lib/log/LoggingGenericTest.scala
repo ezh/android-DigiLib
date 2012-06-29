@@ -105,7 +105,7 @@ class LoggingGenericTest
     Logging.flush should be(-1)
 
     Logging.queue should have size (2)
-    
+
     Logging.reset
 
     /*
@@ -140,9 +140,13 @@ class LoggingGenericTest
     val eventResult = new SyncVar[Boolean]()
     val subscriber = new Logging.Sub {
       def notify(pub: Logging.type#Pub, event: LoggingEvent) = event match {
-        case event: Logging.Record =>
-          if (event.message == "hello 123")
-            eventResult.put(true, 0)
+        case event: LoggingEvent =>
+          event match {
+            case event: Logging.Event.Outgoing =>
+              if (event.record.message == "hello 123")
+                eventResult.put(true, 0)
+            case _ =>
+          }
         case _ =>
           eventResult.put(false, 0)
       }

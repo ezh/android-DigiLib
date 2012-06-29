@@ -54,15 +54,15 @@ private[lib] trait AnyBase extends Logging {
   }
   protected def onResumeBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onResumeBase")
-    AnyBase.stopOnShutdownTimer(context, "onResume")
+    AnyBase.cancelOnShutdownTimer(context, "onResume")
   }
   protected def onPauseBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onPauseBase")
-    AnyBase.stopOnShutdownTimer(context, "onPause")
+    AnyBase.cancelOnShutdownTimer(context, "onPause")
   }
   protected def onStopBase(context: Context, shutdownIfActive: Boolean) = AnyBase.synchronized {
     log.trace("AnyBase::onStopBase")
-    AnyBase.startOnShutdownTimer(context, shutdownIfActive)
+    AnyBase.startOnShutdownTimer(context, "onStop", shutdownIfActive)
   }
   protected def onDestroyBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onDestroyBase")
@@ -77,7 +77,7 @@ object AnyBase extends Logging {
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile private var reportDirectory = "report"
   @volatile private var onShutdownProtect = new WeakReference[Activity](null)
-  private val onShutdownTimer = new SyncVar[String]() // string - cancel reason
+  private val onShutdownState = new SyncVar[ShutdownState]() // string - cancel reason
   val handler = new Handler() // bound to the current thread (UI)
   val info = new SyncVar[Option[Info]]
   info.set(None)
@@ -133,7 +133,8 @@ object AnyBase extends Logging {
     if (!contextPool.exists(_.get == Some(context)))
       return // shutdown in progress/this context already cleared
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
-    // reset
+    // clear state
+    abortOnShutdownTimer(context, "deinit")
     reset(context, "deinit")
     // start deinit sequence
     if (AnyBase.isLastContext)
@@ -245,8 +246,8 @@ object AnyBase extends Logging {
     }
   }
   @Loggable
-  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean): Unit = synchronized {
-    log.debug("start startOnShutdownTimer")
+  private def startOnShutdownTimer(context: Context, reason: String, shutdownIfActive: Boolean): Unit = synchronized {
+    log.debug("start startOnShutdownTimer, reason: " + reason)
     if (onShutdownProtect.get match {
       case Some(activity) =>
         if (!activity.isFinishing && activity.getWindow != null) {
@@ -256,36 +257,43 @@ object AnyBase extends Logging {
       case None =>
         false
     }) return
-    if (onShutdownTimer.get(0) != Some(null))
-      onShutdownTimer.set(null)
+    if (onShutdownState.get(0) != Some(Shutdown.InProgress))
+      onShutdownState.set(Shutdown.InProgress(reason))
     future {
-      onShutdownTimer.get(5000, _ != null) match {
-        case Some(null) if isLastContext || shutdownIfActive =>
-          log.info("start onShutdown sequence")
+      onShutdownState.get(5000, _ != Shutdown.InProgress) match {
+        case Some(Shutdown.InProgress(reason)) if isLastContext || shutdownIfActive =>
+          log.info("start onShutdown sequence, reason: " + reason)
           AppComponent.deinit()
-        case Some(null) =>
-          log.info("cancel onShutdown sequence, component in use")
-          onShutdownTimer.unset()
-        case Some(reason) =>
+        case Some(Shutdown.InProgress(reason)) =>
+          log.info("cancel onShutdown sequence, reason: " + reason + " - component is in use")
+          onShutdownState.unset()
+        case Some(Shutdown.Cancel(reason)) =>
           log.info("cancel onShutdown sequence, reason: " + reason)
-          onShutdownTimer.unset()
+          onShutdownState.unset()
+        case Some(Shutdown.Abort(reason)) =>
+          log.info("abort onShutdown sequence, reason: " + reason)
+          onShutdownState.unset()
         case None =>
           log.fatal("cancel onShutdown sequence, reason unknown")
-          onShutdownTimer.unset()
+          onShutdownState.unset()
       }
     }
   }
-  // true - ok, false - shutdown in progress
   @Loggable
-  private def stopOnShutdownTimer(context: Context, reason: String): Unit = {
-    onShutdownTimer.set(reason)
+  private def cancelOnShutdownTimer(context: Context, reason: String): Unit = {
+    onShutdownState.set(Shutdown.Cancel(reason))
     AppComponent.resurrect()
     AppControl.resurrect()
   }
-  // true - ok,  false - shutdown in progress
+  @Loggable
+  private def abortOnShutdownTimer(context: Context, reason: String): Unit = {
+    onShutdownState.set(Shutdown.Abort(reason))
+    AppComponent.resurrect(true)
+    AppControl.resurrect(true)
+  }
   @Loggable
   private def reset(context: Context, reason: String): Unit = {
-    AnyBase.stopOnShutdownTimer(context, reason)
+    AnyBase.cancelOnShutdownTimer(context, reason)
     if (AppComponent.Inner != null) {
       AppComponent.Inner.state.resetBusyCounter
       context match {
@@ -341,5 +349,11 @@ object AnyBase extends Logging {
         AnyBase.info.set(Some(info))
       }
     }
+  }
+  sealed trait ShutdownState
+  object Shutdown {
+    case class InProgress(reason: String) extends ShutdownState
+    case class Cancel(reason: String) extends ShutdownState
+    case class Abort(reason: String) extends ShutdownState
   }
 }

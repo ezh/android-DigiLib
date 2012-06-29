@@ -93,10 +93,10 @@ class CommonTest
     val lockAfterMatch = new AtomicBoolean(false)
     val want = new AtomicReference[(String, (String, String) => Boolean)](null)
     def notify(pub: Logging.type#Pub, event: LoggingEvent) = event match {
-      case event: Logging.Record =>
+      case event: Logging.Event.Outgoing =>
         want.get match {
           case (message, f) =>
-            if (f(event.message, message)) {
+            if (f(event.record.message, message)) {
               logSubscriber.want.set(null)
               logResult.put(true, 60000)
               if (lockAfterMatch.get)

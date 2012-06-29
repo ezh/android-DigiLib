@@ -348,13 +348,14 @@ object AppControl extends Logging {
       inner = new AppControl()
     }
   }
-  private[lib] def resurrect(): Unit = deinitializationInProgressLock.synchronized {
+  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationInProgressLock.synchronized {
     if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppControl core subsystem")
       deinitializationLock.set(false) // try to cancel
-      // deinitialization canceled
-      if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
-        try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+      // if _AppComponent_ active
+      if (AppComponent.deinitializationLock.get(0) == Some(false))
+        if (!supressEvent)
+          try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
     if (deinitializationInProgressLock.get) {
       Thread.sleep(100) // unoffending delay

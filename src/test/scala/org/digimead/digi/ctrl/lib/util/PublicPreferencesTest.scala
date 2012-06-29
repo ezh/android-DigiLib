@@ -55,30 +55,6 @@ class PublicPreferencesTest
     dfile.delete
   }
 
-  override def setUp() {
-    super.setUp()
-    Logging.reset()
-    Logging.resume()
-    activity = getActivity
-    solo = new Solo(getInstrumentation(), activity)
-    activity.log.info("setUp")
-    Logging.addLogger(AndroidLogger)
-    Logging.subscribe(logSubscriber)
-  }
-  override def tearDown() = {
-    Logging.resume()
-    activity.log.info("tearDown")
-    try {
-      solo.finalize()
-    } catch {
-      case e =>
-        e.printStackTrace()
-    }
-    activity.finish()
-    Logging.removeSubscriptions
-    super.tearDown()
-    Thread.sleep(1000)
-  }
   def testCore() {
     activity.log.info("testCore BEGIN")
 
@@ -190,11 +166,35 @@ class PublicPreferencesTest
 
     activity.log.info("testLatest END")
   }
+  override def setUp() {
+    super.setUp()
+    Logging.reset()
+    Logging.resume()
+    activity = getActivity
+    solo = new Solo(getInstrumentation(), activity)
+    activity.log.info("setUp")
+    Logging.addLogger(AndroidLogger)
+    Logging.subscribe(logSubscriber)
+  }
+  override def tearDown() = {
+    Logging.resume()
+    activity.log.info("tearDown")
+    try {
+      solo.finalize()
+    } catch {
+      case e =>
+        e.printStackTrace()
+    }
+    activity.finish()
+    Logging.removeSubscriptions
+    super.tearDown()
+    Thread.sleep(1000)
+  }
   class LogSubscriber extends Logging.Sub {
     val want = new AtomicReference[(String, (String, String) => Boolean)](null)
     def notify(pub: Logging.type#Pub, event: LoggingEvent) = event match {
-      case event: Logging.Record =>
-        if (want.get != null && want.get._2(event.message, want.get._1))
+      case event: Logging.Event.Outgoing =>
+        if (want.get != null && want.get._2(event.record.message, want.get._1))
           logResult.put(true, 0)
       case _ =>
     }

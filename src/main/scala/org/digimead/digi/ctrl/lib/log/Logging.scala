@@ -242,6 +242,8 @@ object Logging extends Publisher[LoggingEvent] {
       l.deinit
     }
   }
+  def getLoggers() =
+    synchronized { logger.toSeq }
   def getRichLogger(obj: Logging): RichLogger = {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
     val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)

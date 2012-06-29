@@ -536,13 +536,14 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     }
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect(): Unit = deinitializationInProgressLock.synchronized {
+  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationInProgressLock.synchronized {
     if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
-      // deinitialization canceled
-      if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
-        try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+      // if _AppControl_ active
+      if (AppControl.deinitializationLock.get(0) == Some(false))
+        if (!supressEvent)
+          try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
     if (deinitializationInProgressLock.get) {
       Thread.sleep(100) // unoffending delay

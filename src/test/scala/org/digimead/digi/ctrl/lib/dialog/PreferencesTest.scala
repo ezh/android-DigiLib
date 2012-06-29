@@ -38,34 +38,6 @@ class PreferencesTest
   @volatile private var activity: PreferencesTestActivity = null
   implicit lazy val logger = activity.log
 
-  override def setUp() {
-    super.setUp()
-    Logging.reset()
-    Logging.resume()
-    if (activity == null) {
-      PublicPreferences.reset(getInstrumentation.getContext)
-      val editor = PreferenceManager.getDefaultSharedPreferences(getInstrumentation.getContext).edit
-      editor.clear
-      editor.commit
-    }
-    activity = getActivity
-    solo = new Solo(getInstrumentation(), activity)
-    activity.log.info("setUp")
-    Logging.addLogger(AndroidLogger)
-  }
-  override def tearDown() = {
-    Logging.resume()
-    activity.log.info("tearDown")
-    try {
-      solo.finalize()
-    } catch {
-      case e =>
-        e.printStackTrace()
-    }
-    activity.finish()
-    super.tearDown()
-    Thread.sleep(1000)
-  }
   def testDialogRate() {
     activity.log.warn("testDialogRate BEGIN")
 
@@ -267,5 +239,33 @@ class PreferencesTest
     Preferences.DebugLogLevel.get(activity) should equal(2)
 
     activity.log.warn("testDebugLogLevel END")
+  }
+  override def setUp() {
+    super.setUp()
+    Logging.reset()
+    Logging.resume()
+    if (activity == null) {
+      PublicPreferences.reset(getInstrumentation.getContext)
+      val editor = PreferenceManager.getDefaultSharedPreferences(getInstrumentation.getContext).edit
+      editor.clear
+      editor.commit
+    }
+    activity = getActivity
+    solo = new Solo(getInstrumentation(), activity)
+    activity.log.info("setUp")
+    Logging.addLogger(AndroidLogger)
+  }
+  override def tearDown() = {
+    Logging.resume()
+    activity.log.info("tearDown")
+    try {
+      solo.finalize()
+    } catch {
+      case e =>
+        e.printStackTrace()
+    }
+    activity.finish()
+    super.tearDown()
+    Thread.sleep(1000)
   }
 }

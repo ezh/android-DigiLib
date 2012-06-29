@@ -19,6 +19,8 @@ package org.digimead.digi.ctrl.lib.log
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
+import scala.actors.Futures
+
 import org.digimead.digi.ctrl.lib.DigiLibTestActivity
 import org.digimead.digi.ctrl.lib.util.SyncVar
 import org.scalatest.junit.JUnitSuite
@@ -39,10 +41,14 @@ class LoggingFromTheBeginning
   def testLogging() {
     log.warn("testLogging BEGIN")
 
+    Logging.delLogger(Logging.getLoggers)
     Logging.subscribe(logSubscriber)
     activity = getActivity
     solo = new Solo(getInstrumentation(), activity)
-    Logging.addLogger(AndroidLogger)
+    Futures.future {
+      Thread.sleep(1000)
+      Logging.addLogger(AndroidLogger)
+    }
 
     assertLog("Activity::onCreateExt", _ == _, 60000)
 
@@ -62,6 +68,7 @@ class LoggingFromTheBeginning
   override def setUp() {
     super.setUp()
     log.info("setUp")
+    Logging.init(getInstrumentation.getContext)
     logResult.unset()
   }
   override def tearDown() = {
@@ -90,14 +97,14 @@ class LoggingFromTheBeginning
     val want = new AtomicReference[(String, (String, String) => Boolean)](null)
     def notify(pub: Logging.type#Pub, event: LoggingEvent) = {
       event match {
-        case event: Logging.Record =>
+        case event: Logging.Event.Outgoing =>
           want.get match {
             case null =>
-            case (message, f) if event.message == null =>
-            case (message, f) if f != null && message != null && event.message != null =>
-              if (f(event.message.trim, message.trim)) {
+            case (message, f) if event.record.message == null =>
+            case (message, f) if f != null && message != null && event.record.message != null =>
+              if (f(event.record.message.trim, message.trim)) {
                 logSubscriber.want.set(null)
-                logResult.put(event, 60000)
+                logResult.put(event.record, 60000)
                 if (lockAfterMatch.get)
                   if (logSubscriber.want.get == null)
                     logResult.waitUnset(60000)

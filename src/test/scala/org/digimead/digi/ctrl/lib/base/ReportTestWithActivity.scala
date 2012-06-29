@@ -81,6 +81,7 @@ class ReportTestWithActivity
   }
   override def setUp() {
     super.setUp()
+    Logging.init(getInstrumentation.getContext)
     Logging.reset()
     Logging.subscribe(logSubscriber)
     Logging.resume()
@@ -114,14 +115,14 @@ class ReportTestWithActivity
     val want = new AtomicReference[(String, (String, String) => Boolean)](null)
     def notify(pub: Logging.type#Pub, event: LoggingEvent) = {
       event match {
-        case event: Logging.Record =>
+        case event: Logging.Event.Outgoing =>
           want.get match {
             case null =>
-            case (message, f) if event.message == null =>
-            case (message, f) if f != null && message != null && event.message != null =>
-              if (f(event.message.trim, message.trim)) {
+            case (message, f) if event.record.message == null =>
+            case (message, f) if f != null && message != null && event.record.message != null =>
+              if (f(event.record.message.trim, message.trim)) {
                 logSubscriber.want.set(null)
-                logResult.put(event, 60000)
+                logResult.put(event.record, 60000)
                 if (lockAfterMatch.get)
                   if (logSubscriber.want.get == null)
                     logResult.waitUnset(60000)
