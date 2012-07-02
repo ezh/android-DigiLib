@@ -16,66 +16,54 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.Array.canBuildFrom
-import scala.actors.OutputChannel
-import scala.actors.Futures
+import scala.Option.option2Iterable
 import scala.actors.Actor
-import scala.annotation.elidable
-import scala.annotation.implicitNotFound
-import scala.collection.mutable.Publisher
-import scala.collection.JavaConversions._
+import scala.actors.Futures
+import scala.actors.OutputChannel
 import scala.collection.immutable.LongMap
-import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
-import scala.ref.WeakReference
-import scala.xml.Node
+import scala.collection.mutable.Publisher
+import scala.collection.mutable.SynchronizedMap
 import scala.xml.XML
 
+import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DPermission
-import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.dialog.Preferences
 import org.digimead.digi.ctrl.lib.info.ComponentInfo
+import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.log.RichLogger
+import org.digimead.digi.ctrl.lib.message.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
-import org.digimead.digi.ctrl.ICtrlComponent
-import org.digimead.digi.ctrl.lib.declaration.DState
-import org.digimead.digi.ctrl.lib.dialog.Preferences
-import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.message.DMessage
+import org.digimead.digi.ctrl.lib.util.Version
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.DialogInterface
 import android.content.pm.ActivityInfo
-import android.os.Bundle
-import android.app.Dialog
-import android.os.Looper
 import android.net.Uri
-
-import annotation.elidable.ASSERTION
+import android.os.Bundle
+import android.os.Looper
 
 protected class AppComponent private () extends Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
@@ -536,7 +524,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     }
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationInProgressLock.synchronized {
+  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationLock.synchronized {
     if (deinitializationLock.get(0) != Some(false)) {
       log.info("resurrect AppComponent core subsystem")
       deinitializationLock.set(false) // try to cancel
@@ -556,33 +544,37 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
     }
   }
   private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    AnyBase.getContext map {
-      context =>
+    AnyBase.getContext match {
+      case Some(context) =>
         val packageName = context.getPackageName()
-        log.info("deinitializing AppComponent for " + packageName)
-        if (deinitializationLock.isSet)
+        if (deinitializationLock.isSet) {
           deinitializationLock.unset()
-        Futures.future {
-          try {
-            val timeout = deinitializationTimeout(context)
-            if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
-              try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-            deinitializationLock.get(timeout) match {
-              case Some(false) =>
-                log.info("deinitialization AppComponent for " + packageName + " canceled")
-              case _ =>
-                deinitRoutine(packageName)
-            }
-          } finally {
-            deinitializationInProgressLock.synchronized {
-              deinitializationInProgressLock.set(false)
-              deinitializationInProgressLock.notifyAll
+          Futures.future {
+            try {
+              log.info("deinitializing AppComponent for " + packageName)
+              val timeout = deinitializationTimeout(context)
+              if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+                try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+              deinitializationLock.get(timeout) match {
+                case Some(false) =>
+                  log.info("deinitialization AppComponent for " + packageName + " canceled")
+                case _ =>
+                  deinitRoutine(packageName)
+              }
+            } finally {
+              deinitializationInProgressLock.synchronized {
+                deinitializationInProgressLock.set(false)
+                deinitializationInProgressLock.notifyAll
+              }
             }
           }
         }
-    } orElse {
-      log.fatal("unable to find deinitialization context")
-      None
+      case None =>
+        log.fatal("unable to find deinitialization context")
+        deinitializationInProgressLock.synchronized {
+          deinitializationInProgressLock.set(false)
+          deinitializationInProgressLock.notifyAll
+        }
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {

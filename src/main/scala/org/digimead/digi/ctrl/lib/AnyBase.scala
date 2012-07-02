@@ -67,7 +67,13 @@ private[lib] trait AnyBase extends Logging {
   protected def onDestroyBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onDestroyBase")
     callSuper
-    AnyBase.deinit(context)
+    /*
+     *  deinitialize only if there was initialization
+     *  AnyBase.info initialize only once at the beginning
+     *  call onDestroy without onCreate - looks like a dirty trick from Android team
+     */
+    if (AnyBase.info.get.nonEmpty)
+      AnyBase.deinit(context)
   }
 }
 
@@ -198,7 +204,7 @@ object AnyBase extends Logging {
    *            safely. Otherwise it will be killed quickly.
    */
   @Loggable
-  def shutdownApp(packageName: String, safely: Boolean) = synchronized {
+  def shutdownApp(packageName: String, safely: Boolean) = onShutdownState.synchronized {
     if (safely) {
       log.info("shutdown safely " + packageName)
       Logging.flush

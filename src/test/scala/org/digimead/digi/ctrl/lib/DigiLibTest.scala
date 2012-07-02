@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl.lib
 
+import org.digimead.digi.ctrl.lib.declaration.DOption
 import org.digimead.digi.ctrl.lib.log.AndroidLogger
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.scalatest.junit.JUnitSuite
@@ -37,10 +38,14 @@ class DigiLibTest
 
     true should be(true)
 
+    DOption.withName("as_root") should be(DOption.AsRoot)
+
+    activity.log.info("option " + DOption.withName("as_root"))
+
     activity.log.warn("testHelloWorld END")
     android.util.Log.i("DigiLibTest", "testHelloWorld END")
   }
-  
+
   override def setUp() {
     super.setUp()
     Logging.reset()

@@ -39,15 +39,11 @@ object DOption extends DOption {
   val CacheFolder: OptVal = Value("cache_dir", classOf[String], ".")
   val CacheClass: OptVal = Value("cache_class", classOf[String], DConstant.prefix + "lib.base.AppCache")
   val ConfirmConn: OptVal = Value("confirm_connection", classOf[Boolean], true: java.lang.Boolean)
-  val CounterDialogRate: OptVal = Value("counter_dialog_rate", classOf[Int], 0: java.lang.Integer)
   val DebugAndroidLogger: OptVal = Value("debug_android_logger", classOf[Boolean], false: java.lang.Boolean)
   val DebugFlag: OptVal = Value("debug_flag", classOf[String], "")
   val DebugLogLevel: OptVal = Value("debug_log_level", classOf[String], "5")
   val OnBoot: OptVal = Value("on_boot", classOf[Boolean], false: java.lang.Boolean)
   val PreferredLayoutOrientation: OptVal = Value("preferred_layout_orientation", classOf[String], "4") // SCREEN_ORIENTATION_SENSOR
-  val Port: OptVal = Value("port", classOf[Int], 2222: java.lang.Integer)
   val ShutdownTimeout: OptVal = Value("shutdown_timeout", classOf[String], "300")
-  val ShowDialogWelcome: OptVal = Value("show_dialog_welcome", classOf[Boolean], true: java.lang.Boolean)
-  val ShowDialogRate: OptVal = Value("show_dialog_rate", classOf[Boolean], true: java.lang.Boolean)
   val WriteConnLog: OptVal = Value("write_connection_log", classOf[Boolean], false: java.lang.Boolean)
 }

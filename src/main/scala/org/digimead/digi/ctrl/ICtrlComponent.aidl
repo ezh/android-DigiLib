@@ -30,9 +30,9 @@ interface ICtrlComponent {
   boolean post(in int id, in String workdir);
   List<String> accessAllowRules();
   List<String> accessDenyRules();
-  boolean readBooleanProperty(in int property);
-  int readIntProperty(in int property);
-  String readStringProperty(in int property);
+  boolean readBooleanProperty(in String property);
+  int readIntProperty(in String property);
+  String readStringProperty(in String property);
   boolean accessRulesOrder(); // ADA vs DAD
   Map interfaceRules(); // String, Boolean
   UserInfo user(in String name);

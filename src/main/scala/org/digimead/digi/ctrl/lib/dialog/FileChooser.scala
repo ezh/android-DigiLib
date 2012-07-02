@@ -55,6 +55,8 @@ object FileChooser extends Logging {
   @volatile private var layout: Option[LinearLayout] = None
   @volatile private var inflater: Option[LayoutInflater] = None
   @volatile private var fileFilter = new FileFilter { override def accept(file: File) = true }
+  @volatile private var onFileClickCb = (f: File) => false
+  @volatile private var onResult: (File, Seq[File]) => Any = (dir, selected) => {}
   private lazy val lv = new WeakReference(layout.map(_.findViewById(android.R.id.list).asInstanceOf[ListView]).getOrElse(null))
   private lazy val path = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_path")).asInstanceOf[TextView]).getOrElse(null))
   private lazy val home = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_home")).asInstanceOf[Button]).getOrElse(null))
@@ -79,9 +81,19 @@ object FileChooser extends Logging {
   log.debug("alive")
 
   @Loggable
-  def createDialog(activity: Activity, title: String, path: File, onResult: (File, Seq[File]) => Any, _fileFilter: FileFilter = null)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = {
+  def createDialog(activity: Activity,
+    title: String,
+    path: File,
+    _onResult: (File, Seq[File]) => Any,
+    _fileFilter: FileFilter = null,
+    _onFileClickCb: (File) => Boolean = null)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = {
     log.debug("create FileChooser dialog")
     fileChooserResult.unset()
+    onResult = _onResult
+    if (_fileFilter != null)
+      fileFilter = _fileFilter
+    if (_onFileClickCb != null)
+      onFileClickCb = _onFileClickCb
     if (!dactivity.get.exists(_ == activity)) {
       layout.foreach(l => l.getParent.asInstanceOf[ViewGroup].removeView(l))
       dialog = None
@@ -111,8 +123,6 @@ object FileChooser extends Logging {
       dialog = Some(result)
       result
     })
-    if (_fileFilter != null)
-      fileFilter = _fileFilter
     setup(title, path)
     result
   } getOrElse (null)
@@ -138,8 +148,8 @@ object FileChooser extends Logging {
       home.setOnClickListener(new View.OnClickListener() {
         override def onClick(v: View) {
           activeDirectory = new File("/")
-//          Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
-//            getOrElse("change directory to %s").format(activeDirectory), Toast.LENGTH_SHORT).show()
+          //          Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+          //            getOrElse("change directory to %s").format(activeDirectory), Toast.LENGTH_SHORT).show()
           showDirectory(activeDirectory)
         }
       })
@@ -147,8 +157,8 @@ object FileChooser extends Logging {
         override def onClick(v: View) = {
           activeDirectory.getParentFile match {
             case parent: File =>
-//              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
-//                getOrElse("change directory to %s").format(parent), Toast.LENGTH_SHORT).show()
+              //              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+              //                getOrElse("change directory to %s").format(parent), Toast.LENGTH_SHORT).show()
               showDirectory(parent)
             case null =>
               Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to_failed").
@@ -276,20 +286,28 @@ object FileChooser extends Logging {
       })
     }
   } getOrElse { log.fatal("unable to initialize FileChooser dialog") }
+  @Loggable
   def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long) {
     val file = {
       val want = parent.getAdapter.asInstanceOf[ArrayAdapter[File]].getItem(position)
       if (want.getName == "..") want.getParentFile.getParentFile else want
     }
-    if (file.isDirectory)
+    if (file.isDirectory) {
       if (file.canExecute && file.canRead) {
-//        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to").
-//          getOrElse("change directory to %s").format(file), Toast.LENGTH_SHORT).show()
+        //        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to").
+        //          getOrElse("change directory to %s").format(file), Toast.LENGTH_SHORT).show()
         showDirectory(file)
       } else {
         Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to_failed").
           getOrElse("unable to change directory to %s").format(file), Toast.LENGTH_SHORT).show()
       }
+    } else {
+      if (onFileClickCb(file)) {
+        fileChooserResult.set((activeDirectory, Seq(file)))
+        dialog.foreach(_.dismiss)
+        onResult(activeDirectory, Seq(file))
+      }
+    }
   }
   @Loggable
   def setup(title: String, file: File): Unit = {
