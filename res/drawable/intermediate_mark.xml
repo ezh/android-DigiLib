@@ -25,9 +25,9 @@
     <item>
         <shape android:shape="rectangle" >
             <gradient
-                android:endColor="#00DDDD00"
+                android:endColor="#00222200"
                 android:gradientRadius="500"
-                android:startColor="#88DDDD00"
+                android:startColor="#55999900"
                 android:type="radial" />
         </shape>
     </item>

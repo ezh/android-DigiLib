@@ -16,10 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
@@ -27,6 +27,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -37,7 +38,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
@@ -73,7 +73,10 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
         try {
           val intent = new Intent(Intent.ACTION_VIEW, xdaUri.get)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open XDA thread page: " + xdaUri.get, e)
@@ -83,7 +86,10 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
         try {
           val intent = new Intent(Intent.ACTION_VIEW, wikiUri.get)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open wiki page: " + wikiUri.get, e)

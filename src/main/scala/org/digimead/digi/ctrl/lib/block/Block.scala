@@ -16,11 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
@@ -29,6 +28,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
@@ -75,7 +75,7 @@ object Block extends Logging {
       clipboard.setText(copyText)
       val message = Android.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
-      AnyBase.handler.post(new Runnable { def run = Toast.makeText(context, message, DConstant.toastTimeout).show() })
+      AnyBase.handler.post(new Runnable { def run = Toast.makeText(context, message, Toast.LENGTH_LONG).show() })
       true
     } catch {
       case e =>
@@ -89,7 +89,12 @@ object Block extends Logging {
       intent.setType("text/plain")
       intent.putExtra(Intent.EXTRA_SUBJECT, subjectText)
       intent.putExtra(Intent.EXTRA_TEXT, bodyText)
-      context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
+      AppComponent.Context match {
+        case Some(activity) if activity.isInstanceOf[Activity] =>
+          activity.startActivity(Intent.createChooser(intent, Android.getString(activity, "share").getOrElse("share")))
+        case _ => context.startActivity(Intent.createChooser(intent,
+          Android.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
       true
     } catch {
       case e =>

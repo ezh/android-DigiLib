@@ -20,11 +20,11 @@ import java.util.Calendar
 import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
@@ -33,6 +33,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -44,7 +45,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
@@ -56,7 +56,8 @@ class SupportBlock(val context: Context,
   val emailTo: String,
   val emailSubject: String,
   val voicePhone: String,
-  val skypeUser: String)(implicit val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
+  val skypeUser: String,
+  val icqUser: String)(implicit val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
   val itemProject = SupportBlock.Item(Android.getString(context, "block_support_project_title").getOrElse("project %s").format(Android.getString(context, "app_name").get),
     Android.getString(context, "block_support_project_description").getOrElse("open %s project web site").format(Android.getString(context, "app_name").get), "ic_block_support_project")
   val itemIssues = SupportBlock.Item(Android.getString(context, "block_support_issues_title").getOrElse("view or submit an issue"),
@@ -85,7 +86,10 @@ class SupportBlock(val context: Context,
         try {
           val intent = new Intent(Intent.ACTION_VIEW, projectUri)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open project link: " + projectUri, e)
@@ -95,7 +99,10 @@ class SupportBlock(val context: Context,
         try {
           val intent = new Intent(Intent.ACTION_VIEW, issuesUri)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open project link: " + issuesUri, e)
@@ -109,7 +116,12 @@ class SupportBlock(val context: Context,
           intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject)
           intent.putExtra(android.content.Intent.EXTRA_TEXT, "")
           intent.setType("text/plain");
-          context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(Intent.createChooser(intent,
+              Android.getString(context, "share").getOrElse("share")))
+            case _ => context.startActivity(Intent.createChooser(intent,
+              Android.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable 'send to' email: " + emailTo + " / " + emailSubject, e)
@@ -145,10 +157,12 @@ class SupportBlock(val context: Context,
       case this.itemEmail =>
       // none
       case this.itemChat =>
-        menu.add(Menu.NONE, Android.getId(context, "block_support_voice_call"), 1,
-          Android.getString(context, "block_support_voice_call").getOrElse("Copy phone number, USA/Canada Toll Free"))
-        menu.add(Menu.NONE, Android.getId(context, "block_support_skype_call"), 1,
-          Android.getString(context, "block_support_skype_call").getOrElse("Copy skype account id"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_voice_contact"), 1,
+          Android.getString(context, "block_support_voice_contact").getOrElse("Copy phone number, USA/Canada Toll Free"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_skype_contact"), 1,
+          Android.getString(context, "block_support_skype_contact").getOrElse("Copy Skype account id"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_icq_contact"), 1,
+          Android.getString(context, "block_support_icq_contact").getOrElse("Copy ICQ account id"))
       case item =>
         log.fatal("unsupported context menu item " + item)
     }
@@ -165,7 +179,8 @@ class SupportBlock(val context: Context,
           case item =>
             log.fatal("skip unknown menu item " + item)
             false
-        } case this.itemIssues =>
+        }
+      case this.itemIssues =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
             Block.copyLink(context, item, issuesUri.toString)
@@ -178,10 +193,10 @@ class SupportBlock(val context: Context,
         false
       case this.itemChat =>
         menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_support_voice_call") =>
+          case id if id == Android.getId(context, "block_support_voice_contact") =>
             log.debug("copy to clipboard phone " + voicePhone)
             try {
-              val message = Android.getString(context, "block_support_copy_voice_call").
+              val message = Android.getString(context, "block_support_copy_voice_contact").
                 getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
               AnyBase.handler.post(new Runnable {
                 def run = try {
@@ -199,11 +214,11 @@ class SupportBlock(val context: Context,
                 IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
                 false
             }
-          case id if id == Android.getId(context, "block_support_skype_call") =>
-            log.debug("copy to clipboard skype account id " + skypeUser)
+          case id if id == Android.getId(context, "block_support_skype_contact") =>
+            log.debug("copy to clipboard Skype account id " + skypeUser)
             try {
-              val message = Android.getString(context, "block_support_copy_skype_call").
-                getOrElse("Copy to clipboard skype account \"" + skypeUser + "\"")
+              val message = Android.getString(context, "block_support_copy_skype_contact").
+                getOrElse("Copy to clipboard Skype account \"" + skypeUser + "\"")
               AnyBase.handler.post(new Runnable {
                 def run = try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
@@ -211,13 +226,34 @@ class SupportBlock(val context: Context,
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
                 } catch {
                   case e =>
-                    IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
+                    IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
                 }
               })
               true
             } catch {
               case e =>
-                IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
+                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
+                false
+            }
+          case id if id == Android.getId(context, "block_support_icq_contact") =>
+            log.debug("copy to clipboard ICQ account id " + icqUser)
+            try {
+              val message = Android.getString(context, "block_support_copy_icq_contact").
+                getOrElse("Copy to clipboard ICQ account \"" + icqUser + "\"")
+              AnyBase.handler.post(new Runnable {
+                def run = try {
+                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+                  clipboard.setText(icqUser)
+                  Toast.makeText(context, message, DConstant.toastTimeout).show()
+                } catch {
+                  case e =>
+                    IAmYell("Unable to copy to clipboard ICQ account id " + icqUser, e)
+                }
+              })
+              true
+            } catch {
+              case e =>
+                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
                 false
             }
           case id =>

@@ -127,6 +127,7 @@ object Common extends Logging {
                   log.debug("external storge test failed")
                   externalStorageDisabled = Some(true)
                 }
+                testFile.delete()
               } catch {
                 case e =>
                   log.debug("external storge test failed, " + e.getMessage)

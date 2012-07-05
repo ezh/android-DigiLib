@@ -16,10 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
@@ -27,6 +27,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -37,7 +38,6 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.TextView.BufferType
@@ -62,6 +62,7 @@ class LegalBlock(val context: Context,
   }
   @Loggable
   def onListItemClick(l: ListView, v: View, item: LegalBlock.Item) = {
+    val context = v.getContext
     item match {
       case item: LegalBlock.Item => // show context menu
         log.debug("open context menu for item " + item)
@@ -73,6 +74,7 @@ class LegalBlock(val context: Context,
   @Loggable
   override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: LegalBlock.Item) {
     log.debug("create context menu for " + item)
+    val context = v.getContext
     menu.setHeaderTitle(Android.getString(context, "block_legal_title").getOrElse("legal"))
     Android.getId(context, "ic_launcher", "drawable") match {
       case i if i != 0 =>
@@ -86,13 +88,17 @@ class LegalBlock(val context: Context,
   }
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: LegalBlock.Item): Boolean = {
+    val context = item.view.get.map(_.getContext) getOrElse LegalBlock.this.context
     menuItem.getItemId match {
       case id if id == Android.getId(context, "block_legal_open") =>
         log.debug("open link from " + item.uri)
         try {
           val intent = new Intent(Intent.ACTION_VIEW, Uri.parse(item.uri))
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
           true
         } catch {
           case e =>
@@ -104,7 +110,10 @@ class LegalBlock(val context: Context,
         try {
           val intent = new Intent("Intent.ACTION_SEND")
           intent.setType("text/plain")
-          context.startActivity(Intent.createChooser(intent, "Send Link"))
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(Intent.createChooser(intent, "Send Link"))
+            case _ => context.startActivity(Intent.createChooser(intent, "Send Link").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
           true
         } catch {
           case e =>
