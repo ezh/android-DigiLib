@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -43,9 +44,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Looper
-import android.text.context
 
-protected class AppControl private (componentName: String) extends Logging {
+protected class AppControl private (packageName: String) extends Logging {
   private val ctrlBindTimeout = DTimeout.short
   protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
@@ -55,7 +55,7 @@ protected class AppControl private (componentName: String) extends Logging {
       log.info("connected to DigiControl service")
       val service = ICtrlHost.Stub.asInterface(iservice)
       if (service != null) {
-        service.update_shutdown_timer(componentName, -1)
+        service.update_shutdown_timer(packageName, -1)
         ready.set(Some(service))
       }
     }
@@ -67,6 +67,8 @@ protected class AppControl private (componentName: String) extends Logging {
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
   private val uiThreadID = Looper.getMainLooper.getThread.getId
+  private val internalDirectory = new AtomicReference[File](null)
+  private val externalDirectory = new AtomicReference[File](null) // sdcard
   log.debug("alive")
 
   /*
@@ -140,6 +142,18 @@ protected class AppControl private (componentName: String) extends Logging {
     } else
       None
   }
+  @Loggable(result = false)
+  def getInternalDirectory(timeout: Int = DTimeout.long): Option[File] =
+    Option(internalDirectory.get()) orElse {
+      Futures.future { initializeDirectories(timeout) }()
+      Option(internalDirectory.get())
+    }
+  @Loggable(result = false)
+  def getExternalDirectory(timeout: Int = DTimeout.long): Option[File] =
+    Option(externalDirectory.get()) orElse {
+      Futures.future { initializeDirectories(timeout) }()
+      Option(externalDirectory.get())
+    } orElse Option(internalDirectory.get())
   @Loggable(result = false)
   def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
@@ -324,6 +338,27 @@ protected class AppControl private (componentName: String) extends Logging {
         case None =>
           None
       }
+    }
+  }
+  @Loggable
+  private def initializeDirectories(timeout: Int) {
+    val internalPath = new SyncVar[File]()
+    val externalPath = new SyncVar[File]()
+    AppControl.Inner.callListDirectories(packageName)() match {
+      case Some((internal, external)) =>
+        internalPath.set(new File(internal))
+        externalPath.set(new File(external))
+      case r =>
+        log.warn("unable to get component directories, result " + r)
+        internalPath.set(null)
+        externalPath.set(null)
+    }
+    for {
+      internalPath <- internalPath.get(timeout) if internalPath != null
+      externalPath <- externalPath.get(timeout) if externalPath != null
+    } {
+      internalDirectory.set(internalPath)
+      externalDirectory.set(externalPath)
     }
   }
 }
