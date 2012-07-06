@@ -45,6 +45,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
@@ -108,19 +109,14 @@ class SupportBlock(val context: Context,
             IAmYell("Unable to open project link: " + issuesUri, e)
         }
       case this.itemEmail => // create email
-        // TODO simple email vs complex with log
         log.debug("send email to " + emailTo)
         try {
-          val intent = new Intent(Intent.ACTION_SEND)
-          intent.putExtra(Intent.EXTRA_EMAIL, Array[String](emailTo, ""))
+          val uri = Uri.parse("mailto:" + emailTo)
+          val intent = new Intent(Intent.ACTION_SENDTO, uri)
           intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject)
-          intent.putExtra(android.content.Intent.EXTRA_TEXT, "")
-          intent.setType("text/plain");
           AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(Intent.createChooser(intent,
-              Android.getString(context, "share").getOrElse("share")))
-            case _ => context.startActivity(Intent.createChooser(intent,
-              Android.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
           }
         } catch {
           case e =>

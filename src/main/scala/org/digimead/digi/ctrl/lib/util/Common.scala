@@ -115,6 +115,8 @@ object Common extends Logging {
               try {
                 log.debug("test external storage")
                 val testFile = new File(baseFiles, "testExternalStorage.tmp")
+                if (testFile.exists)
+                  testFile.delete
                 val testContent = (for (i <- 0 until 1024) yield i).mkString // about 2.9 kB
                 val out = new BufferedWriter(new FileWriter(testFile))
                 out.write(testContent)

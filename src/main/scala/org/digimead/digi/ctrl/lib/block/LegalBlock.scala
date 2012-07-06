@@ -38,6 +38,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.TextView.BufferType
@@ -62,7 +63,6 @@ class LegalBlock(val context: Context,
   }
   @Loggable
   def onListItemClick(l: ListView, v: View, item: LegalBlock.Item) = {
-    val context = v.getContext
     item match {
       case item: LegalBlock.Item => // show context menu
         log.debug("open context menu for item " + item)
@@ -74,7 +74,6 @@ class LegalBlock(val context: Context,
   @Loggable
   override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: LegalBlock.Item) {
     log.debug("create context menu for " + item)
-    val context = v.getContext
     menu.setHeaderTitle(Android.getString(context, "block_legal_title").getOrElse("legal"))
     Android.getId(context, "ic_launcher", "drawable") match {
       case i if i != 0 =>
@@ -88,7 +87,6 @@ class LegalBlock(val context: Context,
   }
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: LegalBlock.Item): Boolean = {
-    val context = item.view.get.map(_.getContext) getOrElse LegalBlock.this.context
     menuItem.getItemId match {
       case id if id == Android.getId(context, "block_legal_open") =>
         log.debug("open link from " + item.uri)
