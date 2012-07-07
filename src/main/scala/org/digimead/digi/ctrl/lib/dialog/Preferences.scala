@@ -435,19 +435,25 @@ object Preferences extends Logging {
       publicEditor.commit()
     }
   }
-  object CachePeriod extends Preference[Int](DOption.CachePeriod, (s) => s.toInt,
+  object CachePeriod extends StringPreference[Int](DOption.CachePeriod, (s) => s.toInt,
     "set_cache_period_notify", "set cache period to %s seconds") {}
-  object CacheFolder extends Preference[String](DOption.CacheFolder, (s) => s,
+  object CacheFolder extends StringPreference[String](DOption.CacheFolder, (s) => s,
     "set_cache_folder_notify", "set cache folder to \"%s\"") {
     override def default = AppComponent.Context.get.getCacheDir.getAbsolutePath + "/"
   }
-  object CacheClass extends Preference[String](DOption.CacheClass, (s) => s,
+  object CacheClass extends StringPreference[String](DOption.CacheClass, (s) => s,
     "set_cache_class_notify", "set cache class to \"%s\"") {}
-  object DebugFlag extends Preference[String](DOption.DebugFlag, (s) => s,
+  object DebugFlag extends StringPreference[String](DOption.DebugFlag, (s) => s,
     "set_debug_flag_notify", "set debug flag to \"%s\"") {}
-  abstract class Preference[T](option: DOption#OptVal, convert: String => T, messageID: String, messageFallBack: String) {
-    def default = option.default.asInstanceOf[String]
-    @Loggable
+  trait Preference[T, X] {
+    val option: DOption#OptVal
+    def default = option.default.asInstanceOf[T]
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): X
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit
+    def set(value: T, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit
+  }
+  abstract class StringPreference[T](val option: DOption#OptVal, convert: String => T, messageID: String, messageFallBack: String)
+    extends Preference[String, T] {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): T = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
@@ -465,11 +471,9 @@ object Preferences extends Logging {
           convert(default)
       }
     }
-    @Loggable
     def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       set(get(context)(logger, dispatcher).toString, context)(logger, dispatcher)
     }
-    @Loggable
     def set(value: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
       val public = Common.getPublicPreferences(context)
@@ -498,7 +502,6 @@ object Preferences extends Logging {
         }
       }
     }
-    @Loggable
     private def reset(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
       IAmWarn("reset preference " + option)(logger, dispatcher)
       val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
@@ -508,6 +511,68 @@ object Preferences extends Logging {
       val publicEditor = Common.getPublicPreferences(context).edit()
       publicEditor.remove(option.tag)
       publicEditor.putString(option.tag, default.toString)
+      publicEditor.commit()
+    }
+  }
+  abstract class BooleanPreference(val option: DOption#OptVal, messageID: String, messageFallBack: String)
+    extends Preference[Boolean, Boolean] {
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = synchronized {
+      try {
+        val shared = PreferenceManager.getDefaultSharedPreferences(context)
+        val public = Common.getPublicPreferences(context)
+        try {
+          public.getBoolean(option.tag, shared.getBoolean(option.tag, default))
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            default
+        }
+      } catch {
+        case e =>
+          log.error(e.getMessage, e)
+          default
+      }
+    }
+    def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      set(get(context)(logger, dispatcher), context)(logger, dispatcher)
+    }
+    def set(value: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
+      val shared = PreferenceManager.getDefaultSharedPreferences(context)
+      val public = Common.getPublicPreferences(context)
+      ExceptionHandler.retry[Unit](1) {
+        try {
+          if (!shared.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
+            log.debug("set %s shared preference to [%s]".format(option.toString, value))
+            val sharedEditor = shared.edit
+            sharedEditor.putBoolean(option.tag, value)
+            sharedEditor.commit
+          }
+          if (!public.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
+            log.debug("set %s public preference to [%s]".format(option.toString, value))
+            val publicEditor = public.edit()
+            publicEditor.putBoolean(option.tag, value)
+            publicEditor.commit()
+          }
+          val message = Android.getString(context, messageID).getOrElse(messageFallBack).format(value)
+          if (notify)
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+          IAmMumble(message)(logger, dispatcher)
+        } catch {
+          case e: ClassCastException =>
+            reset(context)(logger, dispatcher)
+            throw e
+        }
+      }
+    }
+    private def reset(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher) {
+      IAmWarn("reset preference " + option)(logger, dispatcher)
+      val sharedEditor = PreferenceManager.getDefaultSharedPreferences(context).edit
+      sharedEditor.remove(option.tag)
+      sharedEditor.putBoolean(option.tag, default)
+      sharedEditor.commit()
+      val publicEditor = Common.getPublicPreferences(context).edit()
+      publicEditor.remove(option.tag)
+      publicEditor.putBoolean(option.tag, default)
       publicEditor.commit()
     }
   }

@@ -20,7 +20,7 @@ package org.digimead.digi.ctrl.lib.util
 trait Passwords {
   val randomIntN = new scala.util.Random(System.currentTimeMillis())
   val numbers = ('0' to '9').toList
-  val symbols = "!@$*".toList
+  val symbols = """!@#$%^&*()_+-=[]{};':",./?""".toList
   val alphabet = ('a' to 'z').toList
   val upperAlphabet = ('A' to 'Z').toList
   val defaultPasswordCharacters = numbers ++ symbols ++ alphabet ++ upperAlphabet
