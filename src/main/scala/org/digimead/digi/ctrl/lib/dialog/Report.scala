@@ -86,7 +86,7 @@ object Report extends Logging {
                             log.debug("found bridge with UID " + uid + " and PID " + pid)
                             if (uid == 0) {
                               log.debug("send INT signal to root bridge with PID " + pid)
-                              val p = Runtime.getRuntime.exec(Array("su", "-c", "kill -INT " + pid))
+                              val p = Runtime.getRuntime.exec(Array("su", "-c", "kill -2 " + pid))
                               p.waitFor
                             } else {
                               log.debug("send INT signal to bridge with PID " + pid)

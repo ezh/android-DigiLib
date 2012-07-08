@@ -194,8 +194,8 @@ class SupportBlock(val context: Context,
             try {
               val message = Android.getString(context, "block_support_copy_voice_contact").
                 getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
-              AnyBase.handler.post(new Runnable {
-                def run = try {
+              AnyBase.runOnUiThread {
+                try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(voicePhone)
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
@@ -203,7 +203,7 @@ class SupportBlock(val context: Context,
                   case e =>
                     IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
                 }
-              })
+              }
               true
             } catch {
               case e =>
@@ -215,8 +215,8 @@ class SupportBlock(val context: Context,
             try {
               val message = Android.getString(context, "block_support_copy_skype_contact").
                 getOrElse("Copy to clipboard Skype account \"" + skypeUser + "\"")
-              AnyBase.handler.post(new Runnable {
-                def run = try {
+              AnyBase.runOnUiThread {
+                try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(skypeUser)
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
@@ -224,7 +224,7 @@ class SupportBlock(val context: Context,
                   case e =>
                     IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
                 }
-              })
+              }
               true
             } catch {
               case e =>
@@ -236,8 +236,8 @@ class SupportBlock(val context: Context,
             try {
               val message = Android.getString(context, "block_support_copy_icq_contact").
                 getOrElse("Copy to clipboard ICQ account \"" + icqUser + "\"")
-              AnyBase.handler.post(new Runnable {
-                def run = try {
+              AnyBase.runOnUiThread {
+                try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(icqUser)
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
@@ -245,7 +245,7 @@ class SupportBlock(val context: Context,
                   case e =>
                     IAmYell("Unable to copy to clipboard ICQ account id " + icqUser, e)
                 }
-              })
+              }
               true
             } catch {
               case e =>

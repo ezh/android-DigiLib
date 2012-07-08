@@ -289,18 +289,19 @@ object Common extends Logging {
       val bindContext = context.getApplicationContext()
       log.debug("start doComponentService for " + componentPackage + " with timeout " + operationTimeout)
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
-      if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
-        log.debug("reuse service connection")
-        val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
-        if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
-          log.debug("binder alive")
-          f(service)
-          return
-        } else {
-          log.warn("try to unbind dead service")
-          context.unbindService(connection)
-          AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
-        }
+      AppComponent.Inner.bindedICtrlPool.get(componentPackage) match {
+        case Some((context, connection, service)) =>
+          log.debug("reuse service connection")
+          if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
+            log.debug("binder alive")
+            f(service)
+            return
+          } else {
+            log.warn("try to unbind dead service")
+            context.unbindService(connection)
+            AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
+          }
+        case None =>
       }
       // lock for bindService
       val lock = new Lock
@@ -327,11 +328,11 @@ object Common extends Logging {
         val executionFuture = executionGuard.submit(new Runnable {
           def run = try {
             if (service != null) {
+              f(service)
               if (reuse) {
                 log.debug("add service connection to bindedICtrlPool")
                 AppComponent.Inner.bindedICtrlPool(componentPackage) = (bindContext, connection, service)
               }
-              f(service)
             }
           } finally {
             service = null
@@ -359,17 +360,21 @@ object Common extends Logging {
       }
   }
   @Loggable
-  def removeCachedComponentService(componentPackage: String) = try {
-    if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
-      log.debug("reuse service connection")
-      val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
-      log.warn("try to unbind cached service")
-      context.unbindService(connection)
-      AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
+  def removeCachedComponentService(componentPackage: String) = AppComponent.Inner.bindedICtrlPool.synchronized {
+    try {
+      AppComponent.Inner.bindedICtrlPool.remove(componentPackage).foreach {
+        case (context, connection, service) => try {
+          log.warn("try to unbind cached service " + service)
+          context.unbindService(connection)
+        } catch {
+          case e: IllegalArgumentException =>
+            log.warn(e.getMessage)
+        }
+      }
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
     }
-  } catch {
-    case e =>
-      log.error(e.getMessage, e)
   }
   @Loggable
   def removeCachedComponentServices() = AppComponent.Inner match {

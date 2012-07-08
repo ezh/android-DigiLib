@@ -66,38 +66,34 @@ object Level extends Logging {
   }
   def isEnable = highlight
   def setEnable(switch: Boolean) = highlight = switch
-  def hlOn(context: Context) = AnyBase.handler.post(new Runnable {
-    def run {
-      noviceControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(Resources.noviceDrawable.mutate)
-        view.invalidate
-      }))
-      intermediateControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(Resources.intermediateDrawable.mutate)
-        view.invalidate
-      }))
-      professionalControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(Resources.professionalDrawable.mutate)
-        view.invalidate
-      }))
-    }
-  })
-  def hlOff(context: Context) = AnyBase.handler.post(new Runnable {
-    def run {
-      noviceControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(null)
-        view.invalidate
-      }))
-      intermediateControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(null)
-        view.invalidate
-      }))
-      professionalControlViews.foreach(_.get.foreach(view => {
-        view.setBackgroundDrawable(null)
-        view.invalidate
-      }))
-    }
-  })
+  def hlOn(context: Context) = AnyBase.runOnUiThread {
+    noviceControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(Resources.noviceDrawable.mutate)
+      view.invalidate
+    }))
+    intermediateControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(Resources.intermediateDrawable.mutate)
+      view.invalidate
+    }))
+    professionalControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(Resources.professionalDrawable.mutate)
+      view.invalidate
+    }))
+  }
+  def hlOff(context: Context) = AnyBase.runOnUiThread {
+    noviceControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(null)
+      view.invalidate
+    }))
+    intermediateControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(null)
+      view.invalidate
+    }))
+    professionalControlViews.foreach(_.get.foreach(view => {
+      view.setBackgroundDrawable(null)
+      view.invalidate
+    }))
+  }
   // LayerDrawable is a workaround for 2.x bugs, waste of memory, 'def' instead of 'lazy val' :-/
   object Resources {
     lazy val inflater = AppComponent.Context.map {

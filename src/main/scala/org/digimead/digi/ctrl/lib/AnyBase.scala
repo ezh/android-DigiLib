@@ -84,7 +84,7 @@ object AnyBase extends Logging {
   @volatile private var reportDirectory = "report"
   @volatile private var onShutdownProtect = new WeakReference[Activity](null)
   private val onShutdownState = new SyncVar[ShutdownState]() // string - cancel reason
-  val handler = new Handler() // bound to the current thread (UI)
+  private val handler = new Handler() // bound to the current thread (UI)
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
@@ -164,6 +164,12 @@ object AnyBase extends Logging {
     // update contextPool
     contextPool = contextPool.filter(_.get != Some(context))
     updateContext()
+  }
+  def runOnUiThread(f: => Any): Unit = getContext.map {
+    case activity: Activity => activity.runOnUiThread(new Runnable { def run() = f })
+    case _ => AnyBase.handler.post(new Runnable { def run = f })
+  } getOrElse {
+    AnyBase.handler.post(new Runnable { def run = f })
   }
   // count only Activity and Service contexts
   def isLastContext() =

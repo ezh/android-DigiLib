@@ -445,15 +445,16 @@ object Preferences extends Logging {
     "set_cache_class_notify", "set cache class to \"%s\"") {}
   object DebugFlag extends StringPreference[String](DOption.DebugFlag, (s) => s,
     "set_debug_flag_notify", "set debug flag to \"%s\"") {}
-  trait Preference[T, X] {
+  // X - default, Y - in, Z - out  
+  trait Preference[X, Y, Z] {
     val option: DOption#OptVal
-    def default = option.default.asInstanceOf[T]
-    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): X
+    def default = option.default.asInstanceOf[X]
+    def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Z
     def set(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit
-    def set(value: T, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit
+    def set(value: Y, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit
   }
   abstract class StringPreference[T](val option: DOption#OptVal, convert: String => T, messageID: String, messageFallBack: String)
-    extends Preference[String, T] {
+    extends Preference[String, String, T] {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): T = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
@@ -515,7 +516,7 @@ object Preferences extends Logging {
     }
   }
   abstract class BooleanPreference(val option: DOption#OptVal, messageID: String, messageFallBack: String)
-    extends Preference[Boolean, Boolean] {
+    extends Preference[Boolean, Boolean, Boolean] {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)

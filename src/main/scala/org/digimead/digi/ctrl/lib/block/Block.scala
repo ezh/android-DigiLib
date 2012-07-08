@@ -75,7 +75,7 @@ object Block extends Logging {
       clipboard.setText(copyText)
       val message = Android.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
-      AnyBase.handler.post(new Runnable { def run = Toast.makeText(context, message, Toast.LENGTH_LONG).show() })
+      AnyBase.runOnUiThread { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
       true
     } catch {
       case e =>
