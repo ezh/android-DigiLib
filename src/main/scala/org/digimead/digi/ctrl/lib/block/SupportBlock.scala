@@ -16,14 +16,15 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.Calendar
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicInteger
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
@@ -50,13 +51,14 @@ import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 
-class SupportBlock(val context: Activity,
+class SupportBlock(val context: Context,
   val projectUri: Uri,
   val issuesUri: Uri,
   val emailTo: String,
   val emailSubject: String,
   val voicePhone: String,
-  val skypeUser: String)(implicit val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
+  val skypeUser: String,
+  val icqUser: String)(implicit val dispatcher: Dispatcher) extends Block[SupportBlock.Item] with Logging {
   val itemProject = SupportBlock.Item(Android.getString(context, "block_support_project_title").getOrElse("project %s").format(Android.getString(context, "app_name").get),
     Android.getString(context, "block_support_project_description").getOrElse("open %s project web site").format(Android.getString(context, "app_name").get), "ic_block_support_project")
   val itemIssues = SupportBlock.Item(Android.getString(context, "block_support_issues_title").getOrElse("view or submit an issue"),
@@ -66,7 +68,8 @@ class SupportBlock(val context: Activity,
   val itemChat = SupportBlock.Item(Android.getString(context, "block_chat_title").getOrElse("live chat via Skype, VoIP, ..."),
     Android.getString(context, "block_support_chat_description").getOrElse("please call from 06:00 to 18:00 UTC"), "ic_block_support_chat")
   val items = Seq(itemProject, itemIssues, itemEmail, itemChat)
-  private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
+    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SupportBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   SupportBlock.block = Some(this)
   @Loggable
@@ -84,7 +87,10 @@ class SupportBlock(val context: Activity,
         try {
           val intent = new Intent(Intent.ACTION_VIEW, projectUri)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open project link: " + projectUri, e)
@@ -94,21 +100,24 @@ class SupportBlock(val context: Activity,
         try {
           val intent = new Intent(Intent.ACTION_VIEW, issuesUri)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open project link: " + issuesUri, e)
         }
       case this.itemEmail => // create email
-        // TODO simple email vs complex with log
         log.debug("send email to " + emailTo)
         try {
-          val intent = new Intent(Intent.ACTION_SEND)
-          intent.putExtra(Intent.EXTRA_EMAIL, Array[String](emailTo, ""))
+          val uri = Uri.parse("mailto:" + emailTo)
+          val intent = new Intent(Intent.ACTION_SENDTO, uri)
           intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject)
-          intent.putExtra(android.content.Intent.EXTRA_TEXT, "")
-          intent.setType("text/plain");
-          context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable 'send to' email: " + emailTo + " / " + emailSubject, e)
@@ -144,10 +153,12 @@ class SupportBlock(val context: Activity,
       case this.itemEmail =>
       // none
       case this.itemChat =>
-        menu.add(Menu.NONE, Android.getId(context, "block_support_voice_call"), 1,
-          Android.getString(context, "block_support_voice_call").getOrElse("Copy phone number, USA/Canada Toll Free"))
-        menu.add(Menu.NONE, Android.getId(context, "block_support_skype_call"), 1,
-          Android.getString(context, "block_support_skype_call").getOrElse("Copy skype account id"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_voice_contact"), 1,
+          Android.getString(context, "block_support_voice_contact").getOrElse("Copy phone number, USA/Canada Toll Free"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_skype_contact"), 1,
+          Android.getString(context, "block_support_skype_contact").getOrElse("Copy Skype account id"))
+        menu.add(Menu.NONE, Android.getId(context, "block_support_icq_contact"), 1,
+          Android.getString(context, "block_support_icq_contact").getOrElse("Copy ICQ account id"))
       case item =>
         log.fatal("unsupported context menu item " + item)
     }
@@ -164,7 +175,8 @@ class SupportBlock(val context: Activity,
           case item =>
             log.fatal("skip unknown menu item " + item)
             false
-        } case this.itemIssues =>
+        }
+      case this.itemIssues =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
             Block.copyLink(context, item, issuesUri.toString)
@@ -177,13 +189,13 @@ class SupportBlock(val context: Activity,
         false
       case this.itemChat =>
         menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_support_voice_call") =>
+          case id if id == Android.getId(context, "block_support_voice_contact") =>
             log.debug("copy to clipboard phone " + voicePhone)
             try {
-              val message = Android.getString(context, "block_support_copy_voice_call").
+              val message = Android.getString(context, "block_support_copy_voice_contact").
                 getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
-              context.runOnUiThread(new Runnable {
-                def run = try {
+              AnyBase.runOnUiThread {
+                try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(voicePhone)
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
@@ -191,32 +203,53 @@ class SupportBlock(val context: Activity,
                   case e =>
                     IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
                 }
-              })
+              }
               true
             } catch {
               case e =>
                 IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
                 false
             }
-          case id if id == Android.getId(context, "block_support_skype_call") =>
-            log.debug("copy to clipboard skype account id " + skypeUser)
+          case id if id == Android.getId(context, "block_support_skype_contact") =>
+            log.debug("copy to clipboard Skype account id " + skypeUser)
             try {
-              val message = Android.getString(context, "block_support_copy_skype_call").
-                getOrElse("Copy to clipboard skype account \"" + skypeUser + "\"")
-              context.runOnUiThread(new Runnable {
-                def run = try {
+              val message = Android.getString(context, "block_support_copy_skype_contact").
+                getOrElse("Copy to clipboard Skype account \"" + skypeUser + "\"")
+              AnyBase.runOnUiThread {
+                try {
                   val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
                   clipboard.setText(skypeUser)
                   Toast.makeText(context, message, DConstant.toastTimeout).show()
                 } catch {
                   case e =>
-                    IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
+                    IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
                 }
-              })
+              }
               true
             } catch {
               case e =>
-                IAmYell("Unable to copy to clipboard skype account id " + skypeUser, e)
+                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
+                false
+            }
+          case id if id == Android.getId(context, "block_support_icq_contact") =>
+            log.debug("copy to clipboard ICQ account id " + icqUser)
+            try {
+              val message = Android.getString(context, "block_support_copy_icq_contact").
+                getOrElse("Copy to clipboard ICQ account \"" + icqUser + "\"")
+              AnyBase.runOnUiThread {
+                try {
+                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+                  clipboard.setText(icqUser)
+                  Toast.makeText(context, message, DConstant.toastTimeout).show()
+                } catch {
+                  case e =>
+                    IAmYell("Unable to copy to clipboard ICQ account id " + icqUser, e)
+                }
+              }
+              true
+            } catch {
+              case e =>
+                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
                 false
             }
           case id =>
@@ -240,9 +273,9 @@ object SupportBlock extends Logging {
     def apply(name: String, description: String) = new Item(counter.getAndIncrement)(name, description)
     def apply(name: String, description: String, icon: String) = new Item(counter.getAndIncrement)(name, description, icon)
   }
-  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item])
+  class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item])
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getLayoutInflater
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {
@@ -261,6 +294,7 @@ object SupportBlock extends Logging {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
+          Level.novice(view)
           item.view = new WeakReference(view)
           view
         case Some(view) =>
@@ -273,7 +307,7 @@ object SupportBlock extends Logging {
       block match {
         case Some(block) if item == block.itemChat =>
           val hour = Calendar.getInstance(TimeZone.getTimeZone("UTC")).get(Calendar.HOUR_OF_DAY)
-          log.debug("current hour " + hour)
+          log.trace("current hour " + hour)
           if (hour >= 6 && hour <= 18)
             text2.setText(Html.fromHtml("<font color='green'>" + item.description + "</font>"))
           else

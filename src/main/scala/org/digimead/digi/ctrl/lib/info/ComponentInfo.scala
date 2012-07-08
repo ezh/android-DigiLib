@@ -122,7 +122,8 @@ case class ComponentInfo(val id: String, // unique string / primary key
     market = in.readString,
     componentPackage = in.readString)
   def writeToParcel(out: Parcel, flags: Int) {
-    ComponentInfo.log.debug("writeToParcel ComponentInfo with flags " + flags)
+    if (ComponentInfo.log.isTraceExtraEnabled)
+      ComponentInfo.log.trace("writeToParcel ComponentInfo with flags " + flags)
     out.writeString(id)
     out.writeString(name)
     out.writeString(version)
@@ -194,10 +195,11 @@ case class ComponentInfo(val id: String, // unique string / primary key
 }
 
 object ComponentInfo extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentInfo] = new Parcelable.Creator[ComponentInfo]() {
     def createFromParcel(in: Parcel): ComponentInfo = try {
-      log.debug("createFromParcel new ComponentInfo")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new ComponentInfo")
       new ComponentInfo(in)
     } catch {
       case e =>

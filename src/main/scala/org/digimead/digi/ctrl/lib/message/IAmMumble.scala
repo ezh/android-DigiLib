@@ -29,16 +29,14 @@ case class IAmMumble(val origin: Origin, val message: String, @transient val onC
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceEnabled)
-      logger.infoWhere("IAmMumble " + message + " ts#" + ts, Logging.Where.ALL)
-    else
-      logger.info("IAmMumble " + message + " ts#" + ts)
+    logger.infoWhere("IAmMumble " + message + " ts#" + ts, Logging.Where.ALL)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
     message = in.readString, onClickCallback = None, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
-    IAmMumble.log.debug("writeToParcel IAmMumble with flags " + flags)
+    if (IAmMumble.log.isTraceExtraEnabled)
+      IAmMumble.log.trace("writeToParcel IAmMumble with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
     out.writeLong(ts)
@@ -49,7 +47,8 @@ case class IAmMumble(val origin: Origin, val message: String, @transient val onC
 object IAmMumble extends Logging {
   final val CREATOR: Parcelable.Creator[IAmMumble] = new Parcelable.Creator[IAmMumble]() {
     def createFromParcel(in: Parcel): IAmMumble = try {
-      log.debug("createFromParcel new IAmMumble")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new IAmMumble")
       val dispatcher = new Dispatcher { def process(message: DMessage) {} }
       new IAmMumble(in)(null, dispatcher)
     } catch {

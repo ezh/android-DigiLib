@@ -16,70 +16,63 @@
 
 package org.digimead.digi.ctrl.lib.base
 
-import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
-import scala.Array.canBuildFrom
-import scala.actors.Futures.future
-import scala.actors.Futures.awaitAll
+import scala.Option.option2Iterable
 import scala.actors.Actor
-import scala.annotation.elidable
-import scala.annotation.implicitNotFound
-import scala.collection.mutable.Publisher
-import scala.collection.JavaConversions._
-import scala.collection.immutable.LongMap
-import scala.collection.mutable.SynchronizedMap
-import scala.collection.mutable.HashMap
-import scala.ref.WeakReference
-import scala.xml.Node
-import scala.xml.XML
+import scala.actors.Futures
 import scala.actors.OutputChannel
+import scala.collection.immutable.LongMap
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.Publisher
+import scala.collection.mutable.SynchronizedMap
+import scala.xml.XML
 
+import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DPermission
-import org.digimead.digi.ctrl.lib.declaration.DPreference
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.dialog.InstallControl
+import org.digimead.digi.ctrl.lib.dialog.Preferences
 import org.digimead.digi.ctrl.lib.info.ComponentInfo
+import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.log.RichLogger
+import org.digimead.digi.ctrl.lib.message.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.util.Version
 import org.digimead.digi.ctrl.lib.util.SyncVar
-import org.digimead.digi.ctrl.ICtrlComponent
-import org.digimead.digi.ctrl.lib.declaration.DState
+import org.digimead.digi.ctrl.lib.util.Version
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
+import android.content.DialogInterface
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.DialogInterface
-import android.os.Bundle
-import android.app.Dialog
-import android.os.Looper
+import android.content.pm.ActivityInfo
 import android.net.Uri
+import android.os.Bundle
+import android.os.Looper
 
-import annotation.elidable.ASSERTION
-
-protected class AppComponent private () extends Actor with Logging {
+protected class AppComponent private () extends Logging {
   private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
   lazy val state = new AppComponent.StateContainer
   lazy val internalStorage = AppComponent.Context.flatMap(ctx => Option(ctx.getFilesDir()))
   // -rwx--x--x 711
-  lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, 711))
-  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, 700))
+  lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, Some(false), Some(false), Some(true)))
+  // -rwx------ 711
+  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, Some(false), Some(false), Some(true)))
   lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
   lazy val nativeManifest = try {
     AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
@@ -92,44 +85,42 @@ protected class AppComponent private () extends Actor with Logging {
     case e => log.error(e.getMessage, e); None
   }
   private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
+  val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
   private[lib] val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicReference[Option[Boolean]](None)
-  private val activitySafeDialog = new AppComponent.SafeDialog
+  private[lib] val activitySafeDialog = new AppComponent.SafeDialog
   private val activitySafeDialogActor = new Actor {
     def act = {
       loop {
         react {
-          case AppComponent.Message.ShowDialog(activity, dialog, onDismiss) =>
+          case AppComponent.Message.ShowDialog(activity, tag, dialog, onDismiss) =>
             val s = sender
             log.info("receive message ShowDialog " + dialog)
             // wait for previous dialog
             log.debug("wait activitySafeDialog lock")
-            activitySafeDialog.put(null) // wait
+            activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
             // wait isSafeDialogEnabled
-            isSafeDialogEnabled.synchronized {
-              log.debug("wait isSafeDialogEnabled lock")
-              while (isSafeDialogEnabled.get match {
-                case Some(true) => show(activity, dialog, onDismiss, s); false // show dialog and exit from loop
-                case Some(false) => true // wait
-                case None => resetDialogSafe; false // skip
-              }) isSafeDialogEnabled.wait
-            }
-          case AppComponent.Message.ShowDialogResource(activity, dialog, args, onDismiss) =>
+            log.debug("wait isSafeDialogEnabled lock")
+            while (isSafeDialogEnabled.get match {
+              case Some(true) => show(activity, tag, dialog, onDismiss, s); false // show dialog and exit from loop
+              case Some(false) => true // wait
+              case None => resetDialogSafe; false // skip
+            }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
+            log.debug("wait isSafeDialogEnabled lock complete")
+          case AppComponent.Message.ShowDialogResource(activity, tag, dialog, args, onDismiss) =>
             val s = sender
             log.info("receive message ShowDialogResource " + dialog)
             // wait for previous dialog
             log.debug("wait activitySafeDialog lock")
-            activitySafeDialog.put(null) // wait
+            activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
             // wait isSafeDialogEnabled
-            isSafeDialogEnabled.synchronized {
-              log.debug("wait isSafeDialogEnabled lock")
-              while (isSafeDialogEnabled.get match {
-                case Some(true) => show(activity, dialog, args, onDismiss, s); false // show dialog and exit from loop
-                case Some(false) => true // wait
-                case None => resetDialogSafe; false // skip
-              }) isSafeDialogEnabled.wait
-            }
-          // show dialog
+            log.debug("wait isSafeDialogEnabled lock")
+            while (isSafeDialogEnabled.get match {
+              case Some(true) => show(activity, tag, dialog, args, onDismiss, s); false // show dialog and exit from loop
+              case Some(false) => true // wait
+              case None => resetDialogSafe; false // skip
+            }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
+            log.debug("wait isSafeDialogEnabled lock complete")
           case message: AnyRef =>
             log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
           case message =>
@@ -137,14 +128,14 @@ protected class AppComponent private () extends Actor with Logging {
         }
       }
     }
-    private def show(activity: Activity, dialog: () => Dialog, onDismiss: Option[() => Unit], sender: OutputChannel[Any]) {
-      val result = onMessageShowDialog(activity, dialog, onDismiss)
+    private def show(activity: Activity, tag: String, dialog: () => Dialog, onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
+      val result = onMessageShowDialog(activity, tag, dialog, onDismiss)
       log.debug("return from message ShowDialog with result " + result)
       if (sender.receiver.getState == Actor.State.Blocked)
         sender ! result // only for ShowDialogSafeWait
     }
-    private def show(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit], sender: OutputChannel[Any]) {
-      val result = onMessageShowDialogResource(activity, dialog, args, onDismiss)
+    private def show(activity: Activity, tag: String, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
+      val result = onMessageShowDialogResource(activity, tag, dialog, args, onDismiss)
       log.debug("return from message ShowDialog with result " + result)
       if (sender.receiver.getState == Actor.State.Blocked)
         sender ! result // only for ShowDialogSafeWait
@@ -153,94 +144,89 @@ protected class AppComponent private () extends Actor with Logging {
   log.debug("disable safe dialogs")
   log.debug("alive")
 
-  def act = {
-    loop {
-      react {
-        case message: AnyRef =>
-          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
-        case message =>
-          log.errorWhere("skip unknown message " + message)
-      }
-    }
-  }
-  def showDialogSafe(activity: Activity, id: Int): Unit =
-    showDialogSafe(activity, id, null)
-  def showDialogSafe(activity: Activity, id: Int, args: Bundle): Unit =
-    showDialogSafe(activity, id, args, null)
+  def showDialogSafe(activity: Activity, tag: String, id: Int): Unit =
+    showDialogSafe(activity, tag, id, null)
+  def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle): Unit =
+    showDialogSafe(activity, tag, id, args, null)
   @Loggable
-  def showDialogSafe(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit) {
-    log.trace("Activity::showDialogSafe id " + id)
+  def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any) {
+    log.trace("Activity::showDialogSafe tag:%s id:%d".format(tag, id))
     assert(id != 0, { "unexpected id value " + id })
-    activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))
+    activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, tag, id, Option(args), Option(onDismiss))
   }
-  def showDialogSafeWait(activity: Activity, id: Int): Option[Dialog] =
-    showDialogSafeWait(activity, id, null)
-  def showDialogSafeWait(activity: Activity, id: Int, args: Bundle): Option[Dialog] =
-    showDialogSafeWait(activity, id, args, null)
+  def showDialogSafeWait(activity: Activity, tag: String, id: Int): Option[Dialog] =
+    showDialogSafeWait(activity, tag, id, null)
+  def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle): Option[Dialog] =
+    showDialogSafeWait(activity, tag, id, args, null)
   @Loggable
-  def showDialogSafeWait(activity: Activity, id: Int, args: Bundle, onDismiss: () => Unit): Option[Dialog] = try {
-    log.trace("Activity::showDialogSafe id " + id + " at thread " + Thread.currentThread.getId + " and ui " + uiThreadID)
+  def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any): Option[Dialog] = try {
+    log.trace("Activity::showDialogSafe tag:%s id:%d at thread %l and ui %l ".format(tag, id, Thread.currentThread.getId, uiThreadID))
     assert(uiThreadID != Thread.currentThread.getId && id != 0, { "unexpected thread == UI, " + Thread.currentThread.getId + " or id " + id })
-    (activitySafeDialogActor !? AppComponent.Message.ShowDialogResource(activity, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
+    (activitySafeDialogActor !? AppComponent.Message.ShowDialogResource(activity, tag, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
   } catch {
     case e =>
       log.error(e.getMessage, e)
       None
   }
-  def showDialogSafe[T <: Dialog](activity: Activity, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Unit =
-    showDialogSafe[T](activity, dialog, null)
+  def showDialogSafe[T <: Dialog](activity: Activity, tag: String, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Unit =
+    showDialogSafe[T](activity, tag, dialog, null)
   @Loggable
-  def showDialogSafe[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]) {
+  def showDialogSafe[T <: Dialog](activity: Activity, tag: String, dialog: () => T, onDismiss: () => Any)(implicit m: scala.reflect.Manifest[T]) {
     log.trace("Activity::showDialogSafe " + m.erasure.getName)
-    activitySafeDialogActor ! AppComponent.Message.ShowDialog(activity, dialog, Option(onDismiss))
+    activitySafeDialogActor ! AppComponent.Message.ShowDialog(activity, tag, dialog, Option(onDismiss))
   }
-  def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Option[T] =
-    showDialogSafeWait[T](activity, dialog, null)
+  def showDialogSafeWait[T <: Dialog](activity: Activity, tag: String, dialog: () => T)(implicit m: scala.reflect.Manifest[T]): Option[T] =
+    showDialogSafeWait[T](activity, tag, dialog, null)
   @Loggable
-  def showDialogSafeWait[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: () => Unit)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
+  def showDialogSafeWait[T <: Dialog](activity: Activity, tag: String, dialog: () => T, onDismiss: () => Any)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
     log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + Thread.currentThread.getId + " and ui " + uiThreadID)
     assert(uiThreadID != Thread.currentThread.getId, { "unexpected thread == UI, " + Thread.currentThread.getId })
-    (activitySafeDialogActor !? AppComponent.Message.ShowDialog(activity, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
+    (activitySafeDialogActor !? AppComponent.Message.ShowDialog(activity, tag, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
   } catch {
     case e =>
       log.error(e.getMessage, e)
       None
   }
   @Loggable
-  def setDialogSafe(dialog: Dialog) {
-    assert(!activitySafeDialog.isSet || activitySafeDialog.get == null,
-      { "unexpected dialog value " + activitySafeDialog.get })
-    activitySafeDialog.set((dialog, null))
+  def setDialogSafe(tag: Option[String], dialog: Option[Dialog]) {
+    if (activitySafeDialog.isSet && activitySafeDialog.get(0) != Some(AppComponent.SafeDialogEntry(None, None, None))) {
+      val expected = AppComponent.SafeDialogEntry(tag, None, None)
+      assert(activitySafeDialog.get(0) == Some(expected),
+        { "activitySafeDialog expected " + expected + ", found " + activitySafeDialog.get })
+      activitySafeDialog.set(AppComponent.SafeDialogEntry(tag, dialog, None))
+    } else {
+      log.warn("reset dialog " + AppComponent.SafeDialogEntry(tag, dialog, None) + ", previously was " + activitySafeDialog.get(0))
+      activitySafeDialog.set(AppComponent.SafeDialogEntry(None, None, None))
+      Thread.sleep(10) // gap for onMessageShowDialog
+      activitySafeDialog.unset()
+    }
   }
   @Loggable
   def resetDialogSafe() =
     activitySafeDialog.unset()
   @Loggable
   def getDialogSafe(timeout: Long): Option[Dialog] =
-    activitySafeDialog.get(timeout).map(_._1)
+    activitySafeDialog.get(timeout).flatMap(_.dialog)
   @Loggable
   def enableSafeDialogs() {
     log.debug("enable safe dialogs")
-    isSafeDialogEnabled.synchronized {
-      isSafeDialogEnabled.set(Some(true))
-      isSafeDialogEnabled.notifyAll
-    }
+    isSafeDialogEnabled.set(Some(true))
+    isSafeDialogEnabled.synchronized { isSafeDialogEnabled.notifyAll }
   }
   @Loggable
   def suspendSafeDialogs() {
     log.debug("disable safe dialogs")
-    isSafeDialogEnabled.synchronized {
-      isSafeDialogEnabled.set(Some(false))
-      isSafeDialogEnabled.notifyAll
-    }
+    isSafeDialogEnabled.set(Some(false))
+    isSafeDialogEnabled.synchronized { isSafeDialogEnabled.notifyAll }
   }
   @Loggable
-  def disableSafeDialogs() {
+  def disableSafeDialogs() = Futures.future {
     log.debug("disable safe dialogs")
-    isSafeDialogEnabled.synchronized {
-      isSafeDialogEnabled.set(None)
-      isSafeDialogEnabled.notifyAll
-    }
+    isSafeDialogEnabled.set(None)
+    isSafeDialogEnabled.synchronized { isSafeDialogEnabled.notifyAll }
+    activitySafeDialog.set(AppComponent.SafeDialogEntry(None, None, None)) // throw signal for unlock onMessageShowDialog, ..., dismiss safe dialog if any
+    Thread.sleep(10) // gap for onMessageShowDialog
+    activitySafeDialog.unset()
   }
   @Loggable
   def disableRotation() = AppComponent.Context match {
@@ -282,12 +268,12 @@ protected class AppComponent private () extends Actor with Logging {
     }): Option[ComponentInfo] = AppComponent.synchronized {
     applicationManifest.flatMap {
       appManifest =>
-        AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
+        AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
           case Some(info) =>
             Some(info.asInstanceOf[ComponentInfo])
           case None =>
             val result = getComponentInfo(locale, localeLanguage, iconExtractor)
-            result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
+            result.foreach(r => AppCache.actor ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString + locale + localeLanguage, r))
             result
         }
     }
@@ -314,12 +300,12 @@ protected class AppComponent private () extends Actor with Logging {
     for {
       appManifest <- applicationManifest
     } yield {
-      AppCache !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
+      AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
         case Some(info) =>
           Some(info.asInstanceOf[ComponentInfo])
         case None =>
           val result = ComponentInfo(appManifest, locale, localeLanguage, iconExtractor)
-          result.foreach(r => AppCache ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString, r))
+          result.foreach(r => AppCache.actor ! AppCache.Message.UpdateByID(0, appManifest.hashCode.toString, r))
           result
       }
     }
@@ -346,37 +332,36 @@ protected class AppComponent private () extends Actor with Logging {
       intent.putExtras(data)
       sendPrivateBroadcast(intent)
   }
-  /*
-   *  true - all ok
-   *  false - we need some work
-   */
+  // onFinish(component state, service state, service isBusy flag) => Unit
   @Loggable
-  def synchronizeStateWithICtrlHost(onFinish: (DState.Value) => Unit = null): Unit = AppComponent.Context.foreach {
+  def synchronizeStateWithICtrlHost(onFinish: (DState.Value, DState.Value, Boolean) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
-      if (AppComponent.Inner.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
-        // DigiControl unavailable and state already broken, submit and return
-        if (onFinish != null) onFinish(DState.Broken)
+      if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
+        log.warn("DigiControl unavailable and state already broken")
+        if (onFinish != null) onFinish(DState.Broken, DState.Unknown, false)
         return
       }
-      AppControl.Inner.callStatus(activity.getPackageName)() match {
-        case Right(componentState) =>
-          val appState = componentState.state match {
-            case DState.Active =>
-              AppComponent.State(DState.Active)
-            case DState.Broken =>
-              AppComponent.State(DState.Broken, Seq("service_failed"))
-            case _ =>
-              AppComponent.State(DState.Passive)
-          }
-          AppComponent.Inner.state.set(appState)
-          if (onFinish != null) onFinish(DState.Passive)
-        case Left(error) =>
-          val appState = if (error == "error_digicontrol_not_found")
-            AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a)) })
-          else
-            AppComponent.State(DState.Broken, Seq(error))
-          AppComponent.Inner.state.set(appState)
-          if (onFinish != null) onFinish(DState.Broken)
+      Futures.future {
+        AppControl.Inner.callStatus(activity.getPackageName)() match {
+          case Right(componentState) =>
+            val appState = componentState.state match {
+              case DState.Active =>
+                AppComponent.State(DState.Active)
+              case DState.Broken =>
+                AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+              case _ =>
+                AppComponent.State(DState.Passive)
+            }
+            AppComponent.this.state.set(appState)
+            if (onFinish != null) onFinish(DState.Passive, componentState.serviceState, componentState.serviceBusy)
+          case Left(error) =>
+            val appState = if (error == "error_digicontrol_not_found")
+              AppComponent.State(DState.Broken, Seq(error), (a) => { AppComponent.this.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)) })
+            else
+              AppComponent.State(DState.Broken, Seq(error))
+            AppComponent.this.state.set(appState)
+            if (onFinish != null) onFinish(DState.Broken, DState.Unknown, false)
+        }
       }
   }
   @Loggable
@@ -393,32 +378,37 @@ protected class AppComponent private () extends Actor with Logging {
       None
   }
   @Loggable
-  private def onMessageShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
+  private def onMessageShowDialog[T <: Dialog](activity: Activity, tag: String, dialog: () => T, onDismiss: Option[() => Any])(implicit m: scala.reflect.Manifest[T]): Option[Dialog] = try {
     // for example: pause activity in the middle of the process
     if (!activitySafeDialog.isSet) {
-      log.warn("skip onMessageShowDialog for " + dialog + ", reason: dialog gone")
+      log.warn("skip onMessageShowDialog for " + tag + ", " + dialog + ", reason: dialog gone")
       return None
     }
-    assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
-      { "unexpected dialog value " + activitySafeDialog.get(0) })
-    if (!isActivityValid(activity)) {
+    val expected = AppComponent.SafeDialogEntry(Some(tag), None, None)
+    assert(activitySafeDialog.isSet && activitySafeDialog.get == expected,
+      { "activitySafeDialog expected " + expected + ", found " + activitySafeDialog.get })
+    if (!isActivityValid(activity) || isSafeDialogEnabled == None) {
       resetDialogSafe
       return None
     }
     activity.runOnUiThread(new Runnable {
-      def run = activitySafeDialog.set((dialog(), () => {
-        log.trace("safe dialog dismiss callback")
-        AppComponent.Inner.enableRotation()
-        onDismiss.foreach(_())
-      }))
+      def run =
+        activitySafeDialog.set(AppComponent.SafeDialogEntry(Some(tag), Option(dialog()), Some(() => {
+          log.trace("safe dialog dismiss callback")
+          AppComponent.this.enableRotation()
+          onDismiss.foreach(_())
+        })))
     })
-    (activitySafeDialog.get(DTimeout.longest, _ != null) match {
-      case Some((d, c)) if d != null =>
-        log.debug("show new safe dialog " + d + " for " + m.erasure.getName)
-        AppComponent.Inner.disableRotation()
-        Option(d)
-      case _ =>
-        log.error("unable to show safe dialog for " + m.erasure.getName)
+    (activitySafeDialog.get(DTimeout.longest, _ != AppComponent.SafeDialogEntry(Some(tag), None, None)) match {
+      case Some(entry @ AppComponent.SafeDialogEntry(tag, result @ Some(dialog), dismissCb)) =>
+        log.debug("show new safe dialog " + entry + " for " + m.erasure.getName)
+        AppComponent.this.disableRotation()
+        result
+      case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
+        log.error("unable to show safe dialog '" + tag + "' for " + m.erasure.getName + ", reset detected")
+        None
+      case result =>
+        log.error("unable to show safe dialog '" + tag + "' for " + m.erasure.getName + " result:" + result)
         activitySafeDialog.unset()
         None
     })
@@ -428,15 +418,16 @@ protected class AppComponent private () extends Actor with Logging {
       None
   }
   @Loggable
-  private def onMessageShowDialogResource(activity: Activity, id: Int, args: Option[Bundle], onDismiss: Option[() => Unit]): Option[Dialog] = try {
+  private def onMessageShowDialogResource(activity: Activity, tag: String, id: Int, args: Option[Bundle], onDismiss: Option[() => Any]): Option[Dialog] = try {
     // for example: pause activity in the middle of the process
     if (!activitySafeDialog.isSet) {
-      log.warn("skip onMessageShowDialogResource for " + id + ", reason: dialog gone")
+      log.warn("skip onMessageShowDialogResource for " + tag + ", " + id + ", reason: dialog gone")
       return None
     }
-    assert(activitySafeDialog.isSet && activitySafeDialog.get == null,
-      { "unexpected dialog value " + activitySafeDialog.get(0) })
-    if (!isActivityValid(activity)) {
+    val expected = AppComponent.SafeDialogEntry(Some(tag), None, None)
+    assert(activitySafeDialog.isSet && activitySafeDialog.get == expected,
+      { "activitySafeDialog expected " + expected + ", found " + activitySafeDialog.get })
+    if (!isActivityValid(activity) || isSafeDialogEnabled == None) {
       resetDialogSafe
       return None
     }
@@ -455,24 +446,21 @@ protected class AppComponent private () extends Actor with Logging {
         }
       }
     })
-    activitySafeDialog.get(DTimeout.longest, _ != null) match {
-      case Some((d, c)) =>
-        if (d != null) {
-          log.debug("show new safe dialog " + d + " for id " + id)
-          activitySafeDialog.updateDismissCallback(() => {
-            log.trace("safe dialog dismiss callback")
-            AppComponent.Inner.enableRotation()
-            onDismiss.foreach(_())
-          })
-          AppComponent.Inner.disableRotation()
-          Option(d)
-        } else {
-          log.error("unable to show safe dialog for id " + id)
-          activitySafeDialog.unset()
-          None
-        }
-      case None =>
-        log.error("unable to show safe dialog for id " + id)
+    activitySafeDialog.get(DTimeout.longest, _ != AppComponent.SafeDialogEntry(Some(tag), None, None)) match {
+      case Some(entry @ AppComponent.SafeDialogEntry(tag, result @ Some(dialog), dismissCb)) =>
+        log.debug("show new safe dialog " + entry + " for id " + id)
+        activitySafeDialog.updateDismissCallback(Some(() => {
+          log.trace("safe dialog dismiss callback")
+          AppComponent.this.enableRotation()
+          onDismiss.foreach(_())
+        }))
+        AppComponent.this.disableRotation()
+        result
+      case Some(AppComponent.SafeDialogEntry(None, None, None)) =>
+        log.error("unable to show safe dialog '" + tag + "' for id " + id + ", reset detected")
+        None
+      case result =>
+        log.error("unable to show safe dialog '" + tag + "' for id " + id + " result:" + result)
         activitySafeDialog.unset()
         None
     }
@@ -485,13 +473,27 @@ protected class AppComponent private () extends Actor with Logging {
     !activity.isFinishing && activity.getWindow != null
 }
 
-object AppComponent extends Logging {
-  @volatile private var inner: AppComponent = null
-  private val deinitializationLock = new SyncVar[Boolean]()
-  private val deinitializationInProgressLock = new AtomicBoolean(false)
-  private val deinitializationTimeout = DTimeout.longest
+sealed trait AppComponentEvent
 
+object AppComponent extends Logging with Publisher[AppComponentEvent] {
+  @volatile private var inner: AppComponent = null
+  @volatile private[base] var shutdown = true
+  private[base] val deinitializationLock = new SyncVar[Boolean]()
+  private val deinitializationInProgressLock = new AtomicBoolean(false)
+  deinitializationLock.set(false)
   log.debug("alive")
+
+  @Loggable
+  def deinitializationTimeout(context: Context): Int = {
+    implicit val dispatcher = new Dispatcher() { def process(message: DMessage): Unit = {} }
+    // dispatch messages of Preferences.ShutdownTimeout to the void, noWhere is the destiny 
+    val result = Preferences.ShutdownTimeout.get(context)
+    log.debug("retrieve idle shutdown timeout value (" + result + " seconds)")
+    if (result > 0)
+      result * 1000
+    else
+      Integer.MAX_VALUE
+  }
   @Loggable
   private[lib] def init(root: Context, _inner: AppComponent = null) = {
     deinitializationLock.set(false)
@@ -522,41 +524,62 @@ object AppComponent extends Logging {
     }
     inner.state.set(State(DState.Initializing))
   }
-  private[lib] def resurrect(caller: Context) = deinitializationInProgressLock.synchronized {
-    deinitializationLock.set(false) // try to cancel
+  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationLock.synchronized {
+    if (deinitializationLock.get(0) != Some(false)) {
+      log.info("resurrect AppComponent core subsystem")
+      deinitializationLock.set(false) // try to cancel
+      // if _AppControl_ active
+      if (AppControl.deinitializationLock.get(0) == Some(false))
+        if (!supressEvent)
+          try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+    }
     if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, waiting...")
+      Thread.sleep(100) // unoffending delay
       deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get)
+        while (deinitializationInProgressLock.get) {
+          log.debug("deinitialization in progress, waiting...")
           deinitializationInProgressLock.wait
+        }
       }
     }
-    log.info("resurrect AppComponent core subsystem")
-    if (caller.isInstanceOf[AppComponent])
-      caller.asInstanceOf[AppComponent].activitySafeDialog.unset()
   }
-  private[lib] def deinit(): Unit = future {
-    if (deinitializationInProgressLock.compareAndSet(false, true))
-      try {
-        val packageName = Context.map(_.getPackageName()).getOrElse("UNKNOWN")
-        log.info("deinitializing AppComponent for " + packageName)
-        if (deinitializationLock.isSet)
+  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
+    AnyBase.getContext match {
+      case Some(context) =>
+        val packageName = context.getPackageName()
+        if (deinitializationLock.isSet) {
           deinitializationLock.unset()
-        deinitializationLock.get(deinitializationTimeout) match {
-          case Some(false) =>
-            log.info("deinitialization AppComponent for " + packageName + " canceled")
-          case _ =>
-            deinitRoutine(packageName)
+          Futures.future {
+            try {
+              log.info("deinitializing AppComponent for " + packageName)
+              val timeout = deinitializationTimeout(context)
+              if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+                try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+              deinitializationLock.get(timeout) match {
+                case Some(false) =>
+                  log.info("deinitialization AppComponent for " + packageName + " canceled")
+                case _ =>
+                  deinitRoutine(packageName)
+              }
+            } finally {
+              deinitializationInProgressLock.synchronized {
+                deinitializationInProgressLock.set(false)
+                deinitializationInProgressLock.notifyAll
+              }
+            }
+          }
         }
-      } finally {
+      case None =>
+        log.fatal("unable to find deinitialization context")
         deinitializationInProgressLock.synchronized {
           deinitializationInProgressLock.set(false)
           deinitializationInProgressLock.notifyAll
         }
-      }
+    }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppComponent for " + packageName)
+    try { publish(Event.Shutdown) } catch { case e => log.error(e.getMessage, e) }
     assert(inner != null, { "unexpected inner value " + inner })
     val savedInner = inner
     inner = null
@@ -564,7 +587,7 @@ object AppComponent extends Logging {
       log.info("AppComponent hold last context. Clear.")
       AppControl.deinitRoutine(packageName)
     }
-    // unbind services from bindedICtrlPool
+    // unbind services from bindedICtrlPool and finish stopped activities
     AnyBase.getContext.foreach {
       context =>
         savedInner.bindedICtrlPool.keys.foreach(key => {
@@ -573,109 +596,159 @@ object AppComponent extends Logging {
             record._1.unbindService(record._2)
           })
         })
+        if (context.isInstanceOf[Activity])
+          context.asInstanceOf[Activity].finish
     }
     AppCache.deinit()
+    log.info("shutdown (" + shutdown + ")")
+    if (shutdown)
+      AnyBase.shutdownApp(packageName, true)
   }
+  def isSuspend = deinitializationLock.get(0) == None
   def Inner = inner
   def Context = AnyBase.getContext
+  override protected[base] def publish(event: AppComponentEvent) =
+    super.publish(event)
   object LazyInit {
-    // priority -> Seq(functions)
-    @volatile private var pool: LongMap[Seq[() => Any]] = LongMap()
-    private val timeout = DTimeout.long
-    def apply(description: String, priority: Long = 0)(f: => Any)(implicit log: RichLogger) = synchronized {
-      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[() => Any]()
-      pool = pool + (priority -> (storedFunc :+ (() => {
+    // priority -> Seq((timeout, function))
+    @volatile private[base] var pool: LongMap[Seq[(Int, () => String)]] = LongMap()
+    private val defaultTimeout = DTimeout.long
+    def apply(description: String, priority: Long = 0, timeout: Int = defaultTimeout)(f: => Any)(implicit log: RichLogger) = synchronized {
+      val storedFunc = if (pool.isDefinedAt(priority)) pool(priority) else Seq[(Int, () => String)]()
+      pool = pool + (priority -> (storedFunc :+ (timeout, () => {
         val scheduler = Executors.newSingleThreadScheduledExecutor()
         scheduler.schedule(new Runnable { def run = log.warn("LazyInit block \"" + description + "\" hang") }, timeout, TimeUnit.MILLISECONDS)
         val tsBegin = System.currentTimeMillis
         log.debug("begin LazyInit block \"" + description + "\"")
         f
-        log.debug("end LazyInit block \"" + description + "\" within " + ((System.currentTimeMillis - tsBegin).toFloat / 1000) + "s")
+        val message = "\"" + description + "\" " + (System.currentTimeMillis - tsBegin) + "ms"
+        log.debug("end LazyInit block " + message)
         scheduler.shutdownNow
+        message
       })))
     }
-    def init() = synchronized {
-      for (prio <- pool.keys.toSeq.sorted) {
-        log.debug("running " + pool(prio).size + " LazyInit routine(s) at priority level " + prio)
-        val futures = pool(prio).map(f => future {
-          try {
-            f()
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
+    def init() = {
+      val initpool = LazyInit.synchronized {
+        val saved = pool
+        pool = LongMap()
+        saved
+      }
+      val begin = System.currentTimeMillis
+      log.debug("running " + (initpool.keys.foldLeft(0) { (total, key) => initpool(key).size + total }) + " LazyInit routine(s)")
+      for (prio <- initpool.keys.toSeq.sorted) {
+        val levelBegin = System.currentTimeMillis
+        log.debug("running " + initpool(prio).size + " LazyInit routine(s) at priority level " + prio)
+        var timeout = 0
+        val futures = initpool(prio).map(t => {
+          val fTimeout = t._1
+          val f = t._2
+          timeout = scala.math.max(timeout, fTimeout)
+          Futures.future {
+            try {
+              f()
+            } catch {
+              case e =>
+                log.error(e.getMessage, e)
+            }
           }
         })
-        awaitAll(timeout, futures: _*)
+        val results = Futures.awaitAll(timeout, futures: _*).asInstanceOf[List[Option[String]]].flatten
+        log.debug((("complete " + initpool(prio).size + " LazyInit routine(s) at priority level " + prio +
+          " within " + (System.currentTimeMillis - levelBegin) + "ms") +: results).mkString("\n"))
       }
-      pool = LongMap()
+      log.debug("complete LazyInit, " + (initpool.keys.foldLeft(0) { (total, key) => initpool(key).size + total }) +
+        "f " + (System.currentTimeMillis - begin) + "ms")
     }
     def isEmpty = synchronized { pool.isEmpty }
     def nonEmpty = synchronized { pool.nonEmpty }
   }
-  // Tuple2 [ dialog, onDismiss callback ]
-  class SafeDialog extends SyncVar[(Dialog, () => Unit)] with Logging {
+  class SafeDialog extends SyncVar[SafeDialogEntry] with Logging {
     @volatile private var activityDialogGuard: ScheduledExecutorService = null
-    private val isPrivateReplace = new AtomicBoolean(false)
+    private val replaceFlag = new AtomicBoolean(false)
     private val lock = new Object
 
     @Loggable
-    override def set(d: (Dialog, () => Unit), signalAll: Boolean = true): Unit = lock.synchronized {
-      log.debugWhere("set safe dialog to '" + d + "'", Logging.Where.BEFORE)
+    override def set(entry: SafeDialogEntry, signalAll: Boolean = true): Unit = lock.synchronized {
+      replaceFlag.set(false)
+      log.debugWhere("set safe dialog to " + entry, Logging.Where.BEFORE)
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
       }
+      // clear previous dialog if any
       get(0) match {
-        case Some((previousDialog, dismissCallback)) if previousDialog != null =>
-          if (d._1 == previousDialog) {
-            log.fatal("overwrite the same dialog '" + d._1 + "'")
+        case Some(previous @ SafeDialogEntry(tag, Some(dialog), dismissCb)) if entry.dialog != None =>
+          // replace with new dialog
+          if (entry.dialog == dialog) {
+            log.fatal("overwrite the same dialog " + entry)
             return
           }
-          log.info("replace safe dialog '" + previousDialog + "' with new one '" + d._1 + "'")
-          isPrivateReplace.synchronized {
-            if (previousDialog.isShowing) {
-              // we want replace dialog
-              isPrivateReplace.set(true)
-              previousDialog.dismiss
-              while (isSet && isPrivateReplace.get)
-                isPrivateReplace.wait
-            } else {
-              log.warn("replace hidden safe dialog")
-              previousDialog.setOnDismissListener(null)
-              previousDialog.dismiss
+          log.info("replace safe dialog " + previous + " with new one " + entry)
+          if (dialog.isShowing) {
+            replaceFlag.set(true)
+            try {
+              dialog.dismiss
+            } catch {
+              case e =>
+                log.warn(previous + " dialog: " + e.getMessage)
+                dialog.getWindow.closeAllPanels
+            }
+            while (replaceFlag.get)
+              replaceFlag.synchronized { replaceFlag.wait }
+          } else {
+            dialog.setOnDismissListener(null)
+            try {
+              dialog.dismiss
+            } catch {
+              case e =>
+                log.warn(previous + " dialog: " + e.getMessage)
+                dialog.getWindow.closeAllPanels
             }
           }
+        case Some(previous @ SafeDialogEntry(tag, Some(dialog), dismissCb)) =>
+          // replace with stub (state == None)
+          if (!dialog.isShowing)
+            try {
+              dialog.dismiss
+            } catch {
+              case e =>
+                log.warn(previous + " dialog: " + e.getMessage)
+                dialog.getWindow.closeAllPanels
+            }
         case _ =>
       }
-      if (d._1 != null) {
+      // set new
+      for { dialog <- entry.dialog } {
+        // add guard timer
         activityDialogGuard = Executors.newSingleThreadScheduledExecutor()
         activityDialogGuard.schedule(new Runnable {
           def run() = {
-            log.fatal("dismiss stalled dialog " + d._1)
+            log.fatal("dismiss stalled dialog " + entry)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
-            if (d._1.isShowing)
-              d._1.dismiss
+            try {
+              dialog.dismiss
+            } catch {
+              case e =>
+                log.warn(entry + " dialog: " + e.getMessage)
+                dialog.getWindow.closeAllPanels
+            }
           }
         }, DTimeout.longest, TimeUnit.MILLISECONDS)
-        d._1.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
+        // add on dismiss listener
+        dialog.setOnDismissListener(new DialogInterface.OnDismissListener with Logging {
           @Loggable
           override def onDismiss(dialog: DialogInterface) = SafeDialog.this.synchronized {
-            log.info("dismiss safe dialog " + d._1)
+            log.info("dismiss safe dialog " + entry)
             if (activityDialogGuard != null) {
               activityDialogGuard.shutdownNow
               activityDialogGuard = null
             }
-            if (isPrivateReplace.getAndSet(false)) {
-              log.g_a_s_e("!")
-              // there is set(N) waiting for us
-              // do it silent for external routines
-              isPrivateReplace.synchronized {
-                value.set(None)
-                isPrivateReplace.notifyAll
-              }
+            if (replaceFlag.getAndSet(false)) {
+              log.debug("replaced dialog " + entry + " dismissed")
+              replaceFlag.synchronized { replaceFlag.notifyAll }
             } else {
               unset(false)
               SafeDialog.this.notifyAll()
@@ -683,35 +756,41 @@ object AppComponent extends Logging {
           }
         })
       }
-      super.set(d, signalAll)
+      super.set(entry, signalAll)
     }
-    def updateDismissCallback(f: () => Unit) {
-      val (d, c) = super.get
-      super.set((d, f))
-    }
+    def updateDismissCallback(f: Option[() => Any]) =
+      super.set(super.get.copy(dismissCb = f))
     override def unset(signalAll: Boolean = true) = {
-      log.debugWhere("unset safe dialog " + value, Logging.Where.BEFORE)
+      log.debugWhere("unset safe dialog '" + value + "'", Logging.Where.BEFORE)
       if (activityDialogGuard != null) {
         activityDialogGuard.shutdownNow
         activityDialogGuard = null
       }
-      super.get(0).foreach {
-        case (previousDialog, dismissCallback) if previousDialog != null =>
-          if (previousDialog.isShowing) {
-            previousDialog.setOnDismissListener(null)
-            previousDialog.dismiss
+      super.get(0) match {
+        case Some(previous @ SafeDialogEntry(tag, Some(dialog), dismissCb)) =>
+          if (dialog.isShowing) {
+            dialog.setOnDismissListener(null)
+            try {
+              dialog.dismiss
+            } catch {
+              case e =>
+                log.warn(previous + " dialog: " + e.getMessage)
+                dialog.getWindow.closeAllPanels
+            }
           }
-          if (dismissCallback != null)
-            dismissCallback()
+          dismissCb.foreach(_())
         case _ =>
       }
       super.unset(signalAll)
     }
   }
+  case class SafeDialogEntry(val tag: Option[String],
+    val dialog: Option[Dialog],
+    val dismissCb: Option[() => Any])
   object Message {
     sealed trait Abstract
-    case class ShowDialog[T <: Dialog](activity: Activity, dialog: () => T, onDismiss: Option[() => Unit]) extends Abstract
-    case class ShowDialogResource(activity: Activity, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Unit]) extends Abstract
+    case class ShowDialog[T <: Dialog](activity: Activity, tag: String, dialog: () => T, onDismiss: Option[() => Any]) extends Abstract
+    case class ShowDialogResource(activity: Activity, tag: String, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Any]) extends Abstract
   }
   case class State(val value: DState.Value, val rawMessage: Seq[String] = Seq(), val onClickCallback: (Activity) => Any = (a) => {
     log.warn("onClick callback unimplemented for " + this)
@@ -731,10 +810,12 @@ object AppComponent extends Logging {
         super.set(newState, signalAll)
       } else if (busyCounter != 0) {
         lastNonBusyState = newState
-      } else
+      } else {
+        lastNonBusyState = newState
         super.set(newState, signalAll)
+      }
       log.debugWhere("set status to " + newState, Logging.Where.BEFORE)
-      publish(newState)
+      try { publish(newState) } catch { case e => log.error(e.getMessage, e) }
       AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Update)))
     }
     override def get() = super.get match {
@@ -748,8 +829,13 @@ object AppComponent extends Logging {
       if (busyCounter > 1) {
         busyCounter -= 1
         log.debug("decrease status busy counter to " + busyCounter)
-      } else if (busyCounter == 1) {
-        busyCounter -= 1
+      } else {
+        if (busyCounter == 1) {
+          busyCounter -= 1
+        } else {
+          log.warn("busyCounter " + busyCounter + " out of range")
+          busyCounter = 0
+        }
         log.debug("reset status busy counter")
         lastNonBusyState match {
           case state: AppComponent.State =>
@@ -758,12 +844,15 @@ object AppComponent extends Logging {
           case state =>
             log.warn("unknown lastNonBusyState condition " + state)
         }
-      } else {
-        log.fatal("illegal busyCounter")
       }
     }
-    def isBusy(): Boolean = synchronized {
-      busyCounter != 0
-    }
+    def isBusy(): Boolean =
+      synchronized { busyCounter != 0 }
+    def resetBusyCounter() = { busyCounter = 0 }
+  }
+  object Event {
+    case class Suspend(timeout: Long) extends AppComponentEvent
+    object Resume extends AppComponentEvent
+    object Shutdown extends AppComponentEvent
   }
 }

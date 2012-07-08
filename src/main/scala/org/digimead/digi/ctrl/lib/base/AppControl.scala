@@ -16,13 +16,13 @@
 
 package org.digimead.digi.ctrl.lib.base
 
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.actors.Future
-import scala.actors.Futures.future
-import scala.annotation.elidable
-import scala.collection.JavaConversions.asScalaBuffer
+import scala.actors.Futures
+import scala.collection.JavaConversions._
 
 import org.digimead.digi.ctrl.ICtrlHost
 import org.digimead.digi.ctrl.lib.AnyBase
@@ -44,9 +44,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Looper
-import annotation.elidable.ASSERTION
 
-protected class AppControl private () extends Logging {
+protected class AppControl private (packageName: String) extends Logging {
   private val ctrlBindTimeout = DTimeout.short
   protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
@@ -55,8 +54,10 @@ protected class AppControl private () extends Logging {
     def onServiceConnected(className: ComponentName, iservice: IBinder) {
       log.info("connected to DigiControl service")
       val service = ICtrlHost.Stub.asInterface(iservice)
-      if (service != null)
+      if (service != null) {
+        service.update_shutdown_timer(packageName, -1)
         ready.set(Some(service))
+      }
     }
     @Loggable
     def onServiceDisconnected(className: ComponentName) {
@@ -65,8 +66,9 @@ protected class AppControl private () extends Logging {
     }
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
-  private val actorSecondLevelLock: AnyRef = new Object
   private val uiThreadID = Looper.getMainLooper.getThread.getId
+  private val internalDirectory = new AtomicReference[File](null)
+  private val externalDirectory = new AtomicReference[File](null) // sdcard
   log.debug("alive")
 
   /*
@@ -114,7 +116,7 @@ protected class AppControl private () extends Logging {
       log.fatal("call AppControl function from UI thread")
     // rebind only in we already have connection to ICtrlHost
     if (ctrlBindContext.get != null && AppControl.isICtrlHostInstalled(ctrlBindContext.get)) {
-      future {
+      Futures.future {
         if (rebindInProgressLock.compareAndSet(false, true)) {
           unbind()
           var result: Option[ICtrlHost] = None
@@ -141,12 +143,24 @@ protected class AppControl private () extends Logging {
       None
   }
   @Loggable(result = false)
+  def getInternalDirectory(timeout: Int = DTimeout.long): Option[File] =
+    Option(internalDirectory.get()) orElse {
+      Futures.future { initializeDirectories(timeout) }()
+      Option(internalDirectory.get())
+    }
+  @Loggable(result = false)
+  def getExternalDirectory(timeout: Int = DTimeout.long): Option[File] =
+    Option(externalDirectory.get()) orElse {
+      Futures.future { initializeDirectories(timeout) }()
+      Option(externalDirectory.get())
+    } orElse Option(internalDirectory.get())
+  @Loggable(result = false)
   def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
     if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
       log.fatal("callListDirectories AppControl function from UI thread")
     val t = new Throwable("Intospecting callListDirectories")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.directories(componentPackage) match {
@@ -166,7 +180,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callStart AppControl function from UI thread")
     val t = new Throwable("Intospecting callEnable")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.enable(componentPackage, flag)
@@ -181,7 +195,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callReset AppControl function from UI thread")
     val t = new Throwable("Intospecting callReset")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.reset(componentPackage)
@@ -196,7 +210,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callStart AppControl function from UI thread")
     val t = new Throwable("Intospecting callStart")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.start(componentPackage)
@@ -211,7 +225,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callStatus AppControl function from UI thread")
     val t = new Throwable("Intospecting callStatus")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           try {
@@ -247,7 +261,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callStop AppControl function from UI thread")
     val t = new Throwable("Intospecting callStop")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.stop(componentPackage)
@@ -262,7 +276,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callDisconnect AppControl function from UI thread")
     val t = new Throwable("Intospecting callDisconnect")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.disconnect(componentPackage, processID, connectionID)
@@ -277,7 +291,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callListActiveInterfaces AppControl function from UI thread")
     val t = new Throwable("Intospecting callListActiveInterfaces")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.interfaces(componentPackage) match {
@@ -297,7 +311,7 @@ protected class AppControl private () extends Logging {
       log.fatal("callListPendingConnections AppControl function from UI thread")
     val t = new Throwable("Intospecting callListPendingConnections")
     t.fillInStackTrace()
-    future {
+    Futures.future {
       get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
         case Some(service) =>
           service.pending_connections(componentPackage) match {
@@ -311,15 +325,51 @@ protected class AppControl private () extends Logging {
       }
     }
   }
+  @Loggable(result = false)
+  def callUpdateShutdownTimer(componentPackage: String, remain_mseconds: Long, allowCallFromUI: Boolean = false): Future[Unit] = {
+    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+      log.fatal("callUpdateShutdownTimer AppControl function from UI thread")
+    val t = new Throwable("Intospecting callUpdateShutdownTimer")
+    t.fillInStackTrace()
+    Futures.future {
+      get(ctrlBindTimeout, true, t) orElse rebind(ctrlBindTimeout) match {
+        case Some(service) =>
+          service.update_shutdown_timer(componentPackage, remain_mseconds)
+        case None =>
+          None
+      }
+    }
+  }
+  @Loggable
+  private def initializeDirectories(timeout: Int) {
+    val internalPath = new SyncVar[File]()
+    val externalPath = new SyncVar[File]()
+    AppControl.Inner.callListDirectories(packageName)() match {
+      case Some((internal, external)) =>
+        internalPath.set(new File(internal))
+        externalPath.set(new File(external))
+      case r =>
+        log.warn("unable to get component directories, result " + r)
+        internalPath.set(null)
+        externalPath.set(null)
+    }
+    for {
+      internalPath <- internalPath.get(timeout) if internalPath != null
+      externalPath <- externalPath.get(timeout) if externalPath != null
+    } {
+      internalDirectory.set(internalPath)
+      externalDirectory.set(externalPath)
+    }
+  }
 }
 
 object AppControl extends Logging {
   @volatile private var inner: AppControl = null
-  private val deinitializationLock = new SyncVar[Boolean]()
+  private[base] val deinitializationLock = new SyncVar[Boolean]()
   private val deinitializationInProgressLock = new AtomicBoolean(false)
-  private val deinitializationTimeout = DTimeout.longest
-
+  deinitializationLock.set(false)
   log.debug("alive")
+
   @Loggable
   private[lib] def init(root: Context, _inner: AppControl = null) = {
     deinitializationLock.set(false) // cancel deinitialization sequence if any
@@ -331,44 +381,66 @@ object AppControl extends Logging {
       inner = _inner
     } else {
       log.info("initialize AppControl for " + root.getPackageName())
-      inner = new AppControl()
+      inner = new AppControl(root.getPackageName())
     }
   }
-  private[lib] def resurrect() = {
-    deinitializationLock.set(false)
+  private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationLock.synchronized {
+    if (deinitializationLock.get(0) != Some(false)) {
+      log.info("resurrect AppControl core subsystem")
+      deinitializationLock.set(false) // try to cancel
+      // if _AppComponent_ active
+      if (AppComponent.deinitializationLock.get(0) == Some(false))
+        if (!supressEvent)
+          try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
+    }
     if (deinitializationInProgressLock.get) {
-      log.debug("deinitialization in progress, waiting...")
+      Thread.sleep(100) // unoffending delay
       deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get)
+        while (deinitializationInProgressLock.get) {
+          log.debug("deinitialization in progress, waiting...")
           deinitializationInProgressLock.wait
+        }
       }
     }
-    log.info("resurrect AppControl core subsystem")
   }
-  private[lib] def deinit(): Unit = future {
-    if (deinitializationInProgressLock.compareAndSet(false, true))
-      try {
-        val packageName = AnyBase.getContext.map(_.getPackageName()).getOrElse("UNKNOWN")
-        log.info("deinitializing AppControl for " + packageName)
-        if (deinitializationLock.isSet)
+  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
+    AnyBase.getContext match {
+      case Some(context) =>
+        val packageName = context.getPackageName()
+        if (deinitializationLock.isSet) {
           deinitializationLock.unset()
-        deinitializationLock.get(deinitializationTimeout) match {
-          case Some(false) =>
-            log.info("deinitialization AppControl for " + packageName + " canceled")
-          case _ =>
-            deinitRoutine(packageName)
+          Futures.future {
+            log.info("deinitializing AppControl for " + packageName)
+            try {
+              val timeout = AppComponent.deinitializationTimeout(context)
+              if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
+                try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+              deinitializationLock.get(timeout) match {
+                case Some(false) =>
+                  log.info("deinitialization AppControl for " + packageName + " canceled")
+                case _ =>
+                  deinitRoutine(packageName)
+              }
+            } finally {
+              deinitializationInProgressLock.synchronized {
+                deinitializationInProgressLock.set(false)
+                deinitializationInProgressLock.notifyAll
+              }
+            }
+          }
         }
-      } finally {
+      case None =>
+        log.fatal("unable to find deinitialization context")
         deinitializationInProgressLock.synchronized {
           deinitializationInProgressLock.set(false)
           deinitializationInProgressLock.notifyAll
         }
-      }
+    }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
     log.info("deinitialize AppControl for " + packageName)
     assert(inner != null)
-    val _inner = inner
+    inner.unbind
     inner = null
     if (AnyBase.isLastContext && AppComponent.Inner != null) {
       log.info("AppControl hold last context. Clear.")
@@ -377,6 +449,14 @@ object AppControl extends Logging {
   }
   def Inner = inner
   def ICtrlHost = inner.get()
+  def isSuspend = deinitializationLock.get(0) == None
+  @Loggable
+  def isICtrlHostInstalled(ctx: Context): Boolean = {
+    val pm = ctx.getPackageManager()
+    val intent = new Intent(DIntent.HostService)
+    val info = pm.resolveService(intent, 0);
+    info != null
+  }
   private def get(timeout: Long, throwError: Boolean, serviceInstance: SyncVar[Option[ICtrlHost]], stackTrace: Throwable = null): Option[ICtrlHost] = {
     if (timeout == -1) {
       if (!throwError)
@@ -419,9 +499,12 @@ object AppControl extends Logging {
       val intent = new Intent(DIntent.HostService)
       intent.putExtra("packageName", caller.getPackageName())
       log.info("bind to service " + DIntent.HostService)
-      if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE) && !isICtrlHostInstalled(caller)) {
+      if (!isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
-          AppComponent.Inner.showDialogSafe(a, InstallControl.getId(a))))
+          AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a))))
+        serviceInstance.set(None)
+      } else if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) {
+        AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_bind_failed")))
         serviceInstance.set(None)
       }
       ctrlBindContext.set(caller)
@@ -441,6 +524,7 @@ object AppControl extends Logging {
       serviceInstance.get match {
         case Some(service) =>
           log.info("unbind from service " + DIntent.HostService)
+          service.update_shutdown_timer(caller.getPackageName(), 0)
           caller.unbindService(ctrlConnection)
         case None =>
           log.info("unbind from unexists service " + DIntent.HostService)
@@ -448,12 +532,5 @@ object AppControl extends Logging {
       serviceInstance.unset()
     } else
       log.warn("service " + DIntent.HostService + " already unbinded")
-  }
-  @Loggable
-  def isICtrlHostInstalled(ctx: Context): Boolean = {
-    val pm = ctx.getPackageManager()
-    val intent = new Intent(DIntent.HostService)
-    val info = pm.resolveService(intent, 0);
-    info != null
   }
 }

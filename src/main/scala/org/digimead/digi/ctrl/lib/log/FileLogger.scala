@@ -30,7 +30,23 @@ import android.content.Context
 object FileLogger extends Logger with Logging {
   private[lib] var file: Option[File] = None
   private[lib] var output: Option[BufferedWriter] = None
-  protected var f = (records: Seq[Logging.Record]) => synchronized {
+  private val fileLimit = 102400 // 100kB
+  private val checkEveryNLines = 1000
+  private var counter = 0
+  protected var f = (records: Array[Logging.Record]) => synchronized {
+    // rotate
+    for {
+      output <- output
+      file <- file
+    } {
+      counter += records.size
+      if (counter > checkEveryNLines) {
+        counter = 0
+        if (file.length > fileLimit)
+          openLogFile()
+      }
+    }
+    // write
     output.foreach {
       output =>
         output.write(records.map(r => {
@@ -48,28 +64,7 @@ object FileLogger extends Logger with Logging {
   }
   @Loggable
   override def init(context: Context) = synchronized {
-    val logname = Report.reportPrefix + ".log"
-    deinit
-    // open new
-    file = AnyBase.info.get.flatMap(info => {
-      val file = new File(info.reportPath, logname)
-      if (file.exists) {
-        log.warn("log file " + file + " already exists")
-        Some(file)
-      } else if (file.createNewFile) {
-        // -rw-r--r--
-        log.info("create new log file " + file)
-        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
-        Some(file)
-      } else {
-        log.error("unable to create log file " + file)
-        None
-      }
-    })
-    log.debug("open new log file " + file)
-    output = file.map(f => new BufferedWriter(new FileWriter(f)))
-    // write header
-    output.foreach(_.write(AnyBase.info.get.toString + "\n"))
+    openLogFile()
     output.foreach(_.flush)
   }
   override def deinit() = synchronized {
@@ -85,5 +80,38 @@ object FileLogger extends Logger with Logging {
   }
   override def flush() = synchronized {
     try { output.foreach(_.flush) } catch { case e => log.error(e.getMessage, e) }
+  }
+  private def getLogFileName() =
+    Report.reportPrefix + "." + Report.logFilePrefix + Report.logFileExtension
+  private def openLogFile() = try {
+    deinit
+    // open new
+    file = AnyBase.info.get.flatMap(info => {
+      val file = new File(info.reportPathInternal, getLogFileName)
+      if (file.exists) {
+        log.warn("log file " + file + " already exists")
+        Some(file)
+      } else if (file.createNewFile) {
+        log.info("create new log file " + file)
+        Some(file)
+      } else {
+        log.error("unable to create log file " + file)
+        None
+      }
+    })
+    log.debug("open new log file " + file)
+    output = file.map(f => {
+      // write header
+      val writer = new FileWriter(f)
+      writer.write(AnyBase.info.get.toString + "\n")
+      writer.close
+      // -rw-r--r--
+      f.setReadable(true, false)
+      new BufferedWriter(new FileWriter(f))
+    })
+    Report.compress
+  } catch {
+    case e =>
+      log.error(e.getMessage, e)
   }
 }

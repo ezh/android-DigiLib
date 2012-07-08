@@ -28,16 +28,14 @@ case class IAmBusy(val origin: Origin, val message: String,
   val ts: Long = System.currentTimeMillis)(implicit @transient val logger: RichLogger,
     @transient val dispatcher: Dispatcher) extends DMessage {
   if (logger != null)
-    if (logger.isTraceEnabled)
-      logger.infoWhere("IAmBusy " + message + " ts#" + ts, Logging.Where.ALL)
-    else
-      logger.info("IAmBusy " + message + " ts#" + ts)
+    logger.infoWhere("IAmBusy " + message + " ts#" + ts, Logging.Where.ALL)
   dispatcher.process(this)
   // parcelable interface
   def this(in: Parcel)(logger: RichLogger, dispatcher: Dispatcher) = this(origin = in.readParcelable[Origin](classOf[Origin].getClassLoader),
     message = in.readString, ts = in.readLong)(logger, dispatcher)
   def writeToParcel(out: Parcel, flags: Int) {
-    IAmBusy.log.debug("writeToParcel IAmBusy with flags " + flags)
+    if (IAmBusy.log.isTraceExtraEnabled)
+      IAmBusy.log.trace("writeToParcel IAmBusy with flags " + flags)
     out.writeParcelable(origin, flags)
     out.writeString(message)
     out.writeLong(ts)
@@ -48,7 +46,8 @@ case class IAmBusy(val origin: Origin, val message: String,
 object IAmBusy extends Logging {
   final val CREATOR: Parcelable.Creator[IAmBusy] = new Parcelable.Creator[IAmBusy]() {
     def createFromParcel(in: Parcel): IAmBusy = try {
-      log.debug("createFromParcel new IAmBusy")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new IAmBusy")
       val dispatcher = new Dispatcher { def process(message: DMessage) {} }
       new IAmBusy(in)(null, dispatcher)
     } catch {

@@ -13,12 +13,13 @@
   ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   ~ See the License for the specific language governing permissions and limitations under the License.
 -->
-<resources>
+<resources xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item name="install_digicontrol" type="id"/>
     <item name="failed_market" type="id"/>
-    <item name="block_support_voice_call" type="id"/>
-    <item name="block_support_skype_call" type="id"/>
+    <item name="block_support_voice_contact" type="id"/>
+    <item name="block_support_skype_contact" type="id"/>
+    <item name="block_support_icq_contact" type="id"/>
     <item name="block_legal_open" type="id"/>
     <item name="block_legal_send" type="id"/>
     <item name="block_link_copy" type="id"/>

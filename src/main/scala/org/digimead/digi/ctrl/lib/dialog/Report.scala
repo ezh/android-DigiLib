@@ -72,7 +72,7 @@ object Report extends Logging {
             info =>
               AppComponent.Inner.resetDialogSafe
               future {
-                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
@@ -86,7 +86,7 @@ object Report extends Logging {
                             log.debug("found bridge with UID " + uid + " and PID " + pid)
                             if (uid == 0) {
                               log.debug("send INT signal to root bridge with PID " + pid)
-                              val p = Runtime.getRuntime.exec(Array("su", "-c", "kill -INT " + pid))
+                              val p = Runtime.getRuntime.exec(Array("su", "-c", "kill -2 " + pid))
                               p.waitFor
                             } else {
                               log.debug("send INT signal to bridge with PID " + pid)
@@ -99,7 +99,7 @@ object Report extends Logging {
                         }
                       }
                   })
-                  val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
+                  val file = new File(info.reportPathInternal, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".description")
                   file.createNewFile()
                   writer = new PrintWriter(file)
                   val time = System.currentTimeMillis
@@ -169,12 +169,12 @@ object Report extends Logging {
     if (activity != null) {
       activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-      AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+      AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
     } else {
       AppComponent.Context.foreach {
         case activity: Activity with DActivity =>
           description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-          AppComponent.Inner.showDialogSafe(activity, Android.getId(activity, "report"))
+          AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
         case context =>
           log.fatal("unable to launch report dialog from illegal context")
       }
@@ -190,10 +190,11 @@ object Report extends Logging {
         val bitmap = Bitmap.createBitmap(content.getWidth, content.getHeight, Config.ARGB_8888)
         val canvas = new Canvas(bitmap)
         content.draw(canvas)
-        val file = new File(info.reportPath, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".png")
+        val file = new File(info.reportPathInternal, org.digimead.digi.ctrl.lib.base.Report.reportPrefix + ".png")
         file.createNewFile()
         ostream = new FileOutputStream(file)
         bitmap.compress(CompressFormat.PNG, 100, ostream)
+        file.setReadable(true, false)
       } catch {
         case e =>
           log.error(e.getMessage, e)
@@ -207,10 +208,9 @@ object Report extends Logging {
     info =>
       if (searchAndSubmitLock.compareAndSet(false, true)) {
         Thread.sleep(DTimeout.short) // take it gently ;-)
-        log.info("looking for stack trace reports in: " + info.reportPath)
-        val dir = new File(info.reportPath + "/")
-        val reports = Option(dir.list()).getOrElse(Array[String]())
-        if (reports.exists(_.endsWith(".trc")))
+        log.info("looking for stack trace reports in: " + info.reportPathInternal)
+        val reports = Option(info.reportPathInternal.list()).getOrElse(Array[String]())
+        if (reports.exists(_.endsWith(org.digimead.digi.ctrl.lib.base.Report.traceFileExtension)))
           submit(activity, Some("stack trace detected"))
       }
   } getOrElse ({ "skip searchAndSubmit - uninitialized AnyBase.info" })

@@ -34,20 +34,18 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 
 import scala.actors.Actor
-import scala.annotation.elidable
-import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.SynchronizedMap
 import scala.ref.SoftReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.declaration.DOption.OptVal.value2string_id
 import org.digimead.digi.ctrl.lib.declaration.DConstant
-import org.digimead.digi.ctrl.lib.declaration.DOption
-import org.digimead.digi.ctrl.lib.declaration.DPreference
+import org.digimead.digi.ctrl.lib.dialog.Preferences
 import org.digimead.digi.ctrl.lib.log.Logging
+import org.digimead.digi.ctrl.lib.message.DMessage
+import org.digimead.digi.ctrl.lib.message.Dispatcher
 
 import android.content.Context
-import annotation.elidable.ASSERTION
 
 trait AppCacheT[K, V] {
   def get(namespace: scala.Enumeration#Value, key: K): Option[V]
@@ -197,9 +195,9 @@ class AppCache extends AppCacheT[String, Any] with Logging {
   }
 }
 
-object AppCache extends Actor with Logging {
+object AppCache extends Logging {
   @volatile private var contextPackageName = ""
-  private var inner: AppCacheT[String, Any] = null
+  private[base] var inner: AppCacheT[String, Any] = null
   private var period: Long = 1000 * 60 * 10 // 10 minutes
   private var cacheClass = DConstant.prefix + "lib.base.AppCache"
   private var cachePath = "."
@@ -207,77 +205,81 @@ object AppCache extends Actor with Logging {
   // key -> (timestamp, data)
   private val map = new HashMap[String, SoftReference[(Long, Any)]]() with SynchronizedMap[String, SoftReference[(Long, Any)]]
   log.debug("alive")
-  def act = {
-    loop {
-      react {
-        case Message.Get(namespace, key, period) =>
-          try {
-            reply(inner.get(namespace, key, period))
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-              reply(None)
-          }
-        case Message.GetByID(namespaceID, key, period) =>
-          try {
-            reply(inner.get(namespaceID, key, period))
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-              reply(None)
-          }
-        case Message.Update(namespace, key, value) =>
-          try {
-            inner.update(namespace, key, value)
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.UpdateByID(namespaceID, key, value) =>
-          try {
-            inner.update(namespaceID, key, value)
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.UpdateMany(namespace, updates) =>
-          try {
-            inner.update(namespace, updates)
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.Remove(namespace, key) =>
-          try {
-            reply(inner.remove(namespace, key))
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.RemoveByID(namespaceID, key) =>
-          try {
-            reply(inner.remove(namespaceID, key))
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.Clear(namespace) =>
-          try {
-            inner.clear(namespace)
-          } catch {
-            case e =>
-              log.warn(e.getMessage(), e)
-          }
-        case Message.Reinitialize(context, innerCache) =>
-          inner = null
-          init(context, innerCache)
-        case message: AnyRef =>
-          log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
-        case message =>
-          log.errorWhere("skip unknown message " + message)
+
+  val actor = new Actor {
+    def act = {
+      loop {
+        react {
+          case Message.Get(namespace, key, period) =>
+            try {
+              reply(inner.get(namespace, key, period))
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+                reply(None)
+            }
+          case Message.GetByID(namespaceID, key, period) =>
+            try {
+              reply(inner.get(namespaceID, key, period))
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+                reply(None)
+            }
+          case Message.Update(namespace, key, value) =>
+            try {
+              inner.update(namespace, key, value)
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.UpdateByID(namespaceID, key, value) =>
+            try {
+              inner.update(namespaceID, key, value)
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.UpdateMany(namespace, updates) =>
+            try {
+              inner.update(namespace, updates)
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.Remove(namespace, key) =>
+            try {
+              reply(inner.remove(namespace, key))
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.RemoveByID(namespaceID, key) =>
+            try {
+              reply(inner.remove(namespaceID, key))
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.Clear(namespace) =>
+            try {
+              inner.clear(namespace)
+            } catch {
+              case e =>
+                log.warn(e.getMessage(), e)
+            }
+          case Message.Reinitialize(context, innerCache) =>
+            inner = null
+            init(context, innerCache)
+          case message: AnyRef =>
+            log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
+          case message =>
+            log.errorWhere("skip unknown message " + message)
+        }
       }
     }
   }
+
   def getDefaultPeriod(): Long = synchronized {
     period
   }
@@ -296,15 +298,15 @@ object AppCache extends Actor with Logging {
        * process all requests
        * and then reinitialize
        */
-      this ! Message.Reinitialize(context, innerCache)
+      actor ! Message.Reinitialize(context, innerCache)
       return
     } else
       log.info("initialize AppCache for " + context.getPackageName())
     contextPackageName = context.getPackageName()
-    val pref = context.getSharedPreferences(DPreference.Main, Context.MODE_PRIVATE)
-    period = pref.getLong(DOption.CachePeriod, period)
-    cachePath = pref.getString(DOption.CacheFolder, context.getCacheDir + "/")
-    cacheClass = pref.getString(DOption.CacheClass, cacheClass)
+    implicit val dispatcher = new Dispatcher() { def process(message: DMessage): Unit = {} }
+    period = Preferences.CachePeriod.get(context)
+    cachePath = Preferences.CacheFolder.get(context)
+    cacheClass = Preferences.CacheClass.get(context)
     if (innerCache != null) {
       inner = innerCache
     } else {
@@ -322,14 +324,16 @@ object AppCache extends Actor with Logging {
         log.fatal("cannot create directory: " + cacheFolder)
         inner = new NilCache()
       }
+    log.info("set cache timeout to \"" + period + "\"")
     log.info("set cache directory to \"" + cachePath + "\"")
     log.info("set cache implementation to \"" + inner.getClass.getName() + "\"")
-    start()
+    actor.start()
   }
   def deinit() = synchronized {
-    log.info("deinitialize AppCache for " + contextPackageName)
-    assert(inner != null)
-    inner = null
+    if (inner != null) {
+      log.info("deinitialize AppCache for " + contextPackageName)
+      inner = null
+    }
   }
   def initialized = synchronized { inner != null }
   object Message {

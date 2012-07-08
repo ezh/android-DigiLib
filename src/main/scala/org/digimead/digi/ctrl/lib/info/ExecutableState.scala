@@ -58,7 +58,8 @@ case class ExecutableState(val id: Int,
       data
     }, state = DState(in.readInt))
   def writeToParcel(out: Parcel, flags: Int) {
-    ComponentState.log.debug("writeToParcel ExecutableState with flags " + flags)
+    if (ExecutableState.log.isTraceExtraEnabled)
+      ExecutableState.log.trace("writeToParcel ExecutableState with flags " + flags)
     out.writeInt(id)
     out.writeInt(commandLine.map(_.size).getOrElse(-1))
     commandLine.foreach(cmd => out.writeStringArray(cmd.toArray))
@@ -71,10 +72,11 @@ case class ExecutableState(val id: Int,
 }
 
 object ExecutableState extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ExecutableState] = new Parcelable.Creator[ExecutableState]() {
     def createFromParcel(in: Parcel): ExecutableState = try {
-      log.debug("createFromParcel new ExecutableState")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new ExecutableState")
       new ExecutableState(in)
     } catch {
       case e =>

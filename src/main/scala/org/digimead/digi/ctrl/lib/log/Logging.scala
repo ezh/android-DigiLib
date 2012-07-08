@@ -16,38 +16,49 @@
 
 package org.digimead.digi.ctrl.lib.log
 
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.Date
+import java.util.concurrent.ConcurrentLinkedQueue
 
 import scala.Array.canBuildFrom
+import scala.annotation.implicitNotFound
+import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
-import scala.collection.immutable.HashMap
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.Publisher
+import scala.collection.mutable.SynchronizedMap
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.util.Common
 import org.slf4j.LoggerFactory
 
 import android.content.Context
 
 trait Logging {
-  implicit protected[lib] val log: RichLogger = Logging.getLogger(this)
+  implicit protected[lib] val log: RichLogger = Logging.getRichLogger(this)
 }
 
-object Logging {
+sealed trait LoggingEvent
+
+object Logging extends Publisher[LoggingEvent] {
   @volatile var logPrefix = "@" // prefix for all adb logcat TAGs, everyone may change (but should not) it on his/her own risk
+  @volatile private[log] var isTraceExtraEnabled = false
   @volatile private[log] var isTraceEnabled = true
   @volatile private[log] var isDebugEnabled = true
   @volatile private[log] var isInfoEnabled = true
   @volatile private[log] var isWarnEnabled = true
   @volatile private[log] var isErrorEnabled = true
+  @volatile private[log] var loggingThread = new Thread() // stub
+  private[log] val flushLimit = 1000
   private[log] val pid = try { android.os.Process.myPid } catch { case e => 0 }
   private[log] val queue = new ConcurrentLinkedQueue[Record]
+  private[log] val richLogger = new HashMap[String, RichLogger]() with SynchronizedMap[String, RichLogger]
   private[log] var logger = new HashSet[Logger]()
-  private[log] var richLogger = new HashMap[String, RichLogger]()
-  private[log] var loggingThread = getWorker
   private[log] var initializationContext: WeakReference[Context] = new WeakReference(null)
+  private[log] var shutdownHook: Thread = null
+  private val loggingThreadRecords = new Array[Record](flushLimit)
   val commonLogger = LoggerFactory.getLogger("@~*~*~*~*")
+  AnyBase // init AnyBase before Logging
 
   def setTraceEnabled(t: Boolean) {
     Logging.offer(new Logging.Record(new Date(), Thread.currentThread.getId, Logging.Level.Info, commonLogger.getName, if (t)
@@ -84,17 +95,40 @@ object Logging {
       "disable ERROR log level"))
     isErrorEnabled = t
   }
-  def offer(record: Record) = queue.offer(record)
-  private[lib] def init(context: Context): Unit = synchronized {
+  def offer(record: Record) = queue.synchronized {
+    queue.offer(record)
+    queue.notifyAll
     try {
-      AnyBase.info.get foreach {
-        info =>
-          Runtime.getRuntime().addShutdownHook(new Thread() { override def run() = deinit })
-      }
-      logger.foreach(_.init(context))
-      if (!loggingThread.isAlive)
-        loggingThread = getWorker
-      initializationContext = new WeakReference(context)
+      publish(Event.Incoming(record))
+    } catch {
+      case e =>
+        queue.offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName,
+          e.getMessage match {
+            case null => ""
+            case message => message
+          }, Some(e)))
+    }
+  }
+  def reset() = synchronized {
+    deinit()
+    queue.clear()
+    // if initializationContext.get == None, than there isn't any initialization yet
+    initializationContext.get.foreach(context => init(context))
+  }
+  private[lib] def init(context: Context): Unit = synchronized {
+    def initCommon = {
+      initializationContext = new WeakReference(context.getApplicationContext)
+      shutdownHook = new Thread() { override def run() = deinit }
+      Runtime.getRuntime().addShutdownHook(shutdownHook)
+      logger.foreach(_.init(context.getApplicationContext))
+      offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "initialize logging"))
+    }
+    try {
+      if (initializationContext.get == None) {
+        initCommon
+        resume
+      } else
+        initCommon
     } catch {
       case e => try {
         System.err.println(e.getMessage + "\n" + e.getStackTraceString)
@@ -105,45 +139,82 @@ object Logging {
       }
     }
   }
-  private[lib] def deinit(): Unit = synchronized { delLogger(logger.toSeq) }
-  private def getWorker() = {
-    val thread = new Thread("GenericLogger for " + Logging.getClass.getName) {
-      this.setDaemon(true)
-      override def run() = AnyBase.info.get.foreach {
-        info =>
-          while (logger.nonEmpty) {
-            if (queue.isEmpty())
-              Thread.sleep(500)
-            else {
-              flushQueue(1000)
-              Thread.sleep(50)
+  private[lib] def deinit(): Unit = synchronized {
+    offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "deinitialize logging"))
+    flush()
+    delLogger(logger.toSeq)
+    queue.clear()
+    if (shutdownHook != null) {
+      Runtime.getRuntime().removeShutdownHook(shutdownHook)
+      shutdownHook = null
+    }
+  }
+  def suspend() = {
+    // non blocking check
+    if (loggingThread.isAlive)
+      synchronized {
+        if (loggingThread.isAlive)
+          loggingThread = new Thread() // stub
+      }
+  }
+  def resume() = {
+    // non blocking check
+    if (!loggingThread.isAlive)
+      synchronized {
+        if (!loggingThread.isAlive) {
+          loggingThread = new Thread("GenericLogger for " + Logging.getClass.getName) {
+            this.setDaemon(true)
+            @tailrec
+            override def run() = {
+              if (logger.nonEmpty && !queue.isEmpty) {
+                flushQueue(flushLimit)
+                Thread.sleep(50)
+              } else
+                queue.synchronized { queue.wait }
+              if (loggingThread.getId == this.getId)
+                run
             }
           }
+          loggingThread.start
+        }
       }
-    }
-    thread.start
-    thread
   }
-  def flush() = synchronized {
-    while (!queue.isEmpty())
-      Thread.sleep(100)
+  def flush(): Int = synchronized {
+    if (logger.isEmpty)
+      return -1
+    val flushed = flushQueue()
     logger.foreach(_.flush)
+    flushed
   }
-  private def flushQueue(): Int = flushQueue(java.lang.Integer.MAX_VALUE)
-  private def flushQueue(n: Int): Int = {
-    var count = 0
-    var records: Seq[Record] = Seq()
-    while (count < n && !queue.isEmpty()) {
-      queue.poll() match {
-        case record: Record =>
-          records = records :+ record
-        case other =>
-          records = records :+ Record(new Date(), Thread.currentThread.getId, Logging.Level.Error, "__LOGGER__", "unknown record '" + other + "'")
+  private def flushQueue(): Int = flushQueue(Int.MaxValue)
+  @tailrec
+  private[log] def flushQueue(n: Int, accumulator: Int = 0): Int = {
+    var records = 0
+    loggingThreadRecords.synchronized {
+      val limit = if (n <= flushLimit) (n - accumulator) else flushLimit
+      while (records < limit && !queue.isEmpty()) {
+        loggingThreadRecords(records) = queue.poll().asInstanceOf[Record]
+        try {
+          publish(Event.Outgoing(loggingThreadRecords(records)))
+        } catch {
+          case e =>
+            offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName,
+              e.getMessage match {
+                case null => ""
+                case message => message
+              }, Some(e)))
+        }
+        records += 1
       }
-      count += 1;
+      logger.foreach(_(loggingThreadRecords.take(records)))
     }
-    logger.foreach(_(records))
-    count
+    if (records == flushLimit) {
+      if (records == n)
+        return accumulator + records
+    } else
+      return accumulator + records
+    Thread.sleep(100)
+    flushQueue(n, accumulator + records)
   }
   def dump() =
     ("queue size: " + queue.size + ", loggers: " + logger.mkString(",") + " thread: " + loggingThread.isAlive) +: queue.toArray.map(_.toString)
@@ -157,18 +228,23 @@ object Logging {
     if (!logger.contains(l) || force) {
       initializationContext.get.foreach(l.init)
       logger = logger + l
+      offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "add logger " + l))
     }
-    if (!loggingThread.isAlive)
-      loggingThread = getWorker
   }
   def delLogger(s: Seq[Logger]): Unit =
     synchronized { s.foreach(l => delLogger(l)) }
   def delLogger(l: Logger) = synchronized {
-    logger = logger - l
-    l.flush
-    l.deinit
+    if (logger.contains(l)) {
+      offer(Record(new Date(), Thread.currentThread.getId, Logging.Level.Debug, commonLogger.getName, "delete logger " + l))
+      logger = logger - l
+      flush
+      l.flush
+      l.deinit
+    }
   }
-  def getLogger(obj: Logging): RichLogger = synchronized {
+  def getLoggers() =
+    synchronized { logger.toSeq }
+  def getRichLogger(obj: Logging): RichLogger = {
     val stackArray = Thread.currentThread.getStackTrace().dropWhile(_.getClassName != getClass.getName)
     val stack = if (stackArray(1).getFileName != stackArray(0).getFileName)
       stackArray(1) else stackArray(2)
@@ -181,15 +257,17 @@ object Logging {
       logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed + "$"
     else
       logPrefix + obj.getClass.getPackage.getName.split("""\.""").last + "." + fileParsed
-    getLogger(loggerName)
+    getRichLogger(loggerName)
   }
-  def getLogger(name: String): RichLogger = {
+  def getRichLogger(name: String): RichLogger = richLogger.synchronized {
     if (richLogger.isDefinedAt(name))
       return richLogger(name)
     val newLogger = new RichLogger(name)
-    richLogger = richLogger + (name -> newLogger)
+    richLogger(name) = newLogger
     newLogger
   }
+  def findRichLogger(f: ((String, RichLogger)) => Boolean): Option[(String, RichLogger)] =
+    richLogger.find(f)
   case class Record(val date: Date,
     val tid: Long,
     val level: Level,
@@ -199,6 +277,7 @@ object Logging {
     val pid: Int = Logging.pid) {
     override def toString = "%s P%05d T%05d %s %-24s %s".format(Common.dateString(date), pid, tid, level.toString.charAt(0), tag + ":", message)
   }
+
   sealed trait Level
   object Level {
     case object Trace extends Level
@@ -211,5 +290,9 @@ object Logging {
     val ALL = -1
     val HERE = -2
     val BEFORE = -3
+  }
+  object Event {
+    case class Incoming(record: Record) extends LoggingEvent
+    case class Outgoing(record: Record) extends LoggingEvent
   }
 }

@@ -16,10 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
@@ -41,7 +41,7 @@ import android.widget.ListView
 import android.widget.Toast
 
 trait Block[T <: Block.Item] {
-  val context: Activity
+  val context: Context
   def items: Seq[T]
   def appendTo(adapter: MergeAdapter)
   def onListItemClick(l: ListView, v: View, item: T)
@@ -51,7 +51,9 @@ trait Block[T <: Block.Item] {
     items.foreach(_.view = new WeakReference(null))
 }
 
-object Block {
+object Block extends Logging {
+  log.debug("alive")
+
   trait Item {
     @volatile var view: WeakReference[View] = new WeakReference(null) // android built in cache may sporadically give us junk :-/
   }
@@ -67,15 +69,13 @@ object Block {
       }
     }
   }
-  def copyLink(context: Activity, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+  def copyLink(context: Context, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
     try {
       val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
       clipboard.setText(copyText)
       val message = Android.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
-      context.runOnUiThread(new Runnable {
-        def run = Toast.makeText(context, message, DConstant.toastTimeout).show()
-      })
+      AnyBase.runOnUiThread { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
       true
     } catch {
       case e =>
@@ -83,13 +83,18 @@ object Block {
         false
     }
   }
-  def sendLink(context: Activity, item: Item, subjectText: CharSequence, bodyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
+  def sendLink(context: Context, item: Item, subjectText: CharSequence, bodyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
     try {
       val intent = new Intent(Intent.ACTION_SEND)
       intent.setType("text/plain")
       intent.putExtra(Intent.EXTRA_SUBJECT, subjectText)
       intent.putExtra(Intent.EXTRA_TEXT, bodyText)
-      context.startActivity(Intent.createChooser(intent, Android.getString(context, "share").getOrElse("share")))
+      AppComponent.Context match {
+        case Some(activity) if activity.isInstanceOf[Activity] =>
+          activity.startActivity(Intent.createChooser(intent, Android.getString(activity, "share").getOrElse("share")))
+        case _ => context.startActivity(Intent.createChooser(intent,
+          Android.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
       true
     } catch {
       case e =>

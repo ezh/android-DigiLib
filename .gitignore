@@ -3,6 +3,7 @@ project/boot/
 build/
 .scala_dependencies
 bin/
+/test/
 *.svn*
 .classpath
 .project

@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib.block
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
@@ -27,6 +28,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
@@ -37,11 +39,11 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.TextView.BufferType
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.TextView.BufferType
 
-class LegalBlock(val context: Activity,
+class LegalBlock(val context: Context,
   val items: List[LegalBlock.Item],
   _imageGetter: Html.ImageGetter = null,
   tagHandler: Html.TagHandler = null)(implicit val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
@@ -49,7 +51,8 @@ class LegalBlock(val context: Activity,
     case null => new Block.ImageGetter(context)
     case getter => getter
   }
-  private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
+    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new LegalBlock.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
@@ -90,7 +93,10 @@ class LegalBlock(val context: Activity,
         try {
           val intent = new Intent(Intent.ACTION_VIEW, Uri.parse(item.uri))
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
           true
         } catch {
           case e =>
@@ -102,7 +108,10 @@ class LegalBlock(val context: Activity,
         try {
           val intent = new Intent("Intent.ACTION_SEND")
           intent.setType("text/plain")
-          context.startActivity(Intent.createChooser(intent, "Send Link"))
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(Intent.createChooser(intent, "Send Link"))
+            case _ => context.startActivity(Intent.createChooser(intent, "Send Link").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
           true
         } catch {
           case e =>
@@ -120,9 +129,9 @@ object LegalBlock {
   case class Item(val text: String)(val uri: String) extends Block.Item {
     override def toString() = text
   }
-  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
+  class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getLayoutInflater
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {

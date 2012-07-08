@@ -66,23 +66,23 @@ object ExceptionHandler extends Logging {
   def generateStackTrace(t: Thread, e: Throwable, when: Long) = AnyBase.info.get.foreach {
     info =>
       // Here you should have a more robust, permanent record of problems
-      val reportName = Report.reportPrefix + ".trc"
+      val reportName = Report.reportPrefix + "." + Report.logFilePrefix + Report.traceFileExtension
       val result = new StringWriter()
       val printWriter = new PrintWriter(result)
       e.printStackTrace(printWriter)
       try {
-        val file = new File(info.reportPath, reportName)
+        val file = new File(info.reportPathInternal, reportName)
         log.debug("Writing unhandled exception to: " + file)
         // Write the stacktrace to disk
         val bos = new BufferedWriter(new FileWriter(file))
         bos.write(AnyBase.info.get.get.toString + "\n")
-        bos.write(Common.dateString(new Date(when)))
+        bos.write(Common.dateString(new Date(when)) + "\n")
         bos.write(result.toString())
         bos.flush()
         // Close up everything
         bos.close()
         // -rw-r--r--
-        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
+        file.setReadable(true, false)
         AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Error))) // try to notify user, if it is possible
       } catch {
         // Nothing much we can do about this - the game is over

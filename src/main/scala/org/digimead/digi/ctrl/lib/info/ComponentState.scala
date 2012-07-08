@@ -28,7 +28,9 @@ case class ComponentState(val componentPackage: String,
   val reason: Option[String],
   val execPath: String,
   val dataPath: String,
-  val enabled: Boolean) extends Parcelable {
+  val enabled: Boolean,
+  val serviceState: DState.Value,
+  val serviceBusy: Boolean) extends Parcelable {
   def this(in: Parcel) = this(componentPackage = in.readString,
     executableState =
       in.readParcelableArray(classOf[ExecutableState].getClassLoader) match {
@@ -44,9 +46,12 @@ case class ComponentState(val componentPackage: String,
     },
     execPath = in.readString,
     dataPath = in.readString,
-    enabled = (in.readByte == 1))
+    enabled = (in.readByte == 1),
+    serviceState = DState(in.readInt),
+    serviceBusy = (in.readByte == 1))
   def writeToParcel(out: Parcel, flags: Int) {
-    ComponentState.log.debug("writeToParcel ComponentState with flags " + flags)
+    if (ComponentState.log.isTraceExtraEnabled)
+      ComponentState.log.trace("writeToParcel ComponentState with flags " + flags)
     out.writeString(componentPackage)
     out.writeParcelableArray(executableState.toArray, 0)
     out.writeInt(state.id)
@@ -54,15 +59,18 @@ case class ComponentState(val componentPackage: String,
     out.writeString(execPath)
     out.writeString(dataPath)
     out.writeByte(if (enabled) 1 else 0)
+    out.writeInt(serviceState.id)
+    out.writeByte(if (serviceBusy) 1 else 0)
   }
   def describeContents() = 0
 }
 
 object ComponentState extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[ComponentState] = new Parcelable.Creator[ComponentState]() {
     def createFromParcel(in: Parcel): ComponentState = try {
-      log.debug("createFromParcel new ComponentState")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new ComponentState")
       new ComponentState(in)
     } catch {
       case e =>

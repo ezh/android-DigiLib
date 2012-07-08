@@ -65,7 +65,7 @@ object StaticMarkerBinder {
  */
 
 class SLF4JLoggerFactory extends ILoggerFactory {
-  def getLogger(name: String): Logger = Logging.getLogger(name)
+  def getLogger(name: String): Logger = Logging.getRichLogger(name)
 }
 
 class StaticLoggerBinder extends LoggerFactoryBinder {

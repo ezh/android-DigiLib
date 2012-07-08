@@ -21,7 +21,5 @@ object DPreference {
   val Main = getClass.getPackage.getName + "@namespace.main"
   val Users = getClass.getPackage.getName + "@namespace.users"
   val FilterInterface = getClass.getPackage.getName + "@namespace.filter.interface"
-  val FilterConnectionAllow = getClass.getPackage.getName + "@namespace.filter.connection.allow"
-  val FilterConnectionDeny = getClass.getPackage.getName + "@namespace.filter.connection.deny"
   val Log = getClass.getPackage.getName + "@prefrence.log"
 }

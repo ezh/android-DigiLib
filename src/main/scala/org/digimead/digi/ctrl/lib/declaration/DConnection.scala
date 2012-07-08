@@ -32,7 +32,8 @@ case class DConnection(
     processID = in.readInt,
     key = in.readInt)
   def writeToParcel(out: Parcel, flags: Int) {
-    DConnection.log.debug("writeToParcel DConnection with flags " + flags)
+    if (DConnection.log.isTraceExtraEnabled)
+      DConnection.log.trace("writeToParcel DConnection with flags " + flags)
     out.writeInt(connectionID)
     out.writeInt(processID)
     out.writeInt(key)
@@ -50,10 +51,11 @@ case class DConnection(
 }
 
 object DConnection extends Logging {
-  override protected[lib] val log = Logging.getLogger(this)
+  override protected[lib] val log = Logging.getRichLogger(this)
   final val CREATOR: Parcelable.Creator[DConnection] = new Parcelable.Creator[DConnection]() {
     def createFromParcel(in: Parcel): DConnection = try {
-      log.debug("createFromParcel new DConnection")
+      if (log.isTraceExtraEnabled)
+        log.trace("createFromParcel new DConnection")
       val obj = new DConnection(in)
       obj.FD = in.readInt()
       obj.localIP = in.readInt()
