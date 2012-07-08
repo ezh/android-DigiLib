@@ -80,7 +80,7 @@
     <string name="preference_show_dialog_rate_on">&lt;Rate It> dialog enabled</string>
     <string name="preference_show_dialog_rate">Show &lt;Rate It> dialog</string>
     <string name="preference_shutdown_timeout">Idle shutdown timeout</string>
-    <string name="preference_shutdown_timeout_description">Graceful application shutdown with internal task killer</string>
+    <string name="preference_shutdown_timeout_description">Graceful application shutdown via internal task killer</string>
     <string name="report_upload_failed">Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later.</string>
     <string name="filechooser_menu_item_home">home</string>
     <string name="filechooser_menu_item_up">up</string>

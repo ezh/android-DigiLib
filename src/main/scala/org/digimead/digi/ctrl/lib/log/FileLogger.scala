@@ -33,7 +33,7 @@ object FileLogger extends Logger with Logging {
   private val fileLimit = 102400 // 100kB
   private val checkEveryNLines = 1000
   private var counter = 0
-  protected var f = (records: Seq[Logging.Record]) => synchronized {
+  protected var f = (records: Array[Logging.Record]) => synchronized {
     // rotate
     for {
       output <- output
@@ -87,14 +87,12 @@ object FileLogger extends Logger with Logging {
     deinit
     // open new
     file = AnyBase.info.get.flatMap(info => {
-      val file = new File(info.reportPath, getLogFileName)
+      val file = new File(info.reportPathInternal, getLogFileName)
       if (file.exists) {
         log.warn("log file " + file + " already exists")
         Some(file)
       } else if (file.createNewFile) {
-        // -rw-r--r--
         log.info("create new log file " + file)
-        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
         Some(file)
       } else {
         log.error("unable to create log file " + file)
@@ -102,9 +100,15 @@ object FileLogger extends Logger with Logging {
       }
     })
     log.debug("open new log file " + file)
-    output = file.map(f => new BufferedWriter(new FileWriter(f)))
-    // write header
-    output.foreach(_.write(AnyBase.info.get.toString + "\n"))
+    output = file.map(f => {
+      // write header
+      val writer = new FileWriter(f)
+      writer.write(AnyBase.info.get.toString + "\n")
+      writer.close
+      // -rw-r--r--
+      f.setReadable(true, false)
+      new BufferedWriter(new FileWriter(f))
+    })
     Report.compress
   } catch {
     case e =>

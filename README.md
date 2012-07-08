@@ -24,6 +24,10 @@ DOCUMENTATION
 
 ![static log analysis with gedit](https://github.com/ezh/android-DigiLib/blob/master/contrib/adb.log-2012-03-09%2013:27:53.png?raw=true)
 
+* offline dalvikvm analysis with internal report generator and VIM
+
+![static log analysis with VIM](https://github.com/ezh/android-DigiLib/blob/master/contrib/VIM%20highlighting%202012-06-16%2021:01:04.png?raw=true)
+
 
 AUTHORS
 -------

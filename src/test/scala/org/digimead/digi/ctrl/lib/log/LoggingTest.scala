@@ -17,13 +17,15 @@
 package org.digimead.digi.ctrl.lib.log
 
 import java.util.Date
-import org.digimead.digi.ctrl.lib.base.AppComponent
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
+
 import org.digimead.RobotEsTrick
-import org.scalatest.matchers.ShouldMatchers._
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FunSuite
+import org.scalatest.matchers.ShouldMatchers._
+
 import android.os.Bundle
 
 class LoggingTestBeforeInit_j1 extends FunSuite with BeforeAndAfter with RobotEsTrick {
@@ -141,7 +143,7 @@ class LoggingTestAndroidLogger_j1 extends FunSuite with BeforeAndAfter with Robo
     Logging.loggingThread.isAlive should be(true)
     writeToLog should be(true)
     AndroidLogger.validName.isEmpty should be(true)
-    f(Seq(Logging.Record(new Date, 0, Logging.Level.Debug, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "+")))
+    f(Array(Logging.Record(new Date, 0, Logging.Level.Debug, "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "+")))
     AndroidLogger.validName.nonEmpty should be(true)
     AndroidLogger.validName.head should be(("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "AAAAAAAAAAAAAAAAAAAAAA*"))
   }

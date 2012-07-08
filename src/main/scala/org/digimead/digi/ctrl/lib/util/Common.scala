@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.util
 
+import java.io.BufferedWriter
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -30,10 +31,10 @@ import java.net.InetAddress
 import java.net.NetworkInterface
 import java.nio.channels.FileChannel
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
-import java.util.Date
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
@@ -41,51 +42,40 @@ import scala.collection.immutable.HashMap
 import scala.concurrent.Lock
 import scala.util.control.ControlThrowable
 
+import org.digimead.digi.ctrl.ICtrlComponent
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConnection
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
-import org.digimead.digi.ctrl.lib.dialog.FailedMarket
-import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.log.RichLogger
-import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.ICtrlComponent
 
-import android.app.Activity
-import android.app.Dialog
-import android.content.pm.PackageManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.os.Environment
 import android.os.IBinder
 
 object Common extends Logging {
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
+  @volatile private[util] var externalStorageDisabled: Option[Boolean] = None
+  AnyBase // init AnyBase before Common
   log.debug("alive")
+
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")
-  @Loggable
-  def onCreateDialog(id: Int, activity: Activity with DActivity)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = id match {
-    case id if id == InstallControl.getId(activity) =>
-      InstallControl.createDialog(activity)(logger, dispatcher)
-    case id if id == FailedMarket.getId(activity) =>
-      FailedMarket.createDialog(activity)
-    case _ =>
-      null
-  }
   // -rwx--x--x 711
   @Loggable
-  def getDirectory(context: Context, name: String, forceInternal: Boolean = false, chmod: Int = 711): Option[File] = {
+  def getDirectory(context: Context, name: String, forceInternal: Boolean,
+    allRead: Option[Boolean], allWrite: Option[Boolean], allExecute: Option[Boolean]): Option[File] = {
     var directory: Option[File] = None
     var isExternal = true
     var isNew = false
     log.debug("get working directory, mode 'force internal': " + forceInternal)
-    if (!forceInternal) {
+    if (!forceInternal && externalStorageDisabled != Some(true)) {
       // try to use external storage
       try {
         directory = Option(Environment.getExternalStorageDirectory).flatMap(preBase => {
@@ -119,6 +109,31 @@ object Common extends Logging {
               if (!baseFiles.mkdir) {
                 log.error("mkdir '" + baseFiles + "' failed")
                 baseReady = false
+              }
+            }
+            if (externalStorageDisabled == None) {
+              try {
+                log.debug("test external storage")
+                val testFile = new File(baseFiles, "testExternalStorage.tmp")
+                if (testFile.exists)
+                  testFile.delete
+                val testContent = (for (i <- 0 until 1024) yield i).mkString // about 2.9 kB
+                val out = new BufferedWriter(new FileWriter(testFile))
+                out.write(testContent)
+                out.close()
+                assert(testFile.length == testContent.length)
+                if (scala.io.Source.fromFile(testFile).getLines.mkString == testContent) {
+                  log.debug("external storge test successful")
+                  externalStorageDisabled = Some(false)
+                } else {
+                  log.debug("external storge test failed")
+                  externalStorageDisabled = Some(true)
+                }
+                testFile.delete()
+              } catch {
+                case e =>
+                  log.debug("external storge test failed, " + e.getMessage)
+                  externalStorageDisabled = Some(true)
               }
             }
             if (baseReady)
@@ -167,12 +182,27 @@ object Common extends Logging {
           directory = None
       }
     }
-    if (directory != None && isNew && !isExternal)
-      try { Android.execChmod(chmod, directory.get, false) } catch { case e => log.warn(e.getMessage) }
+    if (directory != None && isNew && !isExternal) {
+      allRead match {
+        case Some(true) => directory.get.setReadable(true, false)
+        case Some(false) => directory.get.setReadable(true, true)
+        case None => directory.get.setReadable(false, false)
+      }
+      allWrite match {
+        case Some(true) => directory.get.setWritable(true, false)
+        case Some(false) => directory.get.setWritable(true, true)
+        case None => directory.get.setWritable(false, false)
+      }
+      allExecute match {
+        case Some(true) => directory.get.setExecutable(true, false)
+        case Some(false) => directory.get.setExecutable(true, true)
+        case None => directory.get.setExecutable(false, false)
+      }
+    }
     directory
   }
-  @Loggable
-  def getPublicPreferences(context: Context): Option[PublicPreferences] =
+  @Loggable(result = false)
+  def getPublicPreferences(context: Context): PublicPreferences =
     PublicPreferences(context)
   @Loggable
   def listInterfaces(): Seq[String] = {
@@ -259,18 +289,19 @@ object Common extends Logging {
       val bindContext = context.getApplicationContext()
       log.debug("start doComponentService for " + componentPackage + " with timeout " + operationTimeout)
       val connectionGuard = Executors.newSingleThreadScheduledExecutor()
-      if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
-        log.debug("reuse service connection")
-        val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
-        if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
-          log.debug("binder alive")
-          f(service)
-          return
-        } else {
-          log.warn("try to unbind dead service")
-          context.unbindService(connection)
-          AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
-        }
+      AppComponent.Inner.bindedICtrlPool.get(componentPackage) match {
+        case Some((context, connection, service)) =>
+          log.debug("reuse service connection")
+          if (service.asBinder.isBinderAlive && service.asBinder.pingBinder) {
+            log.debug("binder alive")
+            f(service)
+            return
+          } else {
+            log.warn("try to unbind dead service")
+            context.unbindService(connection)
+            AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
+          }
+        case None =>
       }
       // lock for bindService
       val lock = new Lock
@@ -297,11 +328,11 @@ object Common extends Logging {
         val executionFuture = executionGuard.submit(new Runnable {
           def run = try {
             if (service != null) {
+              f(service)
               if (reuse) {
                 log.debug("add service connection to bindedICtrlPool")
                 AppComponent.Inner.bindedICtrlPool(componentPackage) = (bindContext, connection, service)
               }
-              f(service)
             }
           } finally {
             service = null
@@ -329,23 +360,32 @@ object Common extends Logging {
       }
   }
   @Loggable
-  def removeCachedComponentService(componentPackage: String) = try {
-    if (AppComponent.Inner.bindedICtrlPool.isDefinedAt(componentPackage)) {
-      log.debug("reuse service connection")
-      val (context, connection, service) = AppComponent.Inner.bindedICtrlPool(componentPackage)
-      log.warn("try to unbind cached service")
-      context.unbindService(connection)
-      AppComponent.Inner.bindedICtrlPool.remove(componentPackage)
+  def removeCachedComponentService(componentPackage: String) = AppComponent.Inner.bindedICtrlPool.synchronized {
+    try {
+      AppComponent.Inner.bindedICtrlPool.remove(componentPackage).foreach {
+        case (context, connection, service) => try {
+          log.warn("try to unbind cached service " + service)
+          context.unbindService(connection)
+        } catch {
+          case e: IllegalArgumentException =>
+            log.warn(e.getMessage)
+        }
+      }
+    } catch {
+      case e =>
+        log.error(e.getMessage, e)
     }
-  } catch {
-    case e =>
-      log.error(e.getMessage, e)
   }
   @Loggable
-  def copyFile(sourceFile: File, destFile: File) {
-    if (!destFile.exists()) {
-      destFile.createNewFile();
-    }
+  def removeCachedComponentServices() = AppComponent.Inner match {
+    case null =>
+    case inner =>
+      inner.bindedICtrlPool.keys.foreach(removeCachedComponentService)
+  }
+  @Loggable
+  def copyFile(sourceFile: File, destFile: File): Boolean = {
+    if (!destFile.exists())
+      destFile.createNewFile()
     var source: FileChannel = null
     var destination: FileChannel = null
     try {
@@ -360,6 +400,20 @@ object Common extends Logging {
         destination.close()
       }
     }
+    sourceFile.length == destFile.length
+  }
+  @Loggable
+  def deleteFile(dfile: File): Boolean =
+    if (dfile.isDirectory) deleteFileRecursive(dfile) else dfile.delete
+  private def deleteFileRecursive(dfile: File): Boolean = {
+    if (dfile.isDirectory)
+      dfile.listFiles.foreach { f => deleteFileRecursive(f) }
+    dfile.delete match {
+      case true => true
+      case false =>
+        log.error("unable to delete \"" + dfile + "\"")
+        false
+    }
   }
   @Loggable
   def isSignedWithDebugKey(context: Context, clazz: Class[_], debugKey: String): Boolean = try {
@@ -371,7 +425,7 @@ object Common extends Logging {
       log.debug("package " + c.getPackageName() + " has been signed with the debug key")
       true
     } else {
-      log.debug("package " + c.getPackageName() + "signed with a key other than the debug key")
+      log.debug("package " + c.getPackageName() + " signed with a key other than the debug key")
       false
     }
   } catch {

@@ -71,7 +71,7 @@ object ExceptionHandler extends Logging {
       val printWriter = new PrintWriter(result)
       e.printStackTrace(printWriter)
       try {
-        val file = new File(info.reportPath, reportName)
+        val file = new File(info.reportPathInternal, reportName)
         log.debug("Writing unhandled exception to: " + file)
         // Write the stacktrace to disk
         val bos = new BufferedWriter(new FileWriter(file))
@@ -82,7 +82,7 @@ object ExceptionHandler extends Logging {
         // Close up everything
         bos.close()
         // -rw-r--r--
-        try { Android.execChmod(644, file, false) } catch { case e => log.warn(e.getMessage) }
+        file.setReadable(true, false)
         AppComponent.Context.foreach(_.sendBroadcast(new Intent(DIntent.Error))) // try to notify user, if it is possible
       } catch {
         // Nothing much we can do about this - the game is over

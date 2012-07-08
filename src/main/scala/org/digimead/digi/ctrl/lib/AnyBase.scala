@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib
 import java.io.File
 import java.util.Date
 
+import scala.Option.option2Iterable
 import scala.actors.Futures.future
 import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
@@ -37,49 +38,42 @@ import org.digimead.digi.ctrl.lib.util.SyncVar
 import android.app.Activity
 import android.app.Service
 import android.content.Context
+import android.os.Handler
 
 private[lib] trait AnyBase extends Logging {
-  protected def onCreateBase(context: Context, callSuper: => Any = {}) = synchronized {
+  protected def onCreateBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onCreateBase")
-    reset(context)
     callSuper
     AnyBase.init(context)
   }
-  protected def onStartBase(context: Context) = synchronized {
+  protected def onStartBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onStartBase")
-    reset(context)
+    AnyBase.reset(context, "onStart")
     if (AppComponent.Inner == null)
       AnyBase.init(context)
   }
-  protected def onResumeBase(context: Context) = synchronized {
+  protected def onResumeBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onResumeBase")
-    AnyBase.stopOnShutdownTimer(context)
+    AnyBase.cancelOnShutdownTimer(context, "onResume")
   }
-  protected def onPauseBase(context: Context) = synchronized {
+  protected def onPauseBase(context: Context) = AnyBase.synchronized {
     log.trace("AnyBase::onPauseBase")
-    AnyBase.stopOnShutdownTimer(context)
+    AnyBase.cancelOnShutdownTimer(context, "onPause")
   }
-  protected def onStopBase(context: Context, shutdownIfActive: Boolean) = synchronized {
+  protected def onStopBase(context: Context, shutdownIfActive: Boolean) = AnyBase.synchronized {
     log.trace("AnyBase::onStopBase")
-    AnyBase.startOnShutdownTimer(context, shutdownIfActive)
+    AnyBase.startOnShutdownTimer(context, "onStop", shutdownIfActive)
   }
-  protected def onDestroyBase(context: Context, callSuper: => Any = {}) = synchronized {
+  protected def onDestroyBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
     log.trace("AnyBase::onDestroyBase")
-    reset(context)
     callSuper
-    AnyBase.deinit(context)
-  }
-  private def reset(context: Context) {
-    AnyBase.stopOnShutdownTimer(context)
-    if (AppComponent.Inner != null) {
-      AppComponent.Inner.state.resetBusyCounter
-      context match {
-        case component: DActivity =>
-          if (AppComponent.Inner.activitySafeDialog.isSet)
-            AppComponent.Inner.activitySafeDialog.unset()
-        case _ =>
-      }
-    }
+    /*
+     *  deinitialize only if there was initialization
+     *  AnyBase.info initialize only once at the beginning
+     *  call onDestroy without onCreate - looks like a dirty trick from Android team
+     */
+    if (AnyBase.info.get.nonEmpty)
+      AnyBase.deinit(context)
   }
 }
 
@@ -88,29 +82,33 @@ object AnyBase extends Logging {
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
   @volatile private var reportDirectory = "report"
-  private val onShutdownTimer = new SyncVar[Boolean]()
+  @volatile private var onShutdownProtect = new WeakReference[Activity](null)
+  private val onShutdownState = new SyncVar[ShutdownState]() // string - cancel reason
+  private val handler = new Handler() // bound to the current thread (UI)
   val info = new SyncVar[Option[Info]]
   info.set(None)
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "16")
+  System.setProperty("actors.maxPoolSize", "16")
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
   log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
     + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
-  def init(context: Context, stackTraceOnUnknownContext: Boolean = true) = synchronized {
+  def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
     log.debug("initialize AnyBase context " + context.getClass.getName)
-    AppComponent.resurrect(context)
+    reset(context, "init")
+    AppComponent.resurrect()
     AppControl.resurrect()
     context match {
-      case activity: Activity =>
+      case activity: DActivity =>
         if (!contextPool.exists(_.get == Some(context))) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
           if (contextPool.isEmpty)
             AppComponent.init(context)
         }
-      case service: Service =>
+      case service: DService =>
         if (!contextPool.exists(_.get == Some(context))) {
           contextPool = contextPool :+ new WeakReference(context)
           updateContext()
@@ -134,11 +132,21 @@ object AnyBase extends Logging {
       Report.init(context)
       uncaughtExceptionHandler.register(context)
       log.debug("start AppComponent singleton actor")
-      AppComponent.Inner.start
     }
   }
-  def deinit(context: Context) = synchronized {
+  def deinit(context: Context): Unit = synchronized {
+    log.debug("context pool are " + contextPool.flatMap(_.get).mkString(", "))
+    if (!contextPool.exists(_.get == Some(context)))
+      return // shutdown in progress/this context already cleared
     log.debug("deinitialize AnyBase context " + context.getClass.getName)
+    // clear state
+    abortOnShutdownTimer(context, "deinit")
+    reset(context, "deinit")
+    // start deinit sequence
+    if (AnyBase.isLastContext)
+      AppControl.deinit()
+    else
+      log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
     // unbind bindedICtrlPool entities for context
     if (AppComponent.Inner != null)
       AppComponent.Inner.bindedICtrlPool.foreach(t => {
@@ -157,6 +165,12 @@ object AnyBase extends Logging {
     contextPool = contextPool.filter(_.get != Some(context))
     updateContext()
   }
+  def runOnUiThread(f: => Any): Unit = getContext.map {
+    case activity: Activity => activity.runOnUiThread(new Runnable { def run() = f })
+    case _ => AnyBase.handler.post(new Runnable { def run = f })
+  } getOrElse {
+    AnyBase.handler.post(new Runnable { def run = f })
+  }
   // count only Activity and Service contexts
   def isLastContext() =
     contextPool.filter(_.get.map(c => c.isInstanceOf[Activity] || c.isInstanceOf[Service]) == Some(true)).size <= 1
@@ -164,40 +178,8 @@ object AnyBase extends Logging {
     case None => updateContext()
     case result: Some[_] => result
   }
-  private def updateContext(): Option[Context] = synchronized {
-    contextPool = contextPool.filter(_.get != None).sortBy(n => n.get match {
-      case Some(activity) if activity.isInstanceOf[Activity] => 1
-      case Some(service) if service.isInstanceOf[Service] => 2
-      case _ => 3
-    })
-    contextPool.headOption.foreach(currentContext = _)
-    log.debug("update primary context to " + currentContext)
-    currentContext.get
-  }
-  @Loggable
-  private def startOnShutdownTimer(context: Context, shutdownIfActive: Boolean) = {
-    log.debug("start startOnShutdownTimer")
-    if (Seq(onShutdownTimer.get(0)).exists(state => state == None || state == Some(false)))
-      onShutdownTimer.set(true)
-    future {
-      onShutdownTimer.get(5000, _ != true) match {
-        case Some(true) if isLastContext || shutdownIfActive =>
-          log.info("start onShutdown sequence")
-          AppComponent.deinit()
-        case Some(true) =>
-          log.info("cancel onShutdown sequence, component in use")
-          onShutdownTimer.unset()
-        case _ =>
-          log.info("cancel onShutdown sequence")
-          onShutdownTimer.unset()
-      }
-    }
-  }
-  @Loggable
-  private def stopOnShutdownTimer(context: Context) = {
-    onShutdownTimer.set(false)
-    AppComponent.resurrect(context)
-  }
+  def preventShutdown(activity: Activity) =
+    onShutdownProtect = new WeakReference(activity)
   /**
    * Shutdown the app either safely or quickly. The app is killed safely by
    * killing the virtual machine that the app runs in after finalizing all
@@ -228,7 +210,7 @@ object AnyBase extends Logging {
    *            safely. Otherwise it will be killed quickly.
    */
   @Loggable
-  def shutdownApp(packageName: String, safely: Boolean) = synchronized {
+  def shutdownApp(packageName: String, safely: Boolean) = onShutdownState.synchronized {
     if (safely) {
       log.info("shutdown safely " + packageName)
       Logging.flush
@@ -260,21 +242,98 @@ object AnyBase extends Logging {
       android.os.Process.sendSignal(android.os.Process.myPid(), 1)
     }
   }
-  case class Info(val reportPath: File,
+  private def updateContext(): Option[Context] = synchronized {
+    contextPool = contextPool.filter(_.get != None).sortBy(n => n.get match {
+      case Some(activity) if activity.isInstanceOf[Activity] => 1
+      case Some(service) if service.isInstanceOf[Service] => 2
+      case _ => 3
+    })
+    if (contextPool.nonEmpty) {
+      contextPool.headOption.foreach(currentContext = _)
+      log.debug("update primary context to " + currentContext.get)
+      currentContext.get
+    } else {
+      currentContext = new WeakReference(null)
+      None
+    }
+  }
+  @Loggable
+  private def startOnShutdownTimer(context: Context, reason: String, shutdownIfActive: Boolean): Unit = synchronized {
+    log.debug("start startOnShutdownTimer, reason: " + reason)
+    if (onShutdownProtect.get match {
+      case Some(activity) =>
+        if (!activity.isFinishing && activity.getWindow != null) {
+          log.debug("prevent start onShutdown timer - protector in use " + activity)
+          true
+        } else false
+      case None =>
+        false
+    }) return
+    if (onShutdownState.get(0) != Some(Shutdown.InProgress))
+      onShutdownState.set(Shutdown.InProgress(reason))
+    future {
+      onShutdownState.get(5000, _ != Shutdown.InProgress) match {
+        case Some(Shutdown.InProgress(reason)) if isLastContext || shutdownIfActive =>
+          log.info("start onShutdown sequence, reason: " + reason)
+          AppComponent.deinit()
+        case Some(Shutdown.InProgress(reason)) =>
+          log.info("cancel onShutdown sequence, reason: " + reason + " - component is in use")
+          onShutdownState.unset()
+        case Some(Shutdown.Cancel(reason)) =>
+          log.info("cancel onShutdown sequence, reason: " + reason)
+          onShutdownState.unset()
+        case Some(Shutdown.Abort(reason)) =>
+          log.info("abort onShutdown sequence, reason: " + reason)
+          onShutdownState.unset()
+        case None =>
+          log.fatal("cancel onShutdown sequence, reason unknown")
+          onShutdownState.unset()
+      }
+    }
+  }
+  @Loggable
+  private def cancelOnShutdownTimer(context: Context, reason: String): Unit = {
+    onShutdownState.set(Shutdown.Cancel(reason))
+    AppComponent.resurrect()
+    AppControl.resurrect()
+  }
+  @Loggable
+  private def abortOnShutdownTimer(context: Context, reason: String): Unit = {
+    onShutdownState.set(Shutdown.Abort(reason))
+    AppComponent.resurrect(true)
+    AppControl.resurrect(true)
+  }
+  @Loggable
+  private def reset(context: Context, reason: String): Unit = {
+    AnyBase.cancelOnShutdownTimer(context, reason)
+    if (AppComponent.Inner != null) {
+      AppComponent.Inner.state.resetBusyCounter
+      context match {
+        case component: DActivity =>
+          if (AppComponent.Inner.activitySafeDialog.isSet)
+            AppComponent.Inner.activitySafeDialog.unset()
+        case _ =>
+      }
+    }
+  }
+  case class Info(val reportPathInternal: File,
+    val reportPathExternal: File,
     val appVersion: String,
     val appBuild: String,
     val appPackage: String,
     val phoneModel: String,
     val androidVersion: String,
     val write: Boolean) {
-    log.debug("reportPath: " + reportPath)
+    log.debug("reportPathInternal: " + reportPathInternal)
+    log.debug("reportPathExternal: " + reportPathExternal)
     log.debug("appVersion: " + appVersion)
     log.debug("appBuild: " + appBuild)
     log.debug("appPackage: " + appPackage)
     log.debug("phoneModel: " + phoneModel)
     log.debug("androidVersion: " + androidVersion)
     log.debug("write to storage: " + write)
-    override def toString = "reportPath: " + reportPath +
+    override def toString = "reportPathInternal: " + reportPathInternal +
+      ", reportPathExternal: " + reportPathExternal +
       ", appVersion: " + appVersion + ", appBuild: " + appBuild +
       ", appPackage: " + appPackage + ", phoneModel: " + phoneModel +
       ", androidVersion: " + androidVersion
@@ -287,7 +346,12 @@ object AnyBase extends Logging {
         val pi = pm.getPackageInfo(context.getPackageName(), 0)
         val pref = context.getSharedPreferences(DPreference.Log, Context.MODE_PRIVATE)
         val writeReport = pref.getBoolean(pi.packageName, true)
-        val info = new AnyBase.Info(reportPath = Common.getDirectory(context, reportDirectory, false, 755).get,
+        // 755
+        val info = new AnyBase.Info(reportPathInternal = Common.getDirectory(context, reportDirectory, true,
+          Some(true), Some(false), Some(true)).get,
+          // 755
+          reportPathExternal = Common.getDirectory(context, reportDirectory, false,
+            Some(true), Some(false), Some(true)).get,
           appVersion = pi.versionName,
           appBuild = Common.dateString(new Date(pi.versionCode.toLong * 1000)),
           appPackage = pi.packageName,
@@ -297,5 +361,11 @@ object AnyBase extends Logging {
         AnyBase.info.set(Some(info))
       }
     }
+  }
+  sealed trait ShutdownState
+  object Shutdown {
+    case class InProgress(reason: String) extends ShutdownState
+    case class Cancel(reason: String) extends ShutdownState
+    case class Abort(reason: String) extends ShutdownState
   }
 }

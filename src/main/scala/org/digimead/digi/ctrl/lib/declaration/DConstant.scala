@@ -24,4 +24,5 @@ object DConstant {
   final val apkNativePath = "armeabi"
   final val SessionAuthority = prefix + "Session"
   final val ComponentAuthority = prefix + "Component"
+  final val PublicPreferencesAuthority = prefix + "PublicPreferences"
 }

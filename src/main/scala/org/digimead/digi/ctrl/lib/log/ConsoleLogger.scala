@@ -18,7 +18,7 @@ package org.digimead.digi.ctrl.lib.log
 
 object ConsoleLogger extends Logger {
   val LINE_SEPARATOR = System.getProperty("line.separator")
-  protected var f = (records: Seq[Logging.Record]) => synchronized {
+  protected var f = (records: Array[Logging.Record]) => synchronized {
     records.foreach(r => {
       System.err.println(r.toString())
       r.throwable.foreach(t => System.err.print(try {

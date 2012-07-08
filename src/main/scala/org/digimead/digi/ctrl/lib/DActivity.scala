@@ -17,7 +17,7 @@
 package org.digimead.digi.ctrl.lib
 
 import scala.Array.canBuildFrom
-import scala.annotation.elidable
+import scala.annotation.implicitNotFound
 import scala.collection.JavaConversions._
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
@@ -26,11 +26,12 @@ import scala.collection.mutable.SynchronizedSet
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.dialog.FailedMarket
+import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.dialog.Report
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.util.Android
-import org.digimead.digi.ctrl.lib.util.Common
 
 import android.accounts.AccountManager
 import android.app.Activity
@@ -43,7 +44,6 @@ import android.os.Handler
 import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.TextView
-import annotation.elidable.ASSERTION
 
 /*
  * trait hasn't ability to use @Loggable
@@ -116,12 +116,7 @@ trait DActivity extends AnyBase with Logging {
     log.trace("Activity::onDestroyExt")
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
-    onDestroyBase(activity, {
-      if (AnyBase.isLastContext)
-        AppComponent.deinit()
-      else
-        log.debug("skip onDestroyExt deinitialization, because there is another context coexists")
-    })
+    onDestroyBase(activity)
   }
   def onCreateDialogExt(activity: Activity with DActivity, id: Int, args: Bundle): Dialog = {
     log.trace("Activity::onCreateDialogExt")
@@ -129,8 +124,12 @@ trait DActivity extends AnyBase with Logging {
       case id if id == Report.getId(activity) =>
         log.debug("show Report dialog")
         Report.createDialog(activity)
+      case id if id == InstallControl.getId(activity) =>
+        InstallControl.createDialog(activity)
+      case id if id == FailedMarket.getId(activity) =>
+        FailedMarket.createDialog(activity)
       case id =>
-        Common.onCreateDialog(id, activity)(log, dispatcher)
+        null
     }
   }
   def onPrepareDialogExt(activity: Activity with DActivity, id: Int, dialog: Dialog, args: Bundle): Boolean = {
@@ -151,6 +150,14 @@ trait DActivity extends AnyBase with Logging {
         val adapter = new ArrayAdapter(activity, android.R.layout.simple_spinner_item, emails)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.setAdapter(adapter)
+        true
+      case id if id == InstallControl.getId(activity) =>
+        log.debug("prepare InstallControl dialog with id " + id)
+        AppComponent.Inner.setDialogSafe(Some(InstallControl.getClass.getName), Some(dialog))
+        true
+      case id if id == FailedMarket.getId(activity) =>
+        log.debug("prepare FailedMarket dialog with id " + id)
+        AppComponent.Inner.setDialogSafe(Some(FailedMarket.getClass.getName), Some(dialog))
         true
       case _ =>
         false

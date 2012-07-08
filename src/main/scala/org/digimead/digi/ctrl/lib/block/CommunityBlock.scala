@@ -19,6 +19,7 @@ package org.digimead.digi.ctrl.lib.block
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
+import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
@@ -27,6 +28,7 @@ import org.digimead.digi.ctrl.lib.util.Android
 import com.commonsware.cwac.merge.MergeAdapter
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
@@ -44,7 +46,7 @@ import android.widget.TextView
 // TODO ui translation help: LANG as link
 // TODO documentation translation help: LANG as link
 // TODO web page/description translation help: LANG as link
-class CommunityBlock(val context: Activity, val xdaUri: Option[Uri],
+class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
   val wikiUri: Option[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
   val itemXDA = CommunityBlock.Item(Android.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
     Android.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
@@ -54,7 +56,8 @@ class CommunityBlock(val context: Activity, val xdaUri: Option[Uri],
     Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
   val items = Seq() ++ (if (xdaUri != None) Seq(itemXDA) else Seq()) ++
     (if (wikiUri != None) Seq(itemWiki) else Seq())
-  private lazy val header = context.getLayoutInflater.inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
+    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
@@ -71,7 +74,10 @@ class CommunityBlock(val context: Activity, val xdaUri: Option[Uri],
         try {
           val intent = new Intent(Intent.ACTION_VIEW, xdaUri.get)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open XDA thread page: " + xdaUri.get, e)
@@ -81,7 +87,10 @@ class CommunityBlock(val context: Activity, val xdaUri: Option[Uri],
         try {
           val intent = new Intent(Intent.ACTION_VIEW, wikiUri.get)
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          context.startActivity(intent)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
         } catch {
           case e =>
             IAmYell("Unable to open wiki page: " + wikiUri.get, e)
@@ -147,9 +156,9 @@ object CommunityBlock {
   private val name = "name"
   private val description = "description"
   case class Item(name: String, description: String, icon: String = "") extends Block.Item
-  class Adapter(context: Activity, textViewResourceId: Int, data: Seq[Item])
+  class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item])
     extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
-    private var inflater: LayoutInflater = context.getLayoutInflater
+    private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
       val item = data(position)
       item.view.get match {
@@ -168,6 +177,7 @@ object CommunityBlock {
                 icon.setImageDrawable(context.getResources.getDrawable(i))
               case _ =>
             }
+          Level.novice(view)
           item.view = new WeakReference(view)
           view
         case Some(view) =>
