@@ -538,7 +538,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
       deinitializationInProgressLock.synchronized {
         while (deinitializationInProgressLock.get) {
           log.debug("deinitialization in progress, waiting...")
-          deinitializationInProgressLock.wait
+          deinitializationInProgressLock.wait(1000)
         }
       }
     }
