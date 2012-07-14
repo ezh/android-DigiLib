@@ -22,12 +22,15 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FilenameFilter
+import java.io.OutputStream
 import java.util.Date
 import java.util.UUID
 import java.util.zip.GZIPOutputStream
 
 import scala.Array.canBuildFrom
+import scala.Option.option2Iterable
 import scala.actors.Futures
+import scala.actors.threadpool.AtomicInteger
 import scala.collection.JavaConversions._
 import scala.util.control.ControlThrowable
 
@@ -90,7 +93,7 @@ object Report extends Logging {
     }
   }
   @Loggable
-  def submit(context: Context, force: Boolean, uploadCallback: Option[(File, Int) => Any] = None): Boolean = synchronized {
+  def submit(context: Context, force: Boolean, uploadCallback: Option[(Int, Int) => Any] = None): Boolean = synchronized {
     for {
       info <- AnyBase.info.get
       context <- AppComponent.Context
@@ -112,30 +115,10 @@ object Report extends Logging {
           val processList = activityManager.getRunningAppProcesses().toSeq
           try {
             if (force || reports.exists(_.getName.endsWith(traceFileExtension))) {
+              val fileN = new AtomicInteger
               val sessionId = UUID.randomUUID.toString + "-"
-              val futures = reports.map(report => {
-                val active = try {
-                  val name = report.getName
-                  val pid = Integer.parseInt(name.split("""[-\.]""")(4).drop(1))
-                  processList.exists(_.pid == pid)
-                } catch {
-                  case _ =>
-                    false
-                }
-                Logging.flush
-                if (active) {
-                  log.debug("there is an active report " + report.getName)
-                  uploadCallback.foreach(_(report, reports.size))
-                  GoogleCloud.upload(report, sessionId)
-                } else {
-                  log.debug("there is a passive report " + report.getName)
-                  uploadCallback.foreach(_(report, reports.size))
-                  GoogleCloud.upload(report, sessionId)
-                }
-              })
-              // IMHO there is cloud rate limit. futures are useless
-              // awaitAll(DTimeout.long, futures.flatten.toSeq: _*)
-              futures.forall(_ == true)
+              Logging.flush
+              GoogleCloud.upload(reports, sessionId, { uploadCallback.foreach(_(fileN.incrementAndGet, reports.size)) })
             } else {
               true
             }
@@ -168,10 +151,12 @@ object Report extends Logging {
         log.debug("new report cleaner thread %s alive".format(this.getId.toString))
         this.setDaemon(true)
         override def run() = try {
-          (if (info.reportPathInternal != info.reportPathExternal)
-            clean(info.reportPathInternal) ++ clean(info.reportPathExternal)
-          else
-            clean(info.reportPathInternal)).foreach(_.delete)
+          (if (info.reportPathInternal != info.reportPathExternal) {
+            val (keep, toDelete) = clean(info.reportPathInternal, Seq())
+            toDelete ++ clean(info.reportPathExternal, keep)._2
+          } else {
+            clean(info.reportPathInternal, Seq())._2
+          }).foreach(_.delete)
         } catch {
           case e =>
             log.error(e.getMessage, e)
@@ -182,10 +167,12 @@ object Report extends Logging {
       cleanThread.get.start
     }
   }
-  private def clean(dir: File): Seq[File] = try {
+  // return (keep suffixes, files to delete)
+  private def clean(dir: File, keep: Seq[String]): (Seq[String], Seq[File]) = try {
     var result: Seq[File] = Seq()
     val files = Option(dir.listFiles()).getOrElse(Array[File]()).map(f => f.getName.toLowerCase -> f)
-    files.filter(_._1.endsWith(traceFileExtension)).sortBy(_._1).reverse.drop(keepTrcFiles).foreach {
+    val traceFiles = files.filter(_._1.endsWith(traceFileExtension)).sortBy(_._1).reverse
+    traceFiles.drop(keepTrcFiles).foreach {
       case (name, file) =>
         log.info("delete outdated stacktrace file " + name)
         result = result :+ file
@@ -201,6 +188,10 @@ object Report extends Logging {
         result = result :+ file
     }
     // delete log files
+    val logKeepTraces = traceFiles.take(keepTrcFiles).map(t => {
+      val name = t._1
+      name.substring(name.length - name.reverse.takeWhile(_ != '-').length - 1)
+    }).distinct
     val logFiles = files.filter(_._1.endsWith(logFileExtension)).sortBy(_._1).reverse
     // keep all log files with PID == last run
     val logKeep = logFiles.take(keepLogFiles).map(_._1 match {
@@ -213,15 +204,16 @@ object Report extends Logging {
           plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
             "." + logFilePrefix + "z" + logFileExtension)
     }).flatten.distinct
-    log.debug("keep log files with suffixes: " + logKeep.mkString(", "))
+    log.debug("keep log files with suffixes: " + (logKeep ++ logKeepTraces).mkString(", "))
+    val keepSuffixes = (logKeep ++ logKeepTraces ++ keep).distinct
     logFiles.drop(keepLogFiles).foreach {
       case (name, file) =>
-        if (!logKeep.exists(name.endsWith)) {
+        if (!keepSuffixes.exists(name.endsWith)) {
           log.info("delete outdated log file " + name)
           result = result :+ file
         }
     }
-    result
+    (keepSuffixes, result)
   }
   @Loggable
   def cleanAfterReview(): Unit = synchronized {
@@ -303,11 +295,13 @@ object Report extends Logging {
             // compress log files
             log.info("save compressed log file " + compressed.getName)
             val is = new BufferedInputStream(new FileInputStream(report))
-            val zos = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(compressed)))
+            var zos: OutputStream = null
             try {
+              zos = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(compressed)))
               Common.writeToStream(is, zos)
             } finally {
-              zos.close()
+              if (zos != null)
+                zos.close()
             }
             if (compressed.length > 0) {
               log.info("delete uncompressed log file " + reportName)

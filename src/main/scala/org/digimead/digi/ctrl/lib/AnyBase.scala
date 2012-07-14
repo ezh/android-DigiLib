@@ -90,11 +90,14 @@ object AnyBase extends Logging {
   System.setProperty("actors.enableForkJoin", "false")
   System.setProperty("actors.corePoolSize", "16")
   System.setProperty("actors.maxPoolSize", "16")
+  val previousPriority = Thread.currentThread.getPriority
+  Thread.currentThread.setPriority(Thread.MAX_PRIORITY)
   private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
   log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
     + weakScheduler.get.get.toString + "[name,priority,group]")
   log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
     ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
+  log.debug("adjust UI thread priority %d -> %d".format(previousPriority, Thread.currentThread.getPriority))
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
     log.debug("initialize AnyBase context " + context.getClass.getName)
     reset(context, "init")
