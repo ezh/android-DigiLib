@@ -19,12 +19,16 @@ package org.digimead.digi.ctrl.lib.storage
 import java.io.File
 import java.net.URI
 import java.net.URLEncoder
-import java.util.concurrent.atomic.AtomicReference
 import java.util.ArrayList
 import java.util.Date
+import java.util.concurrent.atomic.AtomicReference
 
+import scala.actors.Futures
 import scala.io.Codec.charset2codec
 
+import org.apache.http.HttpHost
+import org.apache.http.HttpVersion
+import org.apache.http.NameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpPut
@@ -33,10 +37,8 @@ import org.apache.http.entity.ByteArrayEntity
 import org.apache.http.message.BasicNameValuePair
 import org.apache.http.params.CoreProtocolPNames
 import org.apache.http.util.EntityUtils
-import org.apache.http.HttpHost
-import org.apache.http.HttpVersion
-import org.apache.http.NameValuePair
 import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
@@ -76,11 +78,11 @@ object GoogleCloud extends Logging {
         log.info("proxy not detected")
       client
   }
-  val upload: (File, String) => Boolean = uploadViaApache
-  def uploadViaApache(file: File, prefix: String = ""): Boolean = AppComponent.Context.flatMap {
+  val upload: (Seq[File], String, => Any) => Boolean = uploadViaApache
+  def uploadViaApache(files: Seq[File], prefix: String = "", callback: => Any): Boolean = AppComponent.Context.flatMap {
     context =>
-      log.debug("upload via Apache client " + file.getName + " with default credentials")
-      val result = for {
+      log.debug("upload files via Apache client with default credentials")
+      for {
         clientID_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_ID")
         clientSecret_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_SECRET")
         refreshToken_64 <- Android.getString(context, "APPLICATION_GS_TOKEN")
@@ -94,44 +96,47 @@ object GoogleCloud extends Logging {
         getAccessToken(clientID, clientSecret, refreshToken) match {
           case Some(token) =>
             try {
-              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
-              log.debug("prepare " + file.getName + " for uploading to " + uri)
-              val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
-              val byteArray = source.map(_.toByte).toArray
-              source.close()
-              log.debug(file.getName + " prepared")
+              val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix, "utf-8")).mkString("/"))
               // upload byteArray
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
-              val httpput = new HttpPut(uri.getPath())
-              httpput.setHeader("x-goog-api-version", "2")
-              httpput.setHeader("Authorization", "OAuth " + token.access_token)
-              httpput.setEntity(new ByteArrayEntity(byteArray))
-              val response = httpclient.execute(host, httpput)
-              val entity = response.getEntity()
-              log.debug(uri + " result: " + response.getStatusLine())
-              response.getStatusLine().getStatusCode() match {
-                case 200 =>
-                  log.info("upload " + file.getName + " successful")
-                  Some(true)
-                case _ =>
-                  log.warn("upload " + file.getName + " failed")
-                  None
-              }
+              val futures = files.map(file => Futures.future {
+                val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
+                val httpput = new HttpPut(uri.getPath())
+                httpput.setHeader("x-goog-api-version", "2")
+                httpput.setHeader("Authorization", "OAuth " + token.access_token)
+                val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
+                val byteArray = source.map(_.toByte).toArray
+                source.close()
+                httpput.setEntity(new ByteArrayEntity(byteArray))
+                val response = httpclient.execute(host, httpput)
+                val entity = response.getEntity()
+                log.debug(uri + " result: " + response.getStatusLine())
+                response.getStatusLine().getStatusCode() match {
+                  case 200 =>
+                    log.info("upload " + file.getName + " successful")
+                    callback
+                    true
+                  case _ =>
+                    log.warn("upload " + file.getName + " failed")
+                    callback
+                    false
+                }
+              })
+              Futures.awaitAll(DTimeout.longest, futures: _*).forall(_ == Some(true))
             } catch {
               case e =>
                 log.warn("unable to upload: ", e.getMessage)
-                None
+                false
             }
           case None =>
             log.error("access token not available")
-            None
+            false
         }
       } catch {
         case e =>
           log.error("unable to upload", e)
-          None
+          false
       }
-      result.getOrElse(None)
   } getOrElse false
   def getAccessToken(clientID: String, clientSecret: String, refreshToken: String): Option[AccessToken] = synchronized {
     accessToken.get.foreach(t => if (t.expired > System.currentTimeMillis) {
