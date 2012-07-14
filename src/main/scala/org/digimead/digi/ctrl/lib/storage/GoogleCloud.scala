@@ -27,10 +27,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
+import scala.actors.Futures
 import scala.annotation.tailrec
 import scala.io.Codec.charset2codec
 
 import org.apache.http.HttpHost
+import org.apache.http.HttpResponse
 import org.apache.http.HttpVersion
 import org.apache.http.NameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
@@ -66,8 +68,8 @@ import android.util.Base64
  */
 object GoogleCloud extends Logging {
   private lazy val accessToken = new AtomicReference[Option[AccessToken]](None)
-  // Default connection and socket timeout of 10 seconds. Tweak to taste.
-  private val SOCKET_OPERATION_TIMEOUT = 10 * 1000
+  // Default connection and socket timeout of 5 seconds. Tweak to taste.
+  private val SOCKET_OPERATION_TIMEOUT = 5 * 1000
   private val uploadPoolSize = 4
   private val retry = 3
   val tokenURL = "https://accounts.google.com/o/oauth2/token"
@@ -143,17 +145,27 @@ object GoogleCloud extends Logging {
                   val byteArray = source.map(_.toByte).toArray
                   source.close()
                   httpput.setEntity(new ByteArrayEntity(byteArray))
-                  val response = httpclient.execute(host, httpput)
-                  val entity = response.getEntity()
-                  log.debug(uri + " result: " + response.getStatusLine())
-                  response.getStatusLine().getStatusCode() match {
-                    case 200 =>
-                      log.info("upload " + file.getName + " successful")
-                      callback
-                    case _ =>
-                      log.warn("upload " + file.getName + " failed")
-                      new RuntimeException("upload " + file.getName + " failed")
-                      false
+                  // guard httpclient.execute
+                  val future = Futures.future { httpclient.execute(host, httpput) }
+                  Futures.awaitAll(DTimeout.long, future).head match {
+                    case Some(result) =>
+                      val response = result.asInstanceOf[HttpResponse]
+                      val entity = response.getEntity()
+                      entity.consumeContent
+                      httpclient.getConnectionManager.closeExpiredConnections
+                      log.debug(uri + " result: " + response.getStatusLine())
+                      response.getStatusLine().getStatusCode() match {
+                        case 200 =>
+                          log.info("upload " + file.getName + " successful")
+                          callback
+                        case _ =>
+                          log.warn("upload " + file.getName + " failed")
+                          throw new RuntimeException("upload " + file.getName + " failed")
+                      }
+                    case None =>
+                      log.warn("upload " + file.getName + " failed, timeout")
+                      httpclient.getConnectionManager.closeExpiredConnections
+                      throw new RuntimeException("upload " + file.getName + " failed, timeout")
                   }
                 }
               }, 0, TimeUnit.MILLISECONDS))

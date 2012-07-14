@@ -563,38 +563,40 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
       }
     }
   }
-  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    AnyBase.getContext match {
-      case Some(context) =>
-        val packageName = context.getPackageName()
-        if (deinitializationLock.isSet) {
-          deinitializationLock.unset()
-          Futures.future {
-            try {
-              log.info("deinitializing AppComponent for " + packageName)
-              val timeout = deinitializationTimeout(context)
-              if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
-                try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-              deinitializationLock.get(timeout) match {
-                case Some(false) =>
-                  log.info("deinitialization AppComponent for " + packageName + " canceled")
-                case _ =>
-                  deinitRoutine(packageName)
-              }
-            } finally {
-              deinitializationInProgressLock.synchronized {
-                deinitializationInProgressLock.set(false)
-                deinitializationInProgressLock.notifyAll
+  private[lib] def deinit(): Unit = deinitializationLock.synchronized {
+    if (deinitializationInProgressLock.compareAndSet(false, true)) {
+      AnyBase.getContext match {
+        case Some(context) =>
+          val packageName = context.getPackageName()
+          if (deinitializationLock.isSet) {
+            deinitializationLock.unset()
+            log.info("deinitializing AppComponent for " + packageName)
+            val timeout = deinitializationTimeout(context)
+            if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+              try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            Futures.future {
+              try {
+                deinitializationLock.get(timeout) match {
+                  case Some(false) =>
+                    log.info("deinitialization AppComponent for " + packageName + " canceled")
+                  case _ =>
+                    deinitRoutine(packageName)
+                }
+              } finally {
+                deinitializationInProgressLock.synchronized {
+                  deinitializationInProgressLock.set(false)
+                  deinitializationInProgressLock.notifyAll
+                }
               }
             }
           }
-        }
-      case None =>
-        log.fatal("unable to find deinitialization context")
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
+        case None =>
+          log.fatal("unable to find deinitialization context")
+          deinitializationInProgressLock.synchronized {
+            deinitializationInProgressLock.set(false)
+            deinitializationInProgressLock.notifyAll
+          }
+      }
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
