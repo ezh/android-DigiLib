@@ -145,9 +145,11 @@ protected class AppComponent private () extends Logging {
   log.debug("alive")
 
   def showDialogSafe(activity: Activity, tag: String, id: Int): Unit =
-    showDialogSafe(activity, tag, id, null)
+    showDialogSafe(activity, tag, id, null.asInstanceOf[Bundle])
   def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle): Unit =
     showDialogSafe(activity, tag, id, args, null)
+  def showDialogSafe(activity: Activity, tag: String, id: Int, onDismiss: () => Any): Unit =
+    showDialogSafe(activity, tag, id, null, onDismiss)
   @Loggable
   def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any) {
     log.trace("Activity::showDialogSafe tag:%s id:%d".format(tag, id))
@@ -155,9 +157,11 @@ protected class AppComponent private () extends Logging {
     activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, tag, id, Option(args), Option(onDismiss))
   }
   def showDialogSafeWait(activity: Activity, tag: String, id: Int): Option[Dialog] =
-    showDialogSafeWait(activity, tag, id, null)
+    showDialogSafeWait(activity, tag, id, null.asInstanceOf[Bundle])
   def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle): Option[Dialog] =
     showDialogSafeWait(activity, tag, id, args, null)
+  def showDialogSafeWait(activity: Activity, tag: String, id: Int, onDismiss: () => Any): Option[Dialog] =
+    showDialogSafeWait(activity, tag, id, null, onDismiss)
   @Loggable
   def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any): Option[Dialog] = try {
     log.trace("Activity::showDialogSafe tag:%s id:%d at thread %l and ui %l ".format(tag, id, Thread.currentThread.getId, uiThreadID))
@@ -186,6 +190,22 @@ protected class AppComponent private () extends Logging {
     case e =>
       log.error(e.getMessage, e)
       None
+  }
+  @Loggable
+  def replaceDialogSafe[T <: Dialog](tag: String, dialog: () => T) {
+    activitySafeDialog.get(0) match {
+      case Some(entry @ AppComponent.SafeDialogEntry(Some(tag), Some(previousDialog), previousOnDismiss)) =>
+        AnyBase.runOnUiThread {
+          log.debug("replace previous dialog " + entry)
+          previousDialog.setOnDismissListener(new DialogInterface.OnDismissListener {
+            override def onDismiss(d: DialogInterface) =
+              activitySafeDialog.set(AppComponent.SafeDialogEntry(Some(tag), Option(dialog()), previousOnDismiss))
+          })
+          previousDialog.dismiss
+        }
+      case entry =>
+        log.warn("unable to replace previous dialog " + entry)
+    }
   }
   @Loggable
   def setDialogSafe(tag: Option[String], dialog: Option[Dialog]) {

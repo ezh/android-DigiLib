@@ -19,21 +19,21 @@ package org.digimead.digi.ctrl.lib.dialog
 import java.io.File
 import java.io.FileOutputStream
 import java.io.PrintWriter
+import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.Date
 
-import scala.Option.option2Iterable
+import scala.actors.Futures
 import scala.actors.Futures.future
 
+import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.DActivity
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
-import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.AnyBase
 
 import android.app.Activity
 import android.app.AlertDialog
@@ -41,9 +41,9 @@ import android.app.Dialog
 import android.app.ProgressDialog
 import android.content.Context
 import android.content.DialogInterface
+import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
 import android.graphics.Bitmap.Config
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.text.Html
 import android.view.LayoutInflater
@@ -56,6 +56,7 @@ import android.widget.Toast
  */
 object Report extends Logging {
   val searchAndSubmitLock = new AtomicBoolean(false)
+  val submitInProgressLock = new AtomicBoolean(false)
   def getId(context: Context) = Android.getId(context, "report")
   @Loggable
   def createDialog(activity: Activity with DActivity): Dialog = {
@@ -68,11 +69,10 @@ object Report extends Logging {
       setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          AnyBase.info.get.foreach {
-            info =>
-              AppComponent.Inner.resetDialogSafe
-              future {
-                AppComponent.Inner.showDialogSafe[ProgressDialog](activity, getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+          AppComponent.Inner.replaceDialogSafe(getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+          future {
+            AnyBase.info.get.foreach {
+              info =>
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
@@ -149,7 +149,7 @@ object Report extends Logging {
                       getOrElse("Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later."), Toast.LENGTH_LONG).show()
                   })
                 }
-              }
+            }
           }
         }
       }).
@@ -165,18 +165,29 @@ object Report extends Logging {
   }
   def submit(description: String): Unit = submit(null, Some(description))
   @Loggable
-  def submit(activity: Activity with DActivity = null, description: Option[String] = None): Unit = {
+  def submit(activity: Activity with DActivity = null, description: Option[String] = None): Unit = if (submitInProgressLock.compareAndSet(false, true)) {
+    log.debug("lock report submit")
     if (activity != null) {
       activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
       description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-      AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
+      AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"), () => Futures.future {
+        Thread.sleep(DTimeout.normal)
+        log.debug("unlock report submit")
+        submitInProgressLock.set(false)
+      })
     } else {
       AppComponent.Context.foreach {
         case activity: Activity with DActivity =>
           description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-          AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"))
+          AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"), () => Futures.future {
+            Thread.sleep(DTimeout.normal)
+            log.debug("unlock report submit")
+            submitInProgressLock.set(false)
+          })
         case context =>
           log.fatal("unable to launch report dialog from illegal context")
+          log.debug("unlock report submit")
+          submitInProgressLock.set(false)
       }
     }
   }
