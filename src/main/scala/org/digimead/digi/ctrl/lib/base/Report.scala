@@ -22,11 +22,13 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.FilenameFilter
+import java.io.OutputStream
 import java.util.Date
 import java.util.UUID
 import java.util.zip.GZIPOutputStream
 
 import scala.Array.canBuildFrom
+import scala.Option.option2Iterable
 import scala.actors.Futures
 import scala.collection.JavaConversions._
 import scala.util.control.ControlThrowable
@@ -185,7 +187,8 @@ object Report extends Logging {
   private def clean(dir: File): Seq[File] = try {
     var result: Seq[File] = Seq()
     val files = Option(dir.listFiles()).getOrElse(Array[File]()).map(f => f.getName.toLowerCase -> f)
-    files.filter(_._1.endsWith(traceFileExtension)).sortBy(_._1).reverse.drop(keepTrcFiles).foreach {
+    val traceFiles = files.filter(_._1.endsWith(traceFileExtension)).sortBy(_._1).reverse
+    traceFiles.drop(keepTrcFiles).foreach {
       case (name, file) =>
         log.info("delete outdated stacktrace file " + name)
         result = result :+ file
@@ -201,6 +204,10 @@ object Report extends Logging {
         result = result :+ file
     }
     // delete log files
+    val logKeepTraces = traceFiles.take(keepTrcFiles).map(t => {
+      val name = t._1
+      name.substring(name.length - traceFileExtension.length - 7)
+    }).distinct
     val logFiles = files.filter(_._1.endsWith(logFileExtension)).sortBy(_._1).reverse
     // keep all log files with PID == last run
     val logKeep = logFiles.take(keepLogFiles).map(_._1 match {
@@ -213,10 +220,10 @@ object Report extends Logging {
           plain.substring(plain.length - logFilePrefix.length - logFileExtension.length - 7).takeWhile(_ != '.') +
             "." + logFilePrefix + "z" + logFileExtension)
     }).flatten.distinct
-    log.debug("keep log files with suffixes: " + logKeep.mkString(", "))
+    log.debug("keep log files with suffixes: " + (logKeep ++ logKeepTraces).mkString(", "))
     logFiles.drop(keepLogFiles).foreach {
       case (name, file) =>
-        if (!logKeep.exists(name.endsWith)) {
+        if (!logKeep.exists(name.endsWith) || !logKeepTraces.exists(name.endsWith)) {
           log.info("delete outdated log file " + name)
           result = result :+ file
         }
@@ -303,11 +310,13 @@ object Report extends Logging {
             // compress log files
             log.info("save compressed log file " + compressed.getName)
             val is = new BufferedInputStream(new FileInputStream(report))
-            val zos = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(compressed)))
+            var zos: OutputStream = null
             try {
+              zos = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(compressed)))
               Common.writeToStream(is, zos)
             } finally {
-              zos.close()
+              if (zos != null)
+                zos.close()
             }
             if (compressed.length > 0) {
               log.info("delete uncompressed log file " + reportName)
