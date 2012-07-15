@@ -253,7 +253,7 @@ protected class AppComponent private () extends Logging {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       if (lockRotationCounter.getAndIncrement == 0)
         Android.disableRotation(activity.asInstanceOf[Activity])
-      log.trace("set rotation lock to " + lockRotationCounter.get)
+      log.trace("increment rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to disable rotation, invalid context " + context)
   }
@@ -263,7 +263,7 @@ protected class AppComponent private () extends Logging {
       lockRotationCounter.compareAndSet(0, 1)
       if (lockRotationCounter.decrementAndGet == 0)
         Android.enableRotation(activity.asInstanceOf[Activity])
-      log.trace("set rotation lock to " + lockRotationCounter.get)
+      log.trace("decrement rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to enable rotation, invalid context " + context)
   }

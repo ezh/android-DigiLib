@@ -118,18 +118,22 @@ protected class AppControl private (packageName: String) extends Logging {
     if (ctrlBindContext.get != null && AppControl.isICtrlHostInstalled(ctrlBindContext.get)) {
       Futures.future {
         if (rebindInProgressLock.compareAndSet(false, true)) {
-          unbind()
           var result: Option[ICtrlHost] = None
           while (result == None && AppControl.Inner != null) {
             AppComponent.Context.foreach(_ match {
-              case activity: Activity with DActivity =>
-                log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
+              case activity: Activity with DActivity => try {
+                Thread.sleep(DTimeout.normal)
+                unbind()
                 bind(activity)
+              } catch {
+                case e =>
+                  log.warn(e.getMessage, e)
+              }
               case _ =>
-                log.warn("rebind ICtrlHost service failed")
-                None
             })
-            result = get(DTimeout.long)
+            val timeout = -1
+            val throwError = false
+            result = AppControl.get(timeout, throwError, ready)
           }
           log.warn("rebind ICtrlHost service finished, result: " + result)
           rebindInProgressLock.set(false)
