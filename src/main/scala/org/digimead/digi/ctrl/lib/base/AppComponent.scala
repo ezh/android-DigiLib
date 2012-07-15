@@ -368,7 +368,10 @@ protected class AppComponent private () extends Logging {
               case DState.Active =>
                 AppComponent.State(DState.Active)
               case DState.Broken =>
-                AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+                if (componentState.reason == None)
+                  AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+                else
+                  AppComponent.State(DState.Broken, componentState.reason.toSeq)
               case _ =>
                 AppComponent.State(DState.Passive)
             }
