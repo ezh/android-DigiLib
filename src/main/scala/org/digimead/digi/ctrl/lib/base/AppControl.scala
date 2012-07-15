@@ -118,18 +118,22 @@ protected class AppControl private (packageName: String) extends Logging {
     if (ctrlBindContext.get != null && AppControl.isICtrlHostInstalled(ctrlBindContext.get)) {
       Futures.future {
         if (rebindInProgressLock.compareAndSet(false, true)) {
-          unbind()
           var result: Option[ICtrlHost] = None
           while (result == None && AppControl.Inner != null) {
             AppComponent.Context.foreach(_ match {
-              case activity: Activity with DActivity =>
-                log.warn("rebind ICtrlHost service with timeout " + timeout + " and context " + activity)
+              case activity: Activity with DActivity => try {
+                Thread.sleep(DTimeout.normal)
+                unbind()
                 bind(activity)
+              } catch {
+                case e =>
+                  log.warn(e.getMessage, e)
+              }
               case _ =>
-                log.warn("rebind ICtrlHost service failed")
-                None
             })
-            result = get(DTimeout.long)
+            val timeout = -1
+            val throwError = false
+            result = AppControl.get(timeout, throwError, ready)
           }
           log.warn("rebind ICtrlHost service finished, result: " + result)
           rebindInProgressLock.set(false)
@@ -403,38 +407,40 @@ object AppControl extends Logging {
       }
     }
   }
-  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    AnyBase.getContext match {
-      case Some(context) =>
-        val packageName = context.getPackageName()
-        if (deinitializationLock.isSet) {
-          deinitializationLock.unset()
-          Futures.future {
+  private[lib] def deinit(): Unit = deinitializationLock.synchronized {
+    if (deinitializationInProgressLock.compareAndSet(false, true)) {
+      AnyBase.getContext match {
+        case Some(context) =>
+          val packageName = context.getPackageName()
+          if (deinitializationLock.isSet) {
+            deinitializationLock.unset()
             log.info("deinitializing AppControl for " + packageName)
-            try {
-              val timeout = AppComponent.deinitializationTimeout(context)
-              if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
-                try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-              deinitializationLock.get(timeout) match {
-                case Some(false) =>
-                  log.info("deinitialization AppControl for " + packageName + " canceled")
-                case _ =>
-                  deinitRoutine(packageName)
-              }
-            } finally {
-              deinitializationInProgressLock.synchronized {
-                deinitializationInProgressLock.set(false)
-                deinitializationInProgressLock.notifyAll
+            val timeout = AppComponent.deinitializationTimeout(context)
+            if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
+              try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            Futures.future {
+              try {
+                deinitializationLock.get(timeout) match {
+                  case Some(false) =>
+                    log.info("deinitialization AppControl for " + packageName + " canceled")
+                  case _ =>
+                    deinitRoutine(packageName)
+                }
+              } finally {
+                deinitializationInProgressLock.synchronized {
+                  deinitializationInProgressLock.set(false)
+                  deinitializationInProgressLock.notifyAll
+                }
               }
             }
           }
-        }
-      case None =>
-        log.fatal("unable to find deinitialization context")
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
+        case None =>
+          log.fatal("unable to find deinitialization context")
+          deinitializationInProgressLock.synchronized {
+            deinitializationInProgressLock.set(false)
+            deinitializationInProgressLock.notifyAll
+          }
+      }
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {

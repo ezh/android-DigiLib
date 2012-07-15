@@ -145,9 +145,11 @@ protected class AppComponent private () extends Logging {
   log.debug("alive")
 
   def showDialogSafe(activity: Activity, tag: String, id: Int): Unit =
-    showDialogSafe(activity, tag, id, null)
+    showDialogSafe(activity, tag, id, null.asInstanceOf[Bundle])
   def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle): Unit =
     showDialogSafe(activity, tag, id, args, null)
+  def showDialogSafe(activity: Activity, tag: String, id: Int, onDismiss: () => Any): Unit =
+    showDialogSafe(activity, tag, id, null, onDismiss)
   @Loggable
   def showDialogSafe(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any) {
     log.trace("Activity::showDialogSafe tag:%s id:%d".format(tag, id))
@@ -155,9 +157,11 @@ protected class AppComponent private () extends Logging {
     activitySafeDialogActor ! AppComponent.Message.ShowDialogResource(activity, tag, id, Option(args), Option(onDismiss))
   }
   def showDialogSafeWait(activity: Activity, tag: String, id: Int): Option[Dialog] =
-    showDialogSafeWait(activity, tag, id, null)
+    showDialogSafeWait(activity, tag, id, null.asInstanceOf[Bundle])
   def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle): Option[Dialog] =
     showDialogSafeWait(activity, tag, id, args, null)
+  def showDialogSafeWait(activity: Activity, tag: String, id: Int, onDismiss: () => Any): Option[Dialog] =
+    showDialogSafeWait(activity, tag, id, null, onDismiss)
   @Loggable
   def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any): Option[Dialog] = try {
     log.trace("Activity::showDialogSafe tag:%s id:%d at thread %l and ui %l ".format(tag, id, Thread.currentThread.getId, uiThreadID))
@@ -186,6 +190,22 @@ protected class AppComponent private () extends Logging {
     case e =>
       log.error(e.getMessage, e)
       None
+  }
+  @Loggable
+  def replaceDialogSafe[T <: Dialog](tag: String, dialog: () => T) {
+    activitySafeDialog.get(0) match {
+      case Some(entry @ AppComponent.SafeDialogEntry(Some(tag), Some(previousDialog), previousOnDismiss)) =>
+        AnyBase.runOnUiThread {
+          log.debug("replace previous dialog " + entry)
+          previousDialog.setOnDismissListener(new DialogInterface.OnDismissListener {
+            override def onDismiss(d: DialogInterface) =
+              activitySafeDialog.set(AppComponent.SafeDialogEntry(Some(tag), Option(dialog()), previousOnDismiss))
+          })
+          previousDialog.dismiss
+        }
+      case entry =>
+        log.warn("unable to replace previous dialog " + entry)
+    }
   }
   @Loggable
   def setDialogSafe(tag: Option[String], dialog: Option[Dialog]) {
@@ -233,7 +253,7 @@ protected class AppComponent private () extends Logging {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       if (lockRotationCounter.getAndIncrement == 0)
         Android.disableRotation(activity.asInstanceOf[Activity])
-      log.trace("set rotation lock to " + lockRotationCounter.get)
+      log.trace("increment rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to disable rotation, invalid context " + context)
   }
@@ -243,7 +263,7 @@ protected class AppComponent private () extends Logging {
       lockRotationCounter.compareAndSet(0, 1)
       if (lockRotationCounter.decrementAndGet == 0)
         Android.enableRotation(activity.asInstanceOf[Activity])
-      log.trace("set rotation lock to " + lockRotationCounter.get)
+      log.trace("decrement rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to enable rotation, invalid context " + context)
   }
@@ -348,7 +368,10 @@ protected class AppComponent private () extends Logging {
               case DState.Active =>
                 AppComponent.State(DState.Active)
               case DState.Broken =>
-                AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+                if (componentState.reason == None)
+                  AppComponent.State(DState.Broken, Seq("error_digicontrol_service_failed"))
+                else
+                  AppComponent.State(DState.Broken, componentState.reason.toSeq)
               case _ =>
                 AppComponent.State(DState.Passive)
             }
@@ -543,38 +566,40 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
       }
     }
   }
-  private[lib] def deinit(): Unit = if (deinitializationInProgressLock.compareAndSet(false, true)) {
-    AnyBase.getContext match {
-      case Some(context) =>
-        val packageName = context.getPackageName()
-        if (deinitializationLock.isSet) {
-          deinitializationLock.unset()
-          Futures.future {
-            try {
-              log.info("deinitializing AppComponent for " + packageName)
-              val timeout = deinitializationTimeout(context)
-              if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
-                try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-              deinitializationLock.get(timeout) match {
-                case Some(false) =>
-                  log.info("deinitialization AppComponent for " + packageName + " canceled")
-                case _ =>
-                  deinitRoutine(packageName)
-              }
-            } finally {
-              deinitializationInProgressLock.synchronized {
-                deinitializationInProgressLock.set(false)
-                deinitializationInProgressLock.notifyAll
+  private[lib] def deinit(): Unit = deinitializationLock.synchronized {
+    if (deinitializationInProgressLock.compareAndSet(false, true)) {
+      AnyBase.getContext match {
+        case Some(context) =>
+          val packageName = context.getPackageName()
+          if (deinitializationLock.isSet) {
+            deinitializationLock.unset()
+            log.info("deinitializing AppComponent for " + packageName)
+            val timeout = deinitializationTimeout(context)
+            if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+              try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+            Futures.future {
+              try {
+                deinitializationLock.get(timeout) match {
+                  case Some(false) =>
+                    log.info("deinitialization AppComponent for " + packageName + " canceled")
+                  case _ =>
+                    deinitRoutine(packageName)
+                }
+              } finally {
+                deinitializationInProgressLock.synchronized {
+                  deinitializationInProgressLock.set(false)
+                  deinitializationInProgressLock.notifyAll
+                }
               }
             }
           }
-        }
-      case None =>
-        log.fatal("unable to find deinitialization context")
-        deinitializationInProgressLock.synchronized {
-          deinitializationInProgressLock.set(false)
-          deinitializationInProgressLock.notifyAll
-        }
+        case None =>
+          log.fatal("unable to find deinitialization context")
+          deinitializationInProgressLock.synchronized {
+            deinitializationInProgressLock.set(false)
+            deinitializationInProgressLock.notifyAll
+          }
+      }
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {

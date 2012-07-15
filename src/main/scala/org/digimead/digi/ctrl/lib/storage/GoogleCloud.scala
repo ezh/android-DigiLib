@@ -21,30 +21,45 @@ import java.net.URI
 import java.net.URLEncoder
 import java.util.ArrayList
 import java.util.Date
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 import scala.actors.Futures
+import scala.annotation.tailrec
 import scala.io.Codec.charset2codec
 
 import org.apache.http.HttpHost
+import org.apache.http.HttpResponse
 import org.apache.http.HttpVersion
 import org.apache.http.NameValuePair
 import org.apache.http.client.entity.UrlEncodedFormEntity
 import org.apache.http.client.methods.HttpPost
 import org.apache.http.client.methods.HttpPut
 import org.apache.http.conn.params.ConnRoutePNames
+import org.apache.http.conn.scheme.PlainSocketFactory
+import org.apache.http.conn.scheme.Scheme
+import org.apache.http.conn.scheme.SchemeRegistry
+import org.apache.http.conn.ssl.SSLSocketFactory
 import org.apache.http.entity.ByteArrayEntity
+import org.apache.http.impl.client.DefaultHttpClient
+import org.apache.http.impl.conn.tsccm.ThreadSafeClientConnManager
 import org.apache.http.message.BasicNameValuePair
-import org.apache.http.params.CoreProtocolPNames
+import org.apache.http.params.BasicHttpParams
+import org.apache.http.params.HttpConnectionParams
+import org.apache.http.params.HttpProtocolParams
+import org.apache.http.protocol.HTTP
 import org.apache.http.util.EntityUtils
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
+import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 import org.json.JSONObject
 
-import android.net.http.AndroidHttpClient
 import android.provider.Settings
 import android.util.Base64
 
@@ -53,12 +68,27 @@ import android.util.Base64
  */
 object GoogleCloud extends Logging {
   private lazy val accessToken = new AtomicReference[Option[AccessToken]](None)
+  // Default connection and socket timeout of 5 seconds. Tweak to taste.
+  private val SOCKET_OPERATION_TIMEOUT = 5 * 1000
+  private val uploadPoolSize = 4
+  private val retry = 3
   val tokenURL = "https://accounts.google.com/o/oauth2/token"
   val uploadURL = "http://commondatastorage.googleapis.com"
   protected lazy val httpclient = AppComponent.Context.map {
     context =>
-      val client = AndroidHttpClient.newInstance("Android")
-      client.getParams().setParameter(CoreProtocolPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_1)
+      val params = new BasicHttpParams();
+      HttpProtocolParams.setVersion(params, HttpVersion.HTTP_1_1)
+      HttpProtocolParams.setContentCharset(params, HTTP.DEFAULT_CONTENT_CHARSET)
+      HttpProtocolParams.setUseExpectContinue(params, true)
+      HttpConnectionParams.setStaleCheckingEnabled(params, false)
+      HttpConnectionParams.setConnectionTimeout(params, SOCKET_OPERATION_TIMEOUT)
+      HttpConnectionParams.setSoTimeout(params, SOCKET_OPERATION_TIMEOUT)
+      HttpConnectionParams.setSocketBufferSize(params, 8192);
+      val schReg = new SchemeRegistry()
+      schReg.register(new Scheme("http", PlainSocketFactory.getSocketFactory(), 80))
+      schReg.register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443))
+      val conMgr = new ThreadSafeClientConnManager(params, schReg)
+      val client = new DefaultHttpClient(conMgr, params)
       /*
        * attach proxy
        */
@@ -99,30 +129,48 @@ object GoogleCloud extends Logging {
               val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix, "utf-8")).mkString("/"))
               // upload byteArray
               val host = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme())
-              val futures = files.map(file => Futures.future {
-                val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
-                val httpput = new HttpPut(uri.getPath())
-                httpput.setHeader("x-goog-api-version", "2")
-                httpput.setHeader("Authorization", "OAuth " + token.access_token)
-                val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
-                val byteArray = source.map(_.toByte).toArray
-                source.close()
-                httpput.setEntity(new ByteArrayEntity(byteArray))
-                val response = httpclient.execute(host, httpput)
-                val entity = response.getEntity()
-                log.debug(uri + " result: " + response.getStatusLine())
-                response.getStatusLine().getStatusCode() match {
-                  case 200 =>
-                    log.info("upload " + file.getName + " successful")
-                    callback
-                    true
-                  case _ =>
-                    log.warn("upload " + file.getName + " failed")
-                    callback
-                    false
-                }
+              val executor = new ScheduledThreadPoolExecutor(uploadPoolSize, new ThreadFactory() {
+                val threadNumber = new AtomicInteger(1)
+                override def newThread(r: Runnable): Thread =
+                  new Thread(r, "upload-worker-GoogleCloud-" + threadNumber.getAndIncrement())
               })
-              Futures.awaitAll(DTimeout.longest, futures: _*).forall(_ == Some(true))
+              val futures = files.map(file => executor.schedule(new Runnable {
+                def run = ExceptionHandler.retry[Unit](retry) {
+                  log.debug("trying to upload " + file.getName)
+                  val uri = new URI(Seq(uploadURL, bucket, URLEncoder.encode(prefix + file.getName, "utf-8")).mkString("/"))
+                  val httpput = new HttpPut(uri.getPath())
+                  httpput.setHeader("x-goog-api-version", "2")
+                  httpput.setHeader("Authorization", "OAuth " + token.access_token)
+                  val source = scala.io.Source.fromFile(file)(scala.io.Codec.ISO8859)
+                  val byteArray = source.map(_.toByte).toArray
+                  source.close()
+                  httpput.setEntity(new ByteArrayEntity(byteArray))
+                  // guard httpclient.execute
+                  val future = Futures.future { httpclient.execute(host, httpput) }
+                  Futures.awaitAll(DTimeout.long, future).head match {
+                    case Some(result) =>
+                      val response = result.asInstanceOf[HttpResponse]
+                      val entity = response.getEntity()
+                      entity.consumeContent
+                      httpclient.getConnectionManager.closeExpiredConnections
+                      log.debug(uri + " result: " + response.getStatusLine())
+                      response.getStatusLine().getStatusCode() match {
+                        case 200 =>
+                          log.info("upload " + file.getName + " successful")
+                          callback
+                        case _ =>
+                          log.warn("upload " + file.getName + " failed")
+                          throw new RuntimeException("upload " + file.getName + " failed")
+                      }
+                    case None =>
+                      log.warn("upload " + file.getName + " failed, timeout")
+                      httpclient.getConnectionManager.closeExpiredConnections
+                      throw new RuntimeException("upload " + file.getName + " failed, timeout")
+                  }
+                }
+              }, 0, TimeUnit.MILLISECONDS))
+              executor.shutdown() // gracefully shutting down executor
+              executor.awaitTermination(DTimeout.longest, TimeUnit.MILLISECONDS)
             } catch {
               case e =>
                 log.warn("unable to upload: ", e.getMessage)

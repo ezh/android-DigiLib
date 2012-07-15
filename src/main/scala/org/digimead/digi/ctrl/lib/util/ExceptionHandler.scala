@@ -60,6 +60,7 @@ object ExceptionHandler extends Logging {
       case Some(x) => x
       case None =>
         if (timeout >= 0) Thread.sleep(timeout)
+        log.warn("retry #" + (n - (n - 1)))
         retry(n - 1, timeout)(fn)
     }
   }

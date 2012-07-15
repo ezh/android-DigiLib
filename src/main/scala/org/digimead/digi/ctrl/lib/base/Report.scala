@@ -25,12 +25,12 @@ import java.io.FilenameFilter
 import java.io.OutputStream
 import java.util.Date
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.GZIPOutputStream
 
 import scala.Array.canBuildFrom
 import scala.Option.option2Iterable
 import scala.actors.Futures
-import scala.actors.threadpool.AtomicInteger
 import scala.collection.JavaConversions._
 import scala.util.control.ControlThrowable
 
@@ -190,8 +190,10 @@ object Report extends Logging {
     // delete log files
     val logKeepTraces = traceFiles.take(keepTrcFiles).map(t => {
       val name = t._1
-      name.substring(name.length - name.reverse.takeWhile(_ != '-').length - 1)
-    }).distinct
+      val traceSuffix = name.substring(name.length - name.reverse.takeWhile(_ != '-').length - 1)
+      Array(traceSuffix.takeWhile(_ != '.') + "." + logFilePrefix + logFileExtension,
+        traceSuffix.takeWhile(_ != '.') + "." + logFilePrefix + "z" + logFileExtension)
+    }).flatten.distinct
     val logFiles = files.filter(_._1.endsWith(logFileExtension)).sortBy(_._1).reverse
     // keep all log files with PID == last run
     val logKeep = logFiles.take(keepLogFiles).map(_._1 match {

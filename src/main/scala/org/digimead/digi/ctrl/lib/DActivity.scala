@@ -80,6 +80,7 @@ trait DActivity extends AnyBase with Logging {
     log.trace("Activity::onResumeExt")
     onResumeBase(activity)
     Report.searchAndSubmitLock.set(false)
+    Report.submitInProgressLock.set(false)
     AppComponent.Inner.lockRotationCounter.set(0)
     AppComponent.Inner.resetDialogSafe
   }
