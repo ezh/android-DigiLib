@@ -1,0 +1,196 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>org.digimead.digi.ctrl.lib.info</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../../../../../lib/template.css" />
+      <script type="text/javascript" src="../../../../../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../../../../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../../../../../lib/template.js"></script>
+      <script type="text/javascript" src="../../../../../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body onload="sh_highlightDocument('../lib/', '.min.js');" class="value">
+      <div id="definition">
+        <img src="../../../../../../lib/package_big.png" />
+        <p id="owner"><a name="org" class="extype" href="../../../../../package.html">org</a>.<a name="org.digimead" class="extype" href="../../../../package.html">digimead</a>.<a name="org.digimead.digi" class="extype" href="../../../package.html">digi</a>.<a name="org.digimead.digi.ctrl" class="extype" href="../../package.html">ctrl</a>.<a name="org.digimead.digi.ctrl.lib" class="extype" href="../package.html">lib</a></p>
+        <h1>info</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">info</span>
+      </span>
+      </h4>
+      
+      <div class="fullcommenttop" id="comment"></div>
+    
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ComponentInfo" data-isabs="false">
+      <a id="ComponentInfo:ComponentInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ComponentInfo.html"><span class="name">ComponentInfo</span></a><span class="params">(<span name="id">id: String</span>, <span name="name">name: String</span>, <span name="version">version: String</span>, <span name="description">description: String</span>, <span name="project">project: String</span>, <span name="thumb">thumb: Option[Array[Byte]]</span>, <span name="origin">origin: String</span>, <span name="license">license: String</span>, <span name="email">email: String</span>, <span name="iconHDPI">iconHDPI: Option[Array[Byte]]</span>, <span name="iconLDPI">iconLDPI: Option[Array[Byte]]</span>, <span name="iconMDPI">iconMDPI: Option[Array[Byte]]</span>, <span name="iconXHDPI">iconXHDPI: Option[Array[Byte]]</span>, <span name="market">market: String</span>, <span name="componentPackage">componentPackage: String</span>)</span><span class="result"> extends Parcelable with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ComponentState" data-isabs="false">
+      <a id="ComponentState:ComponentState"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ComponentState.html"><span class="name">ComponentState</span></a><span class="params">(<span name="componentPackage">componentPackage: String</span>, <span name="executableState">executableState: List[ExecutableState]</span>, <span name="state">state: Value</span>, <span name="reason">reason: Option[String]</span>, <span name="execPath">execPath: String</span>, <span name="dataPath">dataPath: String</span>, <span name="enabled">enabled: Boolean</span>, <span name="serviceState">serviceState: Value</span>, <span name="serviceBusy">serviceBusy: Boolean</span>)</span><span class="result"> extends Parcelable with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ExecutableInfo" data-isabs="false">
+      <a id="ExecutableInfo:ExecutableInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutableInfo.html"><span class="name">ExecutableInfo</span></a><span class="params">(<span name="executableID">executableID: Int</span>, <span name="commandLine">commandLine: Option[Seq[String]]</span>, <span name="port">port: Option[Int]</span>, <span name="env">env: Seq[String]</span>, <span name="state">state: Value</span>, <span name="name">name: String</span>, <span name="version">version: String</span>, <span name="description">description: String</span>, <span name="origin">origin: String</span>, <span name="license">license: String</span>, <span name="project">project: String</span>)</span><span class="result"> extends Parcelable with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ExecutableState" data-isabs="false">
+      <a id="ExecutableState:ExecutableState"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutableState.html"><span class="name">ExecutableState</span></a><span class="params">(<span name="id">id: Int</span>, <span name="commandLine">commandLine: Option[Seq[String]]</span>, <span name="port">port: Option[Int]</span>, <span name="env">env: Seq[String]</span>, <span name="state">state: Value</span>)</span><span class="result"> extends Parcelable with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.UserInfo" data-isabs="false">
+      <a id="UserInfo:UserInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="UserInfo.html"><span class="name">UserInfo</span></a><span class="params">(<span name="name">name: String</span>, <span name="password">password: String</span>, <span name="home">home: String</span>, <span name="enabled">enabled: Boolean</span>)</span><span class="result"> extends Parcelable with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ComponentInfo" data-isabs="false">
+      <a id="ComponentInfo:ComponentInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ComponentInfo$.html"><span class="name">ComponentInfo</span></a><span class="result"> extends Logging with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ComponentState" data-isabs="false">
+      <a id="ComponentState:ComponentState"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ComponentState$.html"><span class="name">ComponentState</span></a><span class="result"> extends Logging with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ExecutableInfo" data-isabs="false">
+      <a id="ExecutableInfo:ExecutableInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutableInfo$.html"><span class="name">ExecutableInfo</span></a><span class="result"> extends Logging with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.ExecutableState" data-isabs="false">
+      <a id="ExecutableState:ExecutableState"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ExecutableState$.html"><span class="name">ExecutableState</span></a><span class="result"> extends Logging with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.digimead.digi.ctrl.lib.info.UserInfo" data-isabs="false">
+      <a id="UserInfo:UserInfo"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="UserInfo$.html"><span class="name">UserInfo</span></a><span class="result"> extends Logging with Serializable</span>
+      </span>
+      </h4>
+      
+    </li></ol>
+            </div>
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>
