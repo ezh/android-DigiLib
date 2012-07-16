@@ -84,7 +84,7 @@ object Hash {
    * md5-encoded password hash from a plaintext password and a
    * salt.</p>
    *
-   * <p>The resulting string will be in the form '$1$&lt;salt&gt;$&lt;hashed mess&gt;</p>
+   * <p>The resulting string will be in the form '\$1$&lt;salt&gt;$&lt;hashed mess&gt;'</p>
    *
    * @param password Plaintext password
    *
@@ -104,10 +104,10 @@ object Hash {
    * md5-encoded password hash from a plaintext password and a
    * salt.</p>
    *
-   * <p>The resulting string will be in the form '$1$&lt;salt&gt;$&lt;hashed mess&gt;</p>
+   * <p>The resulting string will be in the form '\$1$&lt;salt&gt;$&lt;hashed mess&gt;'</p>
    *
    * @param password Plaintext password
-   * @param salt A short string to use to randomize md5.  May start with $1$, which
+   * @param salt A short string to use to randomize md5.  May start with \$1$, which
    *             will be ignored.  It is explicitly permitted to pass a pre-existing
    *             MD5Crypt'ed password entry as the salt.  crypt() will strip the salt
    *             chars out properly.
@@ -121,7 +121,7 @@ object Hash {
    * md5-encoded password hash from a plaintext password and a
    * salt.</p>
    *
-   * <p>The resulting string will be in the form '$apr1$&lt;salt&gt;$&lt;hashed mess&gt;</p>
+   * <p>The resulting string will be in the form '\$apr1$&lt;salt&gt;$&lt;hashed mess&gt;'</p>
    *
    * @param password Plaintext password
    *
@@ -141,10 +141,10 @@ object Hash {
    * md5-encoded password hash from a plaintext password and a
    * salt.</p>
    *
-   * <p>The resulting string will be in the form '$apr1$&lt;salt&gt;$&lt;hashed mess&gt;</p>
+   * <p>The resulting string will be in the form '\$apr1$&lt;salt&gt;$&lt;hashed mess&gt;'</p>
    *
-   * @param password Plaintext password
-   * @param salt A short string to use to randomize md5.  May start with $apr1$, which
+   * param password Plaintext password
+   * param salt A short string to use to randomize md5.  May start with \$apr1$, which
    *             will be ignored.  It is explicitly permitted to pass a pre-existing
    *             MD5Crypt'ed password entry as the salt.  crypt() will strip the salt
    *             chars out properly.
@@ -157,18 +157,18 @@ object Hash {
    * <p>This method actually generates md5-encoded password hash from
    * a plaintext password, a salt, and a magic string.</p>
    *
-   * <p>There are two magic strings that make sense to use here.. '$1$' is the
+   * <p>There are two magic strings that make sense to use here.. '\$1$' is the
    * magic string used by the FreeBSD/Linux/OpenBSD MD5Crypt algorithm, and
-   * '$apr1$' is the magic string used by the Apache MD5Crypt algorithm.</p>
+   * '\$apr1$' is the magic string used by the Apache MD5Crypt algorithm.</p>
    *
    * <p>The resulting string will be in the form '&lt;magic&gt;&lt;salt&gt;$&lt;hashed mess&gt;</p>
    *
-   * @param password Plaintext password
-   * @param salt A short string to use to randomize md5.  May start
+   * param password Plaintext password
+   * param salt A short string to use to randomize md5.  May start
    * with the magic string, which will be ignored.  It is explicitly
    * permitted to pass a pre-existing MD5Crypt'ed password entry as
    * the salt.  crypt() will strip the salt chars out properly.
-   * @param magic Either "$apr1$" or "$1$", which controls whether we
+   * param magic Either "\$apr1$" or "\$1$", which controls whether we
    * are doing Apache-style or FreeBSD-style md5Crypt.
    *
    * @return An md5-hashed password string.
