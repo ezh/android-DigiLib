@@ -46,6 +46,8 @@ case class ComponentInfo(val id: String, // unique string / primary key
   val version: String, // Version Not Serializable
   val description: String,
   val project: String, // Uri Not Serializable
+  val translation: String, // Uri Not Serializable
+  val translationCommon: String, // Uri Not Serializable
   val thumb: Option[Array[Byte]], // Bitmap Not Serializable
   val origin: String,
   val license: String,
@@ -61,6 +63,8 @@ case class ComponentInfo(val id: String, // unique string / primary key
     version = in.readString,
     description = in.readString,
     project = in.readString,
+    translation = in.readString,
+    translationCommon = in.readString,
     thumb = {
       val dataLength = in.readInt
       if (dataLength < 0) {
@@ -129,6 +133,8 @@ case class ComponentInfo(val id: String, // unique string / primary key
     out.writeString(version)
     out.writeString(description)
     out.writeString(project)
+    out.writeString(translation)
+    out.writeString(translationCommon)
     thumb match {
       case Some(thumb) =>
         out.writeInt(thumb.length)
@@ -176,6 +182,8 @@ case class ComponentInfo(val id: String, // unique string / primary key
       "Version: " + version,
       "Description: " + description,
       "Project: " + project,
+      "Translation: " + translation,
+      "Translation(common): " + translationCommon,
       "Market: " + market,
       "License: " + license,
       "E-Mail: " + email,
@@ -219,6 +227,8 @@ object ComponentInfo extends Logging {
     val version = check(Check.Version("version"), xml \\ "version" headOption)
     val description = check(Check.Text("description"), suitable(xml \\ "description", locale, localeLanguage))
     val project = future { check(Check.URL("project"), xml \\ "project" headOption) }
+    val translation = future { check(Check.URL("translation"), xml \\ "translation" headOption) }
+    val translationCommon = future { check(Check.URL("translation-common"), xml \\ "translation-common" headOption) }
     val thumb = future { check(Check.URL("thumb"), xml \\ "thumb" headOption) }
     val origin = check(Check.Text("origin"), xml \\ "origin" headOption)
     val license = check(Check.Text("license"), xml \\ "license" headOption)
@@ -236,6 +246,8 @@ object ComponentInfo extends Logging {
       version <- version
       description <- description
       project <- project()
+      translation <- translation()
+      translationCommon <- translationCommon()
       thumb <- thumb()
       origin <- origin
       license <- license
@@ -250,16 +262,16 @@ object ComponentInfo extends Logging {
       log.debug("create FetchedItem from descriptor")
       val Seq(thumbIcon, iconLDPI, iconMDPI, iconHDPI, iconXHDPI) =
         iconExtractor(Seq((Thumbnail, thumb), (LDPI, icon_ldpi), (MDPI, icon_mdpi), (HDPI, icon_hdpi), (XHDPI, icon_xhdpi)))
-      new ComponentInfo(id, name, version, description, project,
-        thumbIcon, origin, license, email, iconHDPI, iconLDPI,
-        iconMDPI, iconXHDPI, market, packageName)
+      new ComponentInfo(id, name, version, description, project, translation, translationCommon,
+        thumbIcon, origin, license, email, iconHDPI, iconLDPI, iconMDPI, iconXHDPI, market, packageName)
     })
     if (artifact == None)
       log.warn("broken descriptor > " + Seq("id: ", id, ", name: ", name, ", version: ", version,
-        ", description: ", description, ", project: ", project, ", thumb: ", thumb,
+        ", description: ", description, ", project: ", project(), ", translation: ", translation(),
+        ", translationCommon: ", translationCommon(), " thumb: ", thumb(),
         ", origin: ", origin, ", license: ", license, ", email: ", email,
-        ", icon-hdpi: ", icon_hdpi, ", icon-ldpi: ", icon_ldpi, ", icon-mdpi: ", icon_mdpi,
-        ", icon-xhdpi: ", icon_xhdpi, ", market: ", market, ", package-name: ", packageName).mkString)
+        ", icon-hdpi: ", icon_hdpi(), ", icon-ldpi: ", icon_ldpi(), ", icon-mdpi: ", icon_mdpi(),
+        ", icon-xhdpi: ", icon_xhdpi(), ", market: ", market, ", package-name: ", packageName).mkString)
     artifact
   } catch {
     case e =>

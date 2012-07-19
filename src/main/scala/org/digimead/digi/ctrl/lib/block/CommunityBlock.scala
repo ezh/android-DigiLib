@@ -43,19 +43,19 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 
-// TODO ui translation help: LANG as link
-// TODO documentation translation help: LANG as link
-// TODO web page/description translation help: LANG as link
-class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
-  val wikiUri: Option[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri: Option[Uri], val translationUri: Option[Uri],
+  val translationCommonUri: Option[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
   val itemXDA = CommunityBlock.Item(Android.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
     Android.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
   val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
     Android.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
-  val itemTranslate = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translate"),
-    Android.getString(context, "block_community_translate_description").getOrElse("add new or improve translation"), "ic_block_community_translate")
-  val items = Seq() ++ (if (xdaUri != None) Seq(itemXDA) else Seq()) ++
-    (if (wikiUri != None) Seq(itemWiki) else Seq())
+  val itemTranslation = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translation of %s").
+    format(Android.getString(context, "app_name").getOrElse("Unknown")),
+    Android.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
+  val itemTranslationCommon = CommunityBlock.Item(Android.getString(context, "block_community_translate_title").getOrElse("translation of %s").format("DigiLib"),
+    Android.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
+  val items = Seq() ++ (if (xdaUri != None) Seq(itemXDA) else Seq()) ++ (if (wikiUri != None) Seq(itemWiki) else Seq()) ++
+    (if (translationUri != None) Seq(itemTranslation) else Seq()) ++ (if (translationCommonUri != None) Seq(itemTranslationCommon) else Seq())
   private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
     inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new CommunityBlock.Adapter(context, Android.getId(context, "block_list_item", "layout"), items)
@@ -95,6 +95,32 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
           case e =>
             IAmYell("Unable to open wiki page: " + wikiUri.get, e)
         }
+      case this.itemTranslation => // jump to translation
+        log.debug("open translation page at " + translationUri.get)
+        try {
+          val intent = new Intent(Intent.ACTION_VIEW, translationUri.get)
+          intent.addCategory(Intent.CATEGORY_BROWSABLE)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
+        } catch {
+          case e =>
+            IAmYell("Unable to open translation page: " + translationUri.get, e)
+        }
+      case this.itemTranslationCommon => // jump to common translation
+        log.debug("open common translation page at " + translationCommonUri.get)
+        try {
+          val intent = new Intent(Intent.ACTION_VIEW, translationCommonUri.get)
+          intent.addCategory(Intent.CATEGORY_BROWSABLE)
+          AppComponent.Context match {
+            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          }
+        } catch {
+          case e =>
+            IAmYell("Unable to open common translation page: " + translationCommonUri.get, e)
+        }
     }
   }
   @Loggable
@@ -114,6 +140,16 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
         menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
           Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case this.itemWiki =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
+      case this.itemTranslation =>
+        menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
+          Android.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
+          Android.getString(context, "block_link_send").getOrElse("Send link to ..."))
+      case this.itemTranslationCommon =>
         menu.add(Menu.NONE, Android.getId(context, "block_link_copy"), 1,
           Android.getString(context, "block_link_copy").getOrElse("Copy link"))
         menu.add(Menu.NONE, Android.getId(context, "block_link_send"), 2,
@@ -141,6 +177,26 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri],
             Block.copyLink(context, item, wikiUri.get.toString)
           case id if id == Android.getId(context, "block_link_send") =>
             Block.sendLink(context, item, item.name, wikiUri.get.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        }
+      case this.itemTranslation =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, translationUri.get.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, translationUri.get.toString)
+          case message =>
+            log.fatal("skip unknown message " + message)
+            false
+        }
+      case this.itemTranslationCommon =>
+        menuItem.getItemId match {
+          case id if id == Android.getId(context, "block_link_copy") =>
+            Block.copyLink(context, item, translationCommonUri.get.toString)
+          case id if id == Android.getId(context, "block_link_send") =>
+            Block.sendLink(context, item, item.name, translationCommonUri.get.toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false
