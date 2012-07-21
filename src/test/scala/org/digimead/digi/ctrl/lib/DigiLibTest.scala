@@ -35,6 +35,7 @@ class DigiLibTest
   def testHelloWorld() {
     android.util.Log.i("DigiLibTest", "testHelloWorld BEGIN")
     activity.log.warn("testHelloWorld BEGIN")
+    AnyBase.ppGroup.names.toSeq.sorted.foreach(name => activity.log.debug(AnyBase.ppGroup.snapshot(name).toShortString))
 
     true should be(true)
 

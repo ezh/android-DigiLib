@@ -39,6 +39,8 @@ import android.app.Activity
 import android.app.Service
 import android.content.Context
 import android.os.Handler
+import android.os.Looper
+import stopwatch.StopwatchGroup
 
 private[lib] trait AnyBase extends Logging {
   protected def onCreateBase(context: Context, callSuper: => Any = {}) = AnyBase.synchronized {
@@ -77,7 +79,22 @@ private[lib] trait AnyBase extends Logging {
   }
 }
 
+/**
+ * Digi base singleton
+ *
+ * @note startup duration is around 500ms
+ */
 object AnyBase extends Logging {
+  /** profiling */
+  val (ppGroup, ppStartup, ppLoading) = {
+    val group = new StopwatchGroup("DigiLib")
+    group.enabled = true
+    group.enableOnDemand = true
+    (group, group.start("startup"), group.start("AnyBase$"))
+  }
+  System.setProperty("actors.enableForkJoin", "false")
+  System.setProperty("actors.corePoolSize", "16")
+  System.setProperty("actors.maxPoolSize", "16")
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)
@@ -85,56 +102,69 @@ object AnyBase extends Logging {
   @volatile private var onShutdownProtect = new WeakReference[Activity](null)
   private val onShutdownState = new SyncVar[ShutdownState]() // string - cancel reason
   private val handler = new Handler() // bound to the current thread (UI)
+  // heavy weight: scheduler 200ms, log 70ms
+  private val weakScheduler = {
+    val previousPriority = Thread.currentThread.getPriority
+    Thread.currentThread.setPriority(Thread.MAX_PRIORITY)
+    val scheduler = DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler]
+    log.debug("set default scala actors scheduler to " + scheduler.getClass.getName() + " "
+      + scheduler.toString + "[name,priority,group]")
+    log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(scheduler) +
+      ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(scheduler))
+    log.debug("adjust UI thread priority %d -> %d".format(previousPriority, Thread.currentThread.getPriority))
+  }
+  val uiThreadID: Long = Looper.getMainLooper.getThread.getId
   val info = new SyncVar[Option[Info]]
   info.set(None)
-  System.setProperty("actors.enableForkJoin", "false")
-  System.setProperty("actors.corePoolSize", "16")
-  System.setProperty("actors.maxPoolSize", "16")
-  val previousPriority = Thread.currentThread.getPriority
-  Thread.currentThread.setPriority(Thread.MAX_PRIORITY)
-  private val weakScheduler = new WeakReference(DaemonScheduler.impl.asInstanceOf[ResizableThreadPoolScheduler])
-  log.debug("set default scala actors scheduler to " + weakScheduler.get.get.getClass.getName() + " "
-    + weakScheduler.get.get.toString + "[name,priority,group]")
-  log.debug("scheduler corePoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerCoreSize(weakScheduler.get.get) +
-    ", maxPoolSize = " + scala.actors.HackDoggyCode.getResizableThreadPoolSchedulerMaxSize(weakScheduler.get.get))
-  log.debug("adjust UI thread priority %d -> %d".format(previousPriority, Thread.currentThread.getPriority))
+  ppLoading.stop
+
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
-    log.debug("initialize AnyBase context " + context.getClass.getName)
-    reset(context, "init")
-    AppComponent.resurrect()
-    AppControl.resurrect()
-    context match {
-      case activity: DActivity =>
-        if (!contextPool.exists(_.get == Some(context))) {
-          contextPool = contextPool :+ new WeakReference(context)
-          updateContext()
-          if (contextPool.isEmpty)
-            AppComponent.init(context)
-        }
-      case service: DService =>
-        if (!contextPool.exists(_.get == Some(context))) {
-          contextPool = contextPool :+ new WeakReference(context)
-          updateContext()
-          if (contextPool.isEmpty)
-            AppControl.init(context)
-        }
-      case context =>
-        // all other contexts are temporary, look at isLastContext
-        if (!contextPool.exists(_.get == Some(context)))
-          contextPool = contextPool :+ new WeakReference(context)
-        if (stackTraceOnUnknownContext)
-          log.fatal("init from unknown context " + context)
-    }
-    if (AppComponent.Inner == null)
-      AppComponent.init(context)
-    if (AppControl.Inner == null)
-      AppControl.init(context)
     if (AnyBase.info.get == None) {
-      Info.init(context)
-      Logging.init(context)
-      Report.init(context)
-      uncaughtExceptionHandler.register(context)
-      log.debug("start AppComponent singleton actor")
+      // dump profiling at startup
+      ppStartup.stop
+      ppGroup.names.toSeq.sorted.foreach(name => log.debug(ppGroup.snapshot(name).toShortString))
+    }
+    ppGroup("AnyBase.init") {
+      log.debug("initialize AnyBase context " + context.getClass.getName)
+      ppGroup("AnyBase.init.A resurrect objects") { reset(context, "init") }
+      ppGroup("AnyBase.init.B initialize object from context") {
+        context match {
+          case activity: DActivity =>
+            if (!contextPool.exists(_.get == Some(context))) {
+              contextPool = contextPool :+ new WeakReference(context)
+              updateContext()
+              if (contextPool.isEmpty)
+                AppComponent.init(context)
+            }
+          case service: DService =>
+            if (!contextPool.exists(_.get == Some(context))) {
+              contextPool = contextPool :+ new WeakReference(context)
+              updateContext()
+              if (contextPool.isEmpty)
+                AppControl.init(context)
+            }
+          case context =>
+            // all other contexts are temporary, look at isLastContext
+            if (!contextPool.exists(_.get == Some(context)))
+              contextPool = contextPool :+ new WeakReference(context)
+            if (stackTraceOnUnknownContext)
+              log.fatal("init from unknown context " + context)
+        }
+      }
+      ppGroup("AnyBase.init.C initialize companion object") {
+        if (AppComponent.Inner == null)
+          AppComponent.init(context)
+        if (AppControl.Inner == null)
+          AppControl.init(context)
+      }
+      if (AnyBase.info.get == None)
+        ppGroup("AnyBase.init.D initialize AnyBase") {
+          Info.init(context)
+          Logging.init(context)
+          Report.init(context)
+          uncaughtExceptionHandler.register(context)
+          log.debug("start AppComponent singleton actor")
+        }
     }
   }
   def deinit(context: Context): Unit = synchronized {
@@ -307,16 +337,24 @@ object AnyBase extends Logging {
     AppControl.resurrect(true)
   }
   @Loggable
-  private def reset(context: Context, reason: String): Unit = {
+  private def reset(context: Context, reason: String): Unit = synchronized {
     AnyBase.cancelOnShutdownTimer(context, reason)
-    if (AppComponent.Inner != null) {
-      AppComponent.Inner.state.resetBusyCounter
-      context match {
-        case component: DActivity =>
-          if (AppComponent.Inner.activitySafeDialog.isSet)
-            AppComponent.Inner.activitySafeDialog.unset()
-        case _ =>
-      }
+    Option(AppComponent.Inner) match {
+      case Some(inner) =>
+        inner.state.resetBusyCounter
+        context match {
+          case component: DActivity =>
+            if (inner.activitySafeDialog.isSet)
+              inner.activitySafeDialog.unset()
+            inner.bindedICtrlPool.keys.foreach(key => {
+              inner.bindedICtrlPool.remove(key).map(record => {
+                log.debug("remove service connection to " + key + " from bindedICtrlPool")
+                record._1.unbindService(record._2)
+              })
+            })
+          case _ =>
+        }
+      case None =>
     }
   }
   case class Info(val reportPathInternal: File,

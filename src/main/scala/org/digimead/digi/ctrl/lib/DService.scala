@@ -21,9 +21,17 @@ import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.app.Service
 
+/**
+ * DigiLib primary service class trait 
+ */
 trait DService extends AnyBase with Logging {
   /*
-   * sometimes in life cycle onCreate stage invoked without onDestroy stage
+   * sometimes in an application life cycle onCreate method invoked without onDestroy phase
+   */
+  /**
+   * extend android onCreate method
+   * 
+   * @note 
    */
   def onCreateExt(service: Service): Unit = {
     log.trace("Service::onCreateExt")
@@ -33,8 +41,18 @@ trait DService extends AnyBase with Logging {
    * sometimes in life cycle onCreate stage invoked without onDestroy stage
    * in fact AppControl.deinit is sporadic event
    */
+  /**
+   * extend android onCreate method
+   */
   def onDestroyExt(service: Service): Unit = {
     log.trace("Service::onDestroyExt")
     onDestroyBase(service)
   }
+}
+
+/** DigiLib primary service support singleton */
+object DService {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("DService$")
+  ppLoading.stop
 }

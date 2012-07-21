@@ -59,11 +59,17 @@ import android.content.pm.PackageManager
 import android.os.Environment
 import android.os.IBinder
 
+/**
+ * Common routines and utilites
+ */
 object Common extends Logging {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("Common$")
+  /** common date time format for Digi applications */
   private lazy val df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSZ")
+  /** flag that prevent use of the external storage */
   @volatile private[util] var externalStorageDisabled: Option[Boolean] = None
-  AnyBase // init AnyBase before Common
-  log.debug("alive")
+  ppLoading.stop
 
   def dateString(date: Date) = df.format(date)
   def dateFile(date: Date) = dateString(date).replaceAll("""[:\.]""", "_").replaceAll("""\+""", "x")

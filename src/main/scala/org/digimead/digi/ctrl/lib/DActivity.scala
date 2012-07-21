@@ -48,6 +48,9 @@ import android.widget.TextView
 /*
  * trait hasn't ability to use @Loggable
  */
+/**
+ * DigiLib primary activity class trait 
+ */
 trait DActivity extends AnyBase with Logging {
   implicit val dispatcher: Dispatcher
   val onPrepareDialogStash = new HashMap[Int, Any]() with SynchronizedMap[Int, Any]
@@ -197,9 +200,13 @@ trait DActivity extends AnyBase with Logging {
   }
 }
 
+/** DigiLib primary activity support singleton */
 object DActivity extends Logging {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("DActivity$")
   /** BroadcastReceiver that recorded at registerReceiver/unregisterReceiver */
-  private val registeredReceivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
-  private val activeReceivers = new HashSet[BroadcastReceiver] with SynchronizedSet[BroadcastReceiver]
-  log.debug("alive")
+  private lazy val registeredReceivers = new HashMap[BroadcastReceiver, (IntentFilter, String, Handler)] with SynchronizedMap[BroadcastReceiver, (IntentFilter, String, Handler)]
+  /** BroadcastReceiver that listen broadcasts right now */
+  private lazy val activeReceivers = new HashSet[BroadcastReceiver] with SynchronizedSet[BroadcastReceiver]
+  ppLoading.stop
 }

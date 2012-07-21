@@ -46,6 +46,8 @@ import android.os.IBinder
 import android.os.Looper
 
 protected class AppControl private (packageName: String) extends Logging {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("AppControl")
   private val ctrlBindTimeout = DTimeout.short
   protected lazy val ready = new SyncVar[Option[ICtrlHost]]()
   protected[lib] lazy val ctrlBindContext = new AtomicReference[Context](null)
@@ -66,10 +68,9 @@ protected class AppControl private (packageName: String) extends Logging {
     }
   }
   private val rebindInProgressLock = new AtomicBoolean(false)
-  private val uiThreadID = Looper.getMainLooper.getThread.getId
   private val internalDirectory = new AtomicReference[File](null)
   private val externalDirectory = new AtomicReference[File](null) // sdcard
-  log.debug("alive")
+  ppLoading.stop
 
   /*
    * None - unknown
@@ -102,7 +103,7 @@ protected class AppControl private (packageName: String) extends Logging {
     AppControl.bindStub(ctrlBindContext, ready, ctrlConnection, error)
   @Loggable
   def bind(caller: Context, allowCallFromUI: Boolean = false): Unit = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("call AppControl function from UI thread")
     AppControl.bind(caller, ctrlBindContext, ready, ctrlConnection)
   }
@@ -112,7 +113,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable
   protected def rebind(timeout: Long, allowCallFromUI: Boolean = false): Option[ICtrlHost] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("call AppControl function from UI thread")
     // rebind only in we already have connection to ICtrlHost
     if (ctrlBindContext.get != null && AppControl.isICtrlHostInstalled(ctrlBindContext.get)) {
@@ -160,7 +161,7 @@ protected class AppControl private (packageName: String) extends Logging {
     } orElse Option(internalDirectory.get())
   @Loggable(result = false)
   def callListDirectories(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[(String, String)]] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callListDirectories AppControl function from UI thread")
     val t = new Throwable("Intospecting callListDirectories")
     t.fillInStackTrace()
@@ -180,7 +181,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callEnable(componentPackage: String, flag: Boolean, allowCallFromUI: Boolean = false): Future[_] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callStart AppControl function from UI thread")
     val t = new Throwable("Intospecting callEnable")
     t.fillInStackTrace()
@@ -195,7 +196,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callReset(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callReset AppControl function from UI thread")
     val t = new Throwable("Intospecting callReset")
     t.fillInStackTrace()
@@ -210,7 +211,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callStart(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callStart AppControl function from UI thread")
     val t = new Throwable("Intospecting callStart")
     t.fillInStackTrace()
@@ -225,7 +226,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callStatus(componentPackage: String, allowCallFromUI: Boolean = false): Future[Either[String, ComponentState]] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callStatus AppControl function from UI thread")
     val t = new Throwable("Intospecting callStatus")
     t.fillInStackTrace()
@@ -261,7 +262,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callStop(componentPackage: String, allowCallFromUI: Boolean = false): Future[Boolean] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callStop AppControl function from UI thread")
     val t = new Throwable("Intospecting callStop")
     t.fillInStackTrace()
@@ -276,7 +277,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callDisconnect(componentPackage: String, processID: Int, connectionID: Int, allowCallFromUI: Boolean = false): Future[Boolean] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callDisconnect AppControl function from UI thread")
     val t = new Throwable("Intospecting callDisconnect")
     t.fillInStackTrace()
@@ -291,7 +292,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callListActiveInterfaces(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[String]]] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callListActiveInterfaces AppControl function from UI thread")
     val t = new Throwable("Intospecting callListActiveInterfaces")
     t.fillInStackTrace()
@@ -311,7 +312,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callListPendingConnections(componentPackage: String, allowCallFromUI: Boolean = false): Future[Option[Seq[Intent]]] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callListPendingConnections AppControl function from UI thread")
     val t = new Throwable("Intospecting callListPendingConnections")
     t.fillInStackTrace()
@@ -331,7 +332,7 @@ protected class AppControl private (packageName: String) extends Logging {
   }
   @Loggable(result = false)
   def callUpdateShutdownTimer(componentPackage: String, remain_mseconds: Long, allowCallFromUI: Boolean = false): Future[Unit] = {
-    if (!allowCallFromUI && Thread.currentThread.getId == uiThreadID)
+    if (!allowCallFromUI && Thread.currentThread.getId == AnyBase.uiThreadID)
       log.fatal("callUpdateShutdownTimer AppControl function from UI thread")
     val t = new Throwable("Intospecting callUpdateShutdownTimer")
     t.fillInStackTrace()
@@ -368,25 +369,31 @@ protected class AppControl private (packageName: String) extends Logging {
 }
 
 object AppControl extends Logging {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("AppComponent$")
+  /** AppControl internal singleton */
   @volatile private var inner: AppControl = null
+  /** deinitialization flag that lock on deinit routine */
   private[base] val deinitializationLock = new SyncVar[Boolean]()
-  private val deinitializationInProgressLock = new AtomicBoolean(false)
   deinitializationLock.set(false)
-  log.debug("alive")
+  ppLoading.stop
 
   @Loggable
-  private[lib] def init(root: Context, _inner: AppControl = null) = {
-    deinitializationLock.set(false) // cancel deinitialization sequence if any
-    initRoutine(root, _inner)
-  }
-  private[lib] def initRoutine(root: Context, _inner: AppControl) = synchronized {
-    if (inner != null) {
-      log.info("reinitialize AppControl core subsystem for " + root.getPackageName())
-      inner = _inner
-    } else {
-      log.info("initialize AppControl for " + root.getPackageName())
-      inner = new AppControl(root.getPackageName())
+  private[lib] def init(root: Context, _inner: AppControl = null) = deinitializationLock.synchronized {
+    AnyBase.ppGroup("AppControl.init") {
+      deinitializationLock.set(false) // cancel deinitialization sequence if any
+      initRoutine(root, _inner)
     }
+  }
+  private[lib] def initRoutine(root: Context, _inner: AppControl) = {
+    if (inner != null)
+      log.info("reinitialize AppControl core subsystem for " + root.getPackageName())
+    else
+      log.info("initialize AppControl for " + root.getPackageName())
+    if (_inner != null)
+      inner = _inner
+    else
+      inner = new AppControl(root.getPackageName())
   }
   private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationLock.synchronized {
     if (deinitializationLock.get(0) != Some(false)) {
@@ -397,50 +404,30 @@ object AppControl extends Logging {
         if (!supressEvent)
           try { AppComponent.publish(AppComponent.Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
-    if (deinitializationInProgressLock.get) {
-      Thread.sleep(100) // unoffending delay
-      deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get) {
-          log.debug("deinitialization in progress, waiting...")
-          deinitializationInProgressLock.wait(1000)
-        }
-      }
-    }
   }
   private[lib] def deinit(): Unit = deinitializationLock.synchronized {
-    if (deinitializationInProgressLock.compareAndSet(false, true)) {
-      AnyBase.getContext match {
-        case Some(context) =>
-          val packageName = context.getPackageName()
-          if (deinitializationLock.isSet) {
-            deinitializationLock.unset()
-            log.info("deinitializing AppControl for " + packageName)
-            val timeout = AppComponent.deinitializationTimeout(context)
-            if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
-              try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-            Futures.future {
-              try {
-                deinitializationLock.get(timeout) match {
-                  case Some(false) =>
-                    log.info("deinitialization AppControl for " + packageName + " canceled")
-                  case _ =>
-                    deinitRoutine(packageName)
-                }
-              } finally {
-                deinitializationInProgressLock.synchronized {
-                  deinitializationInProgressLock.set(false)
-                  deinitializationInProgressLock.notifyAll
-                }
-              }
+    AnyBase.getContext match {
+      case Some(context) if deinitializationLock.isSet =>
+        val packageName = context.getPackageName()
+        if (deinitializationLock.isSet) {
+          deinitializationLock.unset()
+          log.info("deinitializing AppControl for " + packageName)
+          val timeout = AppComponent.deinitializationTimeout(context)
+          if (AppComponent.deinitializationLock.get(0) == Some(false)) // AppComponent active
+            try { AppComponent.publish(AppComponent.Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+          Futures.future {
+            deinitializationLock.get(timeout) match {
+              case Some(false) =>
+                log.info("deinitialization AppControl for " + packageName + " canceled")
+              case _ =>
+                deinitRoutine(packageName)
             }
           }
-        case None =>
-          log.fatal("unable to find deinitialization context")
-          deinitializationInProgressLock.synchronized {
-            deinitializationInProgressLock.set(false)
-            deinitializationInProgressLock.notifyAll
-          }
-      }
+        }
+      case Some(context) =>
+        log.debug("skip deinitialization, already in progress")
+      case None =>
+        log.fatal("unable to find deinitialization context")
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {

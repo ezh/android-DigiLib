@@ -66,7 +66,8 @@ import android.os.Bundle
 import android.os.Looper
 
 protected class AppComponent private () extends Logging {
-  private lazy val uiThreadID: Long = Looper.getMainLooper.getThread.getId
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("AppComponent")
   lazy val state = new AppComponent.StateContainer
   lazy val internalStorage = AppComponent.Context.flatMap(ctx => Option(ctx.getFilesDir()))
   // -rwx--x--x 711
@@ -84,65 +85,69 @@ protected class AppComponent private () extends Logging {
   } catch {
     case e => log.error(e.getMessage, e); None
   }
-  private[lib] val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
-  val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
-  private[lib] val lockRotationCounter = new AtomicInteger(0)
+  lazy val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+  private[lib] lazy val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
+  private[lib] lazy val lockRotationCounter = new AtomicInteger(0)
   private val isSafeDialogEnabled = new AtomicReference[Option[Boolean]](None)
-  private[lib] val activitySafeDialog = new AppComponent.SafeDialog
-  private val activitySafeDialogActor = new Actor {
-    def act = {
-      loop {
-        react {
-          case AppComponent.Message.ShowDialog(activity, tag, dialog, onDismiss) =>
-            val s = sender
-            log.info("receive message ShowDialog " + dialog)
-            // wait for previous dialog
-            log.debug("wait activitySafeDialog lock")
-            activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
-            // wait isSafeDialogEnabled
-            log.debug("wait isSafeDialogEnabled lock")
-            while (isSafeDialogEnabled.get match {
-              case Some(true) => show(activity, tag, dialog, onDismiss, s); false // show dialog and exit from loop
-              case Some(false) => true // wait
-              case None => resetDialogSafe; false // skip
-            }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
-            log.debug("wait isSafeDialogEnabled lock complete")
-          case AppComponent.Message.ShowDialogResource(activity, tag, dialog, args, onDismiss) =>
-            val s = sender
-            log.info("receive message ShowDialogResource " + dialog)
-            // wait for previous dialog
-            log.debug("wait activitySafeDialog lock")
-            activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
-            // wait isSafeDialogEnabled
-            log.debug("wait isSafeDialogEnabled lock")
-            while (isSafeDialogEnabled.get match {
-              case Some(true) => show(activity, tag, dialog, args, onDismiss, s); false // show dialog and exit from loop
-              case Some(false) => true // wait
-              case None => resetDialogSafe; false // skip
-            }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
-            log.debug("wait isSafeDialogEnabled lock complete")
-          case message: AnyRef =>
-            log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
-          case message =>
-            log.errorWhere("skip unknown message " + message)
+  private[lib] lazy val activitySafeDialog = new AppComponent.SafeDialog
+  private lazy val activitySafeDialogActor = {
+    val actor = new Actor {
+      def act = {
+        loop {
+          react {
+            case AppComponent.Message.ShowDialog(activity, tag, dialog, onDismiss) =>
+              val s = sender
+              log.info("receive message ShowDialog " + dialog)
+              // wait for previous dialog
+              log.debug("wait activitySafeDialog lock")
+              activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
+              // wait isSafeDialogEnabled
+              log.debug("wait isSafeDialogEnabled lock")
+              while (isSafeDialogEnabled.get match {
+                case Some(true) => show(activity, tag, dialog, onDismiss, s); false // show dialog and exit from loop
+                case Some(false) => true // wait
+                case None => resetDialogSafe; false // skip
+              }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
+              log.debug("wait isSafeDialogEnabled lock complete")
+            case AppComponent.Message.ShowDialogResource(activity, tag, dialog, args, onDismiss) =>
+              val s = sender
+              log.info("receive message ShowDialogResource " + dialog)
+              // wait for previous dialog
+              log.debug("wait activitySafeDialog lock")
+              activitySafeDialog.put(AppComponent.SafeDialogEntry(Some(tag), None, None)) // wait
+              // wait isSafeDialogEnabled
+              log.debug("wait isSafeDialogEnabled lock")
+              while (isSafeDialogEnabled.get match {
+                case Some(true) => show(activity, tag, dialog, args, onDismiss, s); false // show dialog and exit from loop
+                case Some(false) => true // wait
+                case None => resetDialogSafe; false // skip
+              }) isSafeDialogEnabled.synchronized { isSafeDialogEnabled.wait }
+              log.debug("wait isSafeDialogEnabled lock complete")
+            case message: AnyRef =>
+              log.errorWhere("skip unknown message " + message.getClass.getName + ": " + message)
+            case message =>
+              log.errorWhere("skip unknown message " + message)
+          }
         }
       }
+      private def show(activity: Activity, tag: String, dialog: () => Dialog, onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
+        val result = onMessageShowDialog(activity, tag, dialog, onDismiss)
+        log.debug("return from message ShowDialog with result " + result)
+        if (sender.receiver.getState == Actor.State.Blocked)
+          sender ! result // only for ShowDialogSafeWait
+      }
+      private def show(activity: Activity, tag: String, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
+        val result = onMessageShowDialogResource(activity, tag, dialog, args, onDismiss)
+        log.debug("return from message ShowDialog with result " + result)
+        if (sender.receiver.getState == Actor.State.Blocked)
+          sender ! result // only for ShowDialogSafeWait
+      }
     }
-    private def show(activity: Activity, tag: String, dialog: () => Dialog, onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
-      val result = onMessageShowDialog(activity, tag, dialog, onDismiss)
-      log.debug("return from message ShowDialog with result " + result)
-      if (sender.receiver.getState == Actor.State.Blocked)
-        sender ! result // only for ShowDialogSafeWait
-    }
-    private def show(activity: Activity, tag: String, dialog: Int, args: Option[Bundle], onDismiss: Option[() => Any], sender: OutputChannel[Any]) {
-      val result = onMessageShowDialogResource(activity, tag, dialog, args, onDismiss)
-      log.debug("return from message ShowDialog with result " + result)
-      if (sender.receiver.getState == Actor.State.Blocked)
-        sender ! result // only for ShowDialogSafeWait
-    }
+    actor.start
+    actor
   }
   log.debug("disable safe dialogs")
-  log.debug("alive")
+  ppLoading.stop
 
   def showDialogSafe(activity: Activity, tag: String, id: Int): Unit =
     showDialogSafe(activity, tag, id, null.asInstanceOf[Bundle])
@@ -164,8 +169,8 @@ protected class AppComponent private () extends Logging {
     showDialogSafeWait(activity, tag, id, null, onDismiss)
   @Loggable
   def showDialogSafeWait(activity: Activity, tag: String, id: Int, args: Bundle, onDismiss: () => Any): Option[Dialog] = try {
-    log.trace("Activity::showDialogSafe tag:%s id:%d at thread %l and ui %l ".format(tag, id, Thread.currentThread.getId, uiThreadID))
-    assert(uiThreadID != Thread.currentThread.getId && id != 0, { "unexpected thread == UI, " + Thread.currentThread.getId + " or id " + id })
+    log.trace("Activity::showDialogSafe tag:%s id:%d at thread %l and ui %l ".format(tag, id, Thread.currentThread.getId, AnyBase.uiThreadID))
+    assert(AnyBase.uiThreadID != Thread.currentThread.getId && id != 0, { "unexpected thread == UI, " + Thread.currentThread.getId + " or id " + id })
     (activitySafeDialogActor !? AppComponent.Message.ShowDialogResource(activity, tag, id, Option(args), Option(onDismiss))).asInstanceOf[Option[Dialog]]
   } catch {
     case e =>
@@ -183,8 +188,8 @@ protected class AppComponent private () extends Logging {
     showDialogSafeWait[T](activity, tag, dialog, null)
   @Loggable
   def showDialogSafeWait[T <: Dialog](activity: Activity, tag: String, dialog: () => T, onDismiss: () => Any)(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
-    log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + Thread.currentThread.getId + " and ui " + uiThreadID)
-    assert(uiThreadID != Thread.currentThread.getId, { "unexpected thread == UI, " + Thread.currentThread.getId })
+    log.trace("Activity::showDialogSafe " + m.erasure.getName + " at thread " + Thread.currentThread.getId + " and ui " + AnyBase.uiThreadID)
+    assert(AnyBase.uiThreadID != Thread.currentThread.getId, { "unexpected thread == UI, " + Thread.currentThread.getId })
     (activitySafeDialogActor !? AppComponent.Message.ShowDialog(activity, tag, dialog, Option(onDismiss))).asInstanceOf[Option[T]]
   } catch {
     case e =>
@@ -499,12 +504,16 @@ protected class AppComponent private () extends Logging {
 sealed trait AppComponentEvent
 
 object AppComponent extends Logging with Publisher[AppComponentEvent] {
+  /** profiling support */
+  private val ppLoading = AnyBase.ppGroup.start("AppComponent$")
+  /** AppComponent internal singleton */
   @volatile private var inner: AppComponent = null
+  /** shutdown flag that enable shutdown application after deinitialization */
   @volatile private[base] var shutdown = true
+  /** deinitialization flag that lock on deinit routine */
   private[base] val deinitializationLock = new SyncVar[Boolean]()
-  private val deinitializationInProgressLock = new AtomicBoolean(false)
   deinitializationLock.set(false)
-  log.debug("alive")
+  ppLoading.stop
 
   @Loggable
   def deinitializationTimeout(context: Context): Int = {
@@ -518,33 +527,22 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
       Integer.MAX_VALUE
   }
   @Loggable
-  private[lib] def init(root: Context, _inner: AppComponent = null) = {
-    deinitializationLock.set(false)
-    initRoutine(root, _inner)
+  private[lib] def init(root: Context, _inner: AppComponent = null) = deinitializationLock.synchronized {
+    AnyBase.ppGroup("AppComponent.init") {
+      deinitializationLock.set(false)
+      initRoutine(root, _inner)
+    }
   }
-  private[lib] def initRoutine(root: Context, _inner: AppComponent) = synchronized {
-    // cancel deinitialization sequence if any
-    LazyInit("initialize AppCache") { AppCache.init(root) }
-    if (inner != null) {
+  private[lib] def initRoutine(root: Context, _inner: AppComponent) = {
+    if (inner != null)
       log.info("reinitialize AppComponent core subsystem for " + root.getPackageName())
-      // unbind services from bindedICtrlPool
-      AnyBase.getContext.foreach {
-        context =>
-          inner.bindedICtrlPool.keys.foreach(key => {
-            inner.bindedICtrlPool.remove(key).map(record => {
-              log.debug("remove service connection to " + key + " from bindedICtrlPool")
-              record._1.unbindService(record._2)
-            })
-          })
-      }
-    } else
+    else
       log.info("initialize AppComponent for " + root.getPackageName())
     if (_inner != null)
       inner = _inner
-    else {
+    else
       inner = new AppComponent()
-      inner.activitySafeDialogActor.start
-    }
+    LazyInit("initialize AppCache") { AppCache.init(root) }
     inner.state.set(State(DState.Initializing))
   }
   private[lib] def resurrect(supressEvent: Boolean = false): Unit = deinitializationLock.synchronized {
@@ -556,50 +554,28 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         if (!supressEvent)
           try { publish(Event.Resume) } catch { case e => log.error(e.getMessage, e) }
     }
-    if (deinitializationInProgressLock.get) {
-      Thread.sleep(100) // unoffending delay
-      deinitializationInProgressLock.synchronized {
-        while (deinitializationInProgressLock.get) {
-          log.debug("deinitialization in progress, waiting...")
-          deinitializationInProgressLock.wait(1000)
-        }
-      }
-    }
   }
   private[lib] def deinit(): Unit = deinitializationLock.synchronized {
-    if (deinitializationInProgressLock.compareAndSet(false, true)) {
-      AnyBase.getContext match {
-        case Some(context) =>
-          val packageName = context.getPackageName()
-          if (deinitializationLock.isSet) {
-            deinitializationLock.unset()
-            log.info("deinitializing AppComponent for " + packageName)
-            val timeout = deinitializationTimeout(context)
-            if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
-              try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
-            Futures.future {
-              try {
-                deinitializationLock.get(timeout) match {
-                  case Some(false) =>
-                    log.info("deinitialization AppComponent for " + packageName + " canceled")
-                  case _ =>
-                    deinitRoutine(packageName)
-                }
-              } finally {
-                deinitializationInProgressLock.synchronized {
-                  deinitializationInProgressLock.set(false)
-                  deinitializationInProgressLock.notifyAll
-                }
-              }
-            }
+    AnyBase.getContext match {
+      case Some(context) if deinitializationLock.isSet =>
+        deinitializationLock.unset()
+        val packageName = context.getPackageName()
+        log.info("deinitializing AppComponent for " + packageName)
+        val timeout = deinitializationTimeout(context)
+        if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
+          try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
+        Futures.future {
+          deinitializationLock.get(timeout) match {
+            case Some(false) =>
+              log.info("deinitialization AppComponent for " + packageName + " canceled")
+            case _ =>
+              deinitRoutine(packageName)
           }
-        case None =>
-          log.fatal("unable to find deinitialization context")
-          deinitializationInProgressLock.synchronized {
-            deinitializationInProgressLock.set(false)
-            deinitializationInProgressLock.notifyAll
-          }
-      }
+        }
+      case Some(context) =>
+        log.debug("skip deinitialization, already in progress")
+      case None =>
+        log.fatal("unable to find deinitialization context")
     }
   }
   private[lib] def deinitRoutine(packageName: String): Unit = synchronized {
