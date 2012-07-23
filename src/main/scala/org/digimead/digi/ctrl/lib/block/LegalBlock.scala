@@ -90,10 +90,12 @@ class LegalBlock(val context: Context,
         menu.setHeaderIcon(i)
       case _ =>
     }
-    menu.add(Menu.NONE, Android.getId(context, "block_legal_open"), 1,
-      Android.getString(context, "block_legal_open").getOrElse("Open license"))
-    menu.add(Menu.NONE, Android.getId(context, "block_legal_send"), 1,
-      Android.getString(context, "block_legal_send").getOrElse("Send link to ..."))
+    if (item.uri.nonEmpty) {
+      menu.add(Menu.NONE, Android.getId(context, "block_legal_open"), 1,
+        Android.getString(context, "block_legal_open").getOrElse("Open license"))
+      menu.add(Menu.NONE, Android.getId(context, "block_legal_send"), 1,
+        Android.getString(context, "block_legal_send").getOrElse("Send link to ..."))
+    }
   }
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: LegalBlock.Item): Boolean = {
