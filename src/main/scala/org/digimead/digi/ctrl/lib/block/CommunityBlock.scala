@@ -16,6 +16,8 @@
 
 package org.digimead.digi.ctrl.lib.block
 
+import scala.actors.Future
+import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -43,8 +45,11 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 
-class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri: Option[Uri], val translationUri: Option[Uri],
-  val translationCommonUri: Option[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+class CommunityBlock(val context: Context,
+  val xdaUri: Future[Uri],
+  val wikiUri: Future[Uri],
+  val translationUri: Future[Uri],
+  val translationCommonUri: Future[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
   val itemXDA = CommunityBlock.Item(Android.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
     Android.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
   val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
@@ -70,9 +75,9 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
   def onListItemClick(l: ListView, v: View, item: CommunityBlock.Item) = {
     item match {
       case this.itemXDA => // jump to XDA
-        log.debug("open XDA page at " + xdaUri.get)
+        log.debug("open XDA page at " + xdaUri())
         try {
-          val intent = new Intent(Intent.ACTION_VIEW, xdaUri.get)
+          val intent = new Intent(Intent.ACTION_VIEW, xdaUri())
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
           AppComponent.Context match {
             case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
@@ -80,12 +85,12 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
           }
         } catch {
           case e =>
-            IAmYell("Unable to open XDA thread page: " + xdaUri.get, e)
+            IAmYell("Unable to open XDA thread page: " + xdaUri(), e)
         }
       case this.itemWiki => // jump to project
-        log.debug("open wiki page at " + wikiUri.get)
+        log.debug("open wiki page at " + wikiUri())
         try {
-          val intent = new Intent(Intent.ACTION_VIEW, wikiUri.get)
+          val intent = new Intent(Intent.ACTION_VIEW, wikiUri())
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
           AppComponent.Context match {
             case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
@@ -93,12 +98,12 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
           }
         } catch {
           case e =>
-            IAmYell("Unable to open wiki page: " + wikiUri.get, e)
+            IAmYell("Unable to open wiki page: " + wikiUri(), e)
         }
       case this.itemTranslation => // jump to translation
-        log.debug("open translation page at " + translationUri.get)
+        log.debug("open translation page at " + translationUri())
         try {
-          val intent = new Intent(Intent.ACTION_VIEW, translationUri.get)
+          val intent = new Intent(Intent.ACTION_VIEW, translationUri())
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
           AppComponent.Context match {
             case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
@@ -106,12 +111,12 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
           }
         } catch {
           case e =>
-            IAmYell("Unable to open translation page: " + translationUri.get, e)
+            IAmYell("Unable to open translation page: " + translationUri(), e)
         }
       case this.itemTranslationCommon => // jump to common translation
-        log.debug("open common translation page at " + translationCommonUri.get)
+        log.debug("open common translation page at " + translationCommonUri())
         try {
-          val intent = new Intent(Intent.ACTION_VIEW, translationCommonUri.get)
+          val intent = new Intent(Intent.ACTION_VIEW, translationCommonUri())
           intent.addCategory(Intent.CATEGORY_BROWSABLE)
           AppComponent.Context match {
             case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
@@ -119,7 +124,7 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
           }
         } catch {
           case e =>
-            IAmYell("Unable to open common translation page: " + translationCommonUri.get, e)
+            IAmYell("Unable to open common translation page: " + translationCommonUri(), e)
         }
     }
   }
@@ -164,9 +169,9 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
       case this.itemXDA =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, xdaUri.get.toString)
+            Block.copyLink(context, item, xdaUri().toString)
           case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, xdaUri.get.toString)
+            Block.sendLink(context, item, item.name, xdaUri().toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false
@@ -174,9 +179,9 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
       case this.itemWiki =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, wikiUri.get.toString)
+            Block.copyLink(context, item, wikiUri().toString)
           case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, wikiUri.get.toString)
+            Block.sendLink(context, item, item.name, wikiUri().toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false
@@ -184,9 +189,9 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
       case this.itemTranslation =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, translationUri.get.toString)
+            Block.copyLink(context, item, translationUri().toString)
           case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, translationUri.get.toString)
+            Block.sendLink(context, item, item.name, translationUri().toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false
@@ -194,9 +199,9 @@ class CommunityBlock(val context: Context, val xdaUri: Option[Uri], val wikiUri:
       case this.itemTranslationCommon =>
         menuItem.getItemId match {
           case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, translationCommonUri.get.toString)
+            Block.copyLink(context, item, translationCommonUri().toString)
           case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, translationCommonUri.get.toString)
+            Block.sendLink(context, item, item.name, translationCommonUri().toString)
           case message =>
             log.fatal("skip unknown message " + message)
             false

@@ -40,6 +40,7 @@ import android.app.Service
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import stopwatch.Stopwatch
 import stopwatch.StopwatchGroup
 
 private[lib] trait AnyBase extends Logging {
@@ -85,9 +86,10 @@ private[lib] trait AnyBase extends Logging {
  * @note startup duration is around 500ms
  */
 object AnyBase extends Logging {
-  /** profiling */
+  /** profiling support  */
+  @volatile private var stopWatchGroups = Seq[StopwatchGroup](Stopwatch)
   val (ppGroup, ppStartup, ppLoading) = {
-    val group = new StopwatchGroup("DigiLib")
+    val group = getStopWatchGroup("DigiLib")
     group.enabled = true
     group.enableOnDemand = true
     (group, group.start("startup"), group.start("AnyBase$"))
@@ -118,6 +120,22 @@ object AnyBase extends Logging {
   info.set(None)
   ppLoading.stop
 
+  def getStopWatchGroup(name: String) = synchronized {
+    stopWatchGroups.find(_.name == name) match {
+      case Some(group) =>
+        group
+      case None =>
+        val group = new StopwatchGroup(name)
+        stopWatchGroups = stopWatchGroups :+ group
+        group
+    }
+  }
+  def dumpStopWatchStatistics() = stopWatchGroups.sortBy(_.name).foreach {
+    group =>
+      log.debug("""process "%s" stopwatch statistics""".format(group.name))
+      group.names.toSeq.sorted.foreach(name =>
+        log.debug(group.snapshot(name).toShortString))
+  }
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
     if (AnyBase.info.get == None) {
       // dump profiling at startup
@@ -244,6 +262,8 @@ object AnyBase extends Logging {
    */
   @Loggable
   def shutdownApp(packageName: String, safely: Boolean) = onShutdownState.synchronized {
+    if (log.isTraceEnabled)
+      dumpStopWatchStatistics
     if (safely) {
       log.info("shutdown safely " + packageName)
       Logging.flush

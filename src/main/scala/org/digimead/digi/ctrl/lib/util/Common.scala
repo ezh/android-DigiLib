@@ -207,9 +207,6 @@ object Common extends Logging {
     }
     directory
   }
-  @Loggable(result = false)
-  def getPublicPreferences(context: Context): PublicPreferences =
-    PublicPreferences(context)
   @Loggable
   def listInterfaces(): Seq[String] = {
     var interfaces = HashMap[String, Seq[String]]()

@@ -28,6 +28,7 @@ import scala.Option.option2Iterable
 import scala.actors.Actor
 import scala.actors.Futures
 import scala.actors.OutputChannel
+import scala.annotation.implicitNotFound
 import scala.collection.immutable.LongMap
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Publisher
@@ -63,7 +64,6 @@ import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
 import android.net.Uri
 import android.os.Bundle
-import android.os.Looper
 
 protected class AppComponent private () extends Logging {
   /** profiling support */
@@ -565,6 +565,8 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
         if (AppControl.deinitializationLock.get(0) == Some(false)) // AppControl active
           try { publish(Event.Suspend(timeout)) } catch { case e => log.error(e.getMessage, e) }
         Futures.future {
+          if (log.isTraceEnabled)
+            AnyBase.dumpStopWatchStatistics
           deinitializationLock.get(timeout) match {
             case Some(false) =>
               log.info("deinitialization AppComponent for " + packageName + " canceled")

@@ -16,6 +16,9 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
+import scala.annotation.implicitNotFound
+import scala.annotation.tailrec
+
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
@@ -27,8 +30,8 @@ import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
 import org.digimead.digi.ctrl.lib.message.IAmWarn
 import org.digimead.digi.ctrl.lib.util.Android
-import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.ExceptionHandler
+import org.digimead.digi.ctrl.lib.util.PublicPreferences
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -146,8 +149,7 @@ object Preferences extends Logging {
     def get(context: Context): Int = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
-        public.getString(DOption.DebugLogLevel.tag, shared.getString(DOption.DebugLogLevel.tag, default.toString)).toInt
+        PublicPreferences(context).getString(DOption.DebugLogLevel.tag, shared.getString(DOption.DebugLogLevel.tag, default.toString)).toInt
       } catch {
         case e =>
           log.error(e.getMessage, e)
@@ -161,7 +163,7 @@ object Preferences extends Logging {
     @Loggable
     def set(l: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       if (!shared.contains(DOption.DebugLogLevel.tag) || public.getString(DOption.DebugLogLevel.tag, default.toString) != l) {
         log.debug("set DebugLogLevel shared preference to [%s]".format(l))
         val sharedEditor = shared.edit
@@ -253,7 +255,7 @@ object Preferences extends Logging {
     def get(context: Context): Boolean = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
+        val public = PublicPreferences(context)
         public.getBoolean(DOption.DebugAndroidLogger.tag, shared.getBoolean(DOption.DebugAndroidLogger.tag, default))
       } catch {
         case e =>
@@ -268,7 +270,7 @@ object Preferences extends Logging {
     @Loggable
     def set(f: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       if (!shared.contains(DOption.DebugAndroidLogger.tag) || public.getBoolean(DOption.DebugAndroidLogger.tag, default) != f) {
         log.debug("set DebugAndroidLogger shared preference to [%s]".format(f))
         val sharedEditor = shared.edit
@@ -305,7 +307,7 @@ object Preferences extends Logging {
     def get(context: Context): Int = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
+        val public = PublicPreferences(context)
         public.getString(DOption.PreferredLayoutOrientation.tag, shared.getString(DOption.PreferredLayoutOrientation.tag, default.toString)).toInt
       } catch {
         case e =>
@@ -320,7 +322,7 @@ object Preferences extends Logging {
     @Loggable
     def set(l: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       if (!shared.contains(DOption.PreferredLayoutOrientation.tag) || public.getString(DOption.PreferredLayoutOrientation.tag, default.toString) != l) {
         log.debug("set PreferredLayoutOrientation shared preference to [%s]".format(l))
         val sharedEditor = shared.edit
@@ -375,7 +377,7 @@ object Preferences extends Logging {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Int = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
+        val public = PublicPreferences(context)
         try {
           public.getString(DOption.ShutdownTimeout.tag, shared.getString(DOption.ShutdownTimeout.tag, default.toString)).toInt
         } catch {
@@ -396,7 +398,7 @@ object Preferences extends Logging {
     @Loggable
     def set(timeout: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       ExceptionHandler.retry[Unit](1) {
         try {
           if (!shared.contains(DOption.ShutdownTimeout.tag) || public.getString(DOption.ShutdownTimeout.tag, default.toString) != timeout) {
@@ -429,7 +431,7 @@ object Preferences extends Logging {
       sharedEditor.remove(DOption.ShutdownTimeout.tag)
       sharedEditor.putString(DOption.ShutdownTimeout.tag, default.toString)
       sharedEditor.commit()
-      val publicEditor = Common.getPublicPreferences(context).edit()
+      val publicEditor = PublicPreferences(context).edit()
       publicEditor.remove(DOption.ShutdownTimeout.tag)
       publicEditor.putString(DOption.ShutdownTimeout.tag, default.toString)
       publicEditor.commit()
@@ -458,7 +460,7 @@ object Preferences extends Logging {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): T = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
+        val public = PublicPreferences(context)
         try {
           convert(public.getString(option.tag, shared.getString(option.tag, default.toString)))
         } catch {
@@ -477,7 +479,7 @@ object Preferences extends Logging {
     }
     def set(value: String, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       ExceptionHandler.retry[Unit](1) {
         try {
           if (!shared.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
@@ -509,7 +511,7 @@ object Preferences extends Logging {
       sharedEditor.remove(option.tag)
       sharedEditor.putString(option.tag, default.toString)
       sharedEditor.commit()
-      val publicEditor = Common.getPublicPreferences(context).edit()
+      val publicEditor = PublicPreferences(context).edit()
       publicEditor.remove(option.tag)
       publicEditor.putString(option.tag, default.toString)
       publicEditor.commit()
@@ -520,7 +522,7 @@ object Preferences extends Logging {
     def get(context: Context)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = synchronized {
       try {
         val shared = PreferenceManager.getDefaultSharedPreferences(context)
-        val public = Common.getPublicPreferences(context)
+        val public = PublicPreferences(context)
         try {
           public.getBoolean(option.tag, shared.getBoolean(option.tag, default))
         } catch {
@@ -539,7 +541,7 @@ object Preferences extends Logging {
     }
     def set(value: Boolean, context: Context, notify: Boolean = false)(implicit logger: RichLogger, dispatcher: Dispatcher): Unit = synchronized {
       val shared = PreferenceManager.getDefaultSharedPreferences(context)
-      val public = Common.getPublicPreferences(context)
+      val public = PublicPreferences(context)
       ExceptionHandler.retry[Unit](1) {
         try {
           if (!shared.contains(option.tag) || public.getString(option.tag, default.toString) != value) {
@@ -571,7 +573,7 @@ object Preferences extends Logging {
       sharedEditor.remove(option.tag)
       sharedEditor.putBoolean(option.tag, default)
       sharedEditor.commit()
-      val publicEditor = Common.getPublicPreferences(context).edit()
+      val publicEditor = PublicPreferences(context).edit()
       publicEditor.remove(option.tag)
       publicEditor.putBoolean(option.tag, default)
       publicEditor.commit()

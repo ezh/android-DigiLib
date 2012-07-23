@@ -370,7 +370,7 @@ protected class AppControl private (packageName: String) extends Logging {
 
 object AppControl extends Logging {
   /** profiling support */
-  private val ppLoading = AnyBase.ppGroup.start("AppComponent$")
+  private val ppLoading = AnyBase.ppGroup.start("AppControl$")
   /** AppControl internal singleton */
   @volatile private var inner: AppControl = null
   /** deinitialization flag that lock on deinit routine */

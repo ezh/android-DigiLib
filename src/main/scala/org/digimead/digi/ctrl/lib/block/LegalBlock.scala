@@ -16,8 +16,13 @@
 
 package org.digimead.digi.ctrl.lib.block
 
+import scala.actors.Future
+import scala.actors.Futures
+import scala.annotation.implicitNotFound
+import scala.collection.JavaConversions._
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
@@ -44,9 +49,10 @@ import android.widget.TextView
 import android.widget.TextView.BufferType
 
 class LegalBlock(val context: Context,
-  val items: List[LegalBlock.Item],
+  val lazyItems: List[Future[LegalBlock.Item]],
   _imageGetter: Html.ImageGetter = null,
   tagHandler: Html.TagHandler = null)(implicit val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
+  val items = lazyItems.map(_ => LegalBlock.Item(Android.getString(context, "loading").getOrElse("loading..."))(""))
   private lazy val imageGetter = _imageGetter match {
     case null => new Block.ImageGetter(context)
     case getter => getter
@@ -54,6 +60,10 @@ class LegalBlock(val context: Context,
   private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
     inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new LegalBlock.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
+  private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+  // fill adapter with lazyItems
+  Futures.future { applyFutures(lazyItems) }
+
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
@@ -123,17 +133,38 @@ class LegalBlock(val context: Context,
         false
     }
   }
+  private def applyFutures(futures: List[Future[LegalBlock.Item]]) {
+    val head = futures.head
+    val result = Futures.awaitEither(head,
+      Futures.future[Unit] { if (futures.size > 1) applyFutures(futures.tail) }) match {
+        case result: LegalBlock.Item => result
+        case block => head()
+      }
+    AnyBase.runOnUiThread {
+      val index = lazyItems.indexOf(head)
+      val view = items(index).view.get match {
+        case Some(view) =>
+          val text1 = view.findViewById(android.R.id.text1).asInstanceOf[TextView]
+          text1.setText(Html.fromHtml(result.text, imageGetter, tagHandler), BufferType.SPANNABLE)
+          result.view = new WeakReference(view)
+        case None =>
+      }
+      adapter.remove(items(index))
+      adapter.insert(result, index)
+      adapter.notifyDataSetChanged
+    }
+  }
 }
 
-object LegalBlock {
+object LegalBlock extends Logging {
   case class Item(val text: String)(val uri: String) extends Block.Item {
     override def toString() = text
   }
   class Adapter(context: Context, textViewResourceId: Int, data: Seq[Item], imageGetter: Html.ImageGetter, tagHandler: Html.TagHandler)
-    extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, data.toArray) {
+    extends ArrayAdapter(context, textViewResourceId, android.R.id.text1, new java.util.ArrayList(data.toList)) {
     private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
-      val item = data(position)
+      val item = getItem(position)
       item.view.get match {
         case None =>
           val view = inflater.inflate(textViewResourceId, null)

@@ -81,6 +81,7 @@ case class PublicPreferences private (val file: File, val bundle: Bundle, baseBl
     case n: String => n
     case _ => defValue
   }
+  def getStringSet(key: String, defValues: java.util.Set[String]): java.util.Set[String] = null
   def getAll(): java.util.Map[String, Object] = {
     val result = new java.util.HashMap[String, Object]()
     val iterator = bundle.keySet.iterator.foreach(key => result.put(key, bundle.get(key)))
@@ -353,5 +354,7 @@ object PublicPreferences extends Logging {
       { changes.putInt(key, value); this }
     def putString(key: String, value: String): SharedPreferences.Editor =
       { changes.putString(key, value); this }
+    def putStringSet(key: String, values: java.util.Set[String]): SharedPreferences.Editor =
+      { null; this }
   }
 }
