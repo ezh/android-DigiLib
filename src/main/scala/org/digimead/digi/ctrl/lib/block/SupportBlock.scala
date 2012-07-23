@@ -21,6 +21,7 @@ import java.util.TimeZone
 import java.util.concurrent.atomic.AtomicInteger
 
 import scala.actors.Future
+import scala.actors.Futures
 import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
@@ -28,8 +29,10 @@ import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmWarn
 import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
@@ -84,44 +87,65 @@ class SupportBlock(val context: Context,
   def onListItemClick(l: ListView, v: View, item: SupportBlock.Item) = {
     item match {
       case this.itemProject => // jump to project
-        log.debug("open project web site at " + projectUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, projectUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, projectUri).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(projectUri)) =>
+              log.debug("open project web site at " + projectUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, projectUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open project link: " + projectUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get project link information, timeout")
           }
-        } catch {
-          case e =>
-            IAmYell("Unable to open project link: " + projectUri(), e)
         }
       case this.itemIssues => // jump to issues
-        log.debug("open issues web page at " + projectUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, issuesUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, issuesUri).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(issuesUri)) =>
+              log.debug("open issues web page at " + issuesUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, issuesUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open issues web page link: " + issuesUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get issues web page information, timeout")
           }
-        } catch {
-          case e =>
-            IAmYell("Unable to open project link: " + issuesUri(), e)
         }
       case this.itemEmail => // create email
-        log.debug("send email to " + emailTo())
-        try {
-          val uri = Uri.parse("mailto:" + emailTo())
-          val intent = new Intent(Intent.ACTION_SENDTO, uri)
-          intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject())
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, emailTo, emailSubject).asInstanceOf[List[Option[String]]] match {
+            case List(Some(emailTo), Some(emailSubject)) =>
+              log.debug("send email to " + emailTo)
+              try {
+                val uri = Uri.parse("mailto:" + emailTo)
+                val intent = new Intent(Intent.ACTION_SENDTO, uri)
+                intent.putExtra(Intent.EXTRA_SUBJECT, emailSubject)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable 'send to' email: " + emailTo + " / " + emailSubject, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get email information, timeout")
           }
-        } catch {
-          case e =>
-            IAmYell("Unable 'send to' email: " + emailTo() + " / " + emailSubject(), e)
         }
       case this.itemChat => // show context menu with call/skype
         log.debug("open context menu for voice call")
@@ -168,95 +192,112 @@ class SupportBlock(val context: Context,
   override def onContextItemSelected(menuItem: MenuItem, item: SupportBlock.Item): Boolean = {
     item match {
       case this.itemProject =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, projectUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, projectUri().toString)
-          case item =>
-            log.fatal("skip unknown menu item " + item)
-            false
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, projectUri).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(projectUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, projectUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, projectUri.toString)
+                case item =>
+                  log.fatal("skip unknown menu item " + item)
+              }
+            case _ =>
+              IAmWarn("Unable to get project link information, timeout")
+          }
         }
+        true
       case this.itemIssues =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, issuesUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, issuesUri().toString)
-          case item =>
-            log.fatal("skip unknown menu item " + item)
-            false
-        } case this.itemEmail =>
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, issuesUri).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(issuesUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, issuesUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, issuesUri.toString)
+                case item =>
+                  log.fatal("skip unknown menu item " + item)
+              }
+            case _ =>
+              IAmWarn("Unable to get open issues information, timeout")
+          }
+        }
+        true
+      case this.itemEmail =>
         false
       case this.itemChat =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_support_voice_contact") =>
-            log.debug("copy to clipboard phone " + voicePhone())
-            try {
-              val message = Android.getString(context, "block_support_copy_voice_contact").
-                getOrElse("Copy to clipboard phone \"" + voicePhone() + "\"")
-              AnyBase.runOnUiThread {
-                try {
-                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                  clipboard.setText(voicePhone())
-                  Toast.makeText(context, message, DConstant.toastTimeout).show()
-                } catch {
-                  case e =>
-                    IAmYell("Unable to copy to clipboard phone " + voicePhone(), e)
-                }
+        Futures.future {
+          Futures.awaitAll(SupportBlock.retriveTimeout, voicePhone, skypeUser, icqUser).asInstanceOf[List[Option[String]]] match {
+            case List(Some(voicePhone), Some(skypeUser), Some(icqUser)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_support_voice_contact") =>
+                  log.debug("copy to clipboard phone " + voicePhone)
+                  try {
+                    val message = Android.getString(context, "block_support_copy_voice_contact").
+                      getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
+                    AnyBase.runOnUiThread {
+                      try {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
+                        clipboard.setText(voicePhone)
+                        Toast.makeText(context, message, DConstant.toastTimeout).show()
+                      } catch {
+                        case e =>
+                          IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
+                      }
+                    }
+                  } catch {
+                    case e =>
+                      IAmYell("Unable to copy to clipboard phone " + voicePhone, e)
+                  }
+                case id if id == Android.getId(context, "block_support_skype_contact") =>
+                  log.debug("copy to clipboard Skype account id " + skypeUser)
+                  try {
+                    val message = Android.getString(context, "block_support_copy_skype_contact").
+                      getOrElse("Copy to clipboard Skype account \"" + skypeUser + "\"")
+                    AnyBase.runOnUiThread {
+                      try {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
+                        clipboard.setText(skypeUser)
+                        Toast.makeText(context, message, DConstant.toastTimeout).show()
+                      } catch {
+                        case e =>
+                          IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
+                      }
+                    }
+                  } catch {
+                    case e =>
+                      IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
+                  }
+                case id if id == Android.getId(context, "block_support_icq_contact") =>
+                  log.debug("copy to clipboard ICQ account id " + icqUser)
+                  try {
+                    val message = Android.getString(context, "block_support_copy_icq_contact").
+                      getOrElse("Copy to clipboard ICQ account \"" + icqUser + "\"")
+                    AnyBase.runOnUiThread {
+                      try {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
+                        clipboard.setText(icqUser)
+                        Toast.makeText(context, message, DConstant.toastTimeout).show()
+                      } catch {
+                        case e =>
+                          IAmYell("Unable to copy to clipboard ICQ account id " + icqUser, e)
+                      }
+                    }
+                    true
+                  } catch {
+                    case e =>
+                      IAmYell("Unable to copy to clipboard Skype account id " + skypeUser, e)
+                  }
+                case id =>
+                  log.fatal("unknown context menu id " + id)
               }
-              true
-            } catch {
-              case e =>
-                IAmYell("Unable to copy to clipboard phone " + voicePhone(), e)
-                false
-            }
-          case id if id == Android.getId(context, "block_support_skype_contact") =>
-            log.debug("copy to clipboard Skype account id " + skypeUser())
-            try {
-              val message = Android.getString(context, "block_support_copy_skype_contact").
-                getOrElse("Copy to clipboard Skype account \"" + skypeUser() + "\"")
-              AnyBase.runOnUiThread {
-                try {
-                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                  clipboard.setText(skypeUser())
-                  Toast.makeText(context, message, DConstant.toastTimeout).show()
-                } catch {
-                  case e =>
-                    IAmYell("Unable to copy to clipboard Skype account id " + skypeUser(), e)
-                }
-              }
-              true
-            } catch {
-              case e =>
-                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser(), e)
-                false
-            }
-          case id if id == Android.getId(context, "block_support_icq_contact") =>
-            log.debug("copy to clipboard ICQ account id " + icqUser())
-            try {
-              val message = Android.getString(context, "block_support_copy_icq_contact").
-                getOrElse("Copy to clipboard ICQ account \"" + icqUser() + "\"")
-              AnyBase.runOnUiThread {
-                try {
-                  val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                  clipboard.setText(icqUser())
-                  Toast.makeText(context, message, DConstant.toastTimeout).show()
-                } catch {
-                  case e =>
-                    IAmYell("Unable to copy to clipboard ICQ account id " + icqUser(), e)
-                }
-              }
-              true
-            } catch {
-              case e =>
-                IAmYell("Unable to copy to clipboard Skype account id " + skypeUser(), e)
-                false
-            }
-          case id =>
-            log.fatal("unknown context menu id " + id)
-            false
+            case _ =>
+              IAmWarn("Unable to get contact information, timeout")
+          }
         }
+        true
       case item =>
         log.fatal("unsupported context menu item " + item)
         false
@@ -266,6 +307,7 @@ class SupportBlock(val context: Context,
 
 object SupportBlock extends Logging {
   @volatile private var block: Option[SupportBlock] = None
+  private val retriveTimeout = DTimeout.normal
   private val name = "name"
   private val description = "description"
   sealed case class Item(id: Int)(val name: String, val description: String, val icon: String = "") extends Block.Item
