@@ -17,13 +17,16 @@
 package org.digimead.digi.ctrl.lib.block
 
 import scala.actors.Future
+import scala.actors.Futures
 import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
+import org.digimead.digi.ctrl.lib.message.IAmWarn
 import org.digimead.digi.ctrl.lib.message.IAmYell
 import org.digimead.digi.ctrl.lib.util.Android
 
@@ -46,10 +49,10 @@ import android.widget.ListView
 import android.widget.TextView
 
 class CommunityBlock(val context: Context,
-  val xdaUri: Future[Uri],
-  val wikiUri: Future[Uri],
-  val translationUri: Future[Uri],
-  val translationCommonUri: Future[Uri])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
+  val xdaUri: Option[Future[Uri]],
+  val wikiUri: Option[Future[Uri]],
+  val translationUri: Option[Future[Uri]],
+  val translationCommonUri: Option[Future[Uri]])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
   val itemXDA = CommunityBlock.Item(Android.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
     Android.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
   val itemWiki = CommunityBlock.Item(Android.getString(context, "block_community_wiki_title").getOrElse("wiki"),
@@ -75,56 +78,84 @@ class CommunityBlock(val context: Context,
   def onListItemClick(l: ListView, v: View, item: CommunityBlock.Item) = {
     item match {
       case this.itemXDA => // jump to XDA
-        log.debug("open XDA page at " + xdaUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, xdaUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-          }
-        } catch {
-          case e =>
-            IAmYell("Unable to open XDA thread page: " + xdaUri(), e)
+        Futures.future {
+          xdaUri.foreach(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(xdaUri)) =>
+              log.debug("open XDA page at " + xdaUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, xdaUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open XDA thread page: " + xdaUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get XDA thread page information, timeout")
+          })
         }
       case this.itemWiki => // jump to project
-        log.debug("open wiki page at " + wikiUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, wikiUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-          }
-        } catch {
-          case e =>
-            IAmYell("Unable to open wiki page: " + wikiUri(), e)
+        Futures.future {
+          wikiUri.foreach(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(wikiUri)) =>
+              log.debug("open wiki page at " + wikiUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, wikiUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open wiki page: " + wikiUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get wiki page information, timeout")
+          })
         }
       case this.itemTranslation => // jump to translation
-        log.debug("open translation page at " + translationUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, translationUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-          }
-        } catch {
-          case e =>
-            IAmYell("Unable to open translation page: " + translationUri(), e)
+        Futures.future {
+          translationUri.foreach(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(translationUri)) =>
+              log.debug("open translation page at " + translationUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, translationUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open translation page: " + translationUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get translation page information, timeout")
+          })
         }
       case this.itemTranslationCommon => // jump to common translation
-        log.debug("open common translation page at " + translationCommonUri())
-        try {
-          val intent = new Intent(Intent.ACTION_VIEW, translationCommonUri())
-          intent.addCategory(Intent.CATEGORY_BROWSABLE)
-          AppComponent.Context match {
-            case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
-            case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-          }
-        } catch {
-          case e =>
-            IAmYell("Unable to open common translation page: " + translationCommonUri(), e)
+        Futures.future {
+          translationCommonUri.foreach(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(translationCommonUri)) =>
+              log.debug("open common translation page at " + translationCommonUri)
+              try {
+                val intent = new Intent(Intent.ACTION_VIEW, translationCommonUri)
+                intent.addCategory(Intent.CATEGORY_BROWSABLE)
+                AppComponent.Context match {
+                  case Some(activity) if activity.isInstanceOf[Activity] => activity.startActivity(intent)
+                  case _ => context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+              } catch {
+                case e =>
+                  IAmYell("Unable to open common translation page: " + translationCommonUri, e)
+              }
+            case _ =>
+              IAmWarn("Unable to get common translation page information, timeout")
+          })
         }
     }
   }
@@ -167,45 +198,74 @@ class CommunityBlock(val context: Context,
   override def onContextItemSelected(menuItem: MenuItem, item: CommunityBlock.Item): Boolean = {
     item match {
       case this.itemXDA =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, xdaUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, xdaUri().toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
-            false
+        Futures.future {
+          xdaUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(xdaUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, xdaUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, xdaUri.toString)
+                case message =>
+                  log.fatal("skip unknown message " + message)
+              }
+            case _ =>
+              IAmWarn("Unable to get XDA thread page information, timeout")
+          })
         }
+        true
       case this.itemWiki =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, wikiUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, wikiUri().toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
-            false
+        Futures.future {
+          wikiUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(wikiUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, wikiUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, wikiUri.toString)
+                case message =>
+                  log.fatal("skip unknown message " + message)
+              }
+            case _ =>
+              IAmWarn("Unable to get wiki page information, timeout")
+          })
         }
+        true
       case this.itemTranslation =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, translationUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, translationUri().toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
-            false
+        Futures.future {
+          translationUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(translationUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, translationUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, translationUri.toString)
+                case message =>
+                  log.fatal("skip unknown message " + message)
+                  false
+              }
+            case _ =>
+              IAmWarn("Unable to get translation page information, timeout")
+          })
         }
+        true
       case this.itemTranslationCommon =>
-        menuItem.getItemId match {
-          case id if id == Android.getId(context, "block_link_copy") =>
-            Block.copyLink(context, item, translationCommonUri().toString)
-          case id if id == Android.getId(context, "block_link_send") =>
-            Block.sendLink(context, item, item.name, translationCommonUri().toString)
-          case message =>
-            log.fatal("skip unknown message " + message)
-            false
+        Futures.future {
+          translationCommonUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
+            case List(Some(translationCommonUri)) =>
+              menuItem.getItemId match {
+                case id if id == Android.getId(context, "block_link_copy") =>
+                  Block.copyLink(context, item, translationCommonUri.toString)
+                case id if id == Android.getId(context, "block_link_send") =>
+                  Block.sendLink(context, item, item.name, translationCommonUri.toString)
+                case message =>
+                  log.fatal("skip unknown message " + message)
+              }
+            case _ =>
+              IAmWarn("Unable to get common translation page information, timeout")
+          })
         }
+        true
       case item =>
         log.fatal("unsupported context menu item " + item)
         false
@@ -214,6 +274,7 @@ class CommunityBlock(val context: Context,
 }
 
 object CommunityBlock {
+  private val retriveTimeout = DTimeout.normal
   private val name = "name"
   private val description = "description"
   case class Item(name: String, description: String, icon: String = "") extends Block.Item
