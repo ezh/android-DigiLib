@@ -610,6 +610,7 @@ object AppComponent extends Logging with Publisher[AppComponentEvent] {
   def isSuspend = deinitializationLock.get(0) == None
   def Inner = inner
   def Context = AnyBase.getContext
+  def AppContext = Context.map(_.getApplicationContext)
   override protected[base] def publish(event: AppComponentEvent) =
     super.publish(event)
   object LazyInit {

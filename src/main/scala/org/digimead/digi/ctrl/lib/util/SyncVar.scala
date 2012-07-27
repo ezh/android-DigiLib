@@ -223,3 +223,14 @@ class SyncVar[A] extends Logging {
     } else isSet
   }
 }
+
+object SyncVar {
+  def apply[T](arg: T): SyncVar[T] = synchronized {
+    val result = new SyncVar[T]()
+    result.set(arg)
+    result
+  }
+  def apply[T](): SyncVar[T] = synchronized {
+    new SyncVar[T]()
+  }
+}

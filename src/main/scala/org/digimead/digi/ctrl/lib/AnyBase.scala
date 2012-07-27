@@ -142,6 +142,9 @@ object AnyBase extends Logging {
       ppStartup.stop
       ppGroup.names.toSeq.sorted.foreach(name => log.debug(ppGroup.snapshot(name).toShortString))
     }
+    if (contextPool.isEmpty)
+      // add application context at start
+      contextPool = contextPool :+ new WeakReference(context.getApplicationContext)
     ppGroup("AnyBase.init") {
       log.debug("initialize AnyBase context " + context.getClass.getName)
       ppGroup("AnyBase.init.A resurrect objects") { reset(context, "init") }
