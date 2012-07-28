@@ -24,6 +24,8 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.SynchronizedSet
 
+import org.digimead.digi.ctrl.lib.androidext.SafeDialog
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
@@ -31,7 +33,6 @@ import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.dialog.Report
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.util.Android
 
 import android.accounts.AccountManager
 import android.app.Activity
@@ -49,7 +50,7 @@ import android.widget.TextView
  * trait hasn't ability to use @Loggable
  */
 /**
- * DigiLib primary activity class trait 
+ * DigiLib primary activity class trait
  */
 trait DActivity extends AnyBase with Logging {
   implicit val dispatcher: Dispatcher
@@ -61,7 +62,7 @@ trait DActivity extends AnyBase with Logging {
     log.trace("Activity::onCreateExt")
     onCreateBase(activity)
     AppComponent.Inner.lockRotationCounter.set(0)
-    AppComponent.Inner.resetDialogSafe
+    SafeDialog.reset
     // sometimes onDestroy skipped, there is no harm to drop garbage
     DActivity.registeredReceivers.clear
     DActivity.activeReceivers.clear
@@ -85,13 +86,13 @@ trait DActivity extends AnyBase with Logging {
     Report.searchAndSubmitLock.set(false)
     Report.submitInProgressLock.set(false)
     AppComponent.Inner.lockRotationCounter.set(0)
-    AppComponent.Inner.resetDialogSafe
+    SafeDialog.reset
   }
   def onPauseExt(activity: Activity with DActivity) {
     log.trace("Activity::onPauseExt")
     AppComponent.Inner.lockRotationCounter.set(0)
-    AppComponent.Inner.disableSafeDialogs
-    Android.enableRotation(activity)
+    SafeDialog.disable
+    Util.enableRotation(activity)
     onPauseBase(activity)
   }
   def onStopExt(activity: Activity with DActivity, shutdownIfActive: Boolean, origUnregisterReceiver: (BroadcastReceiver) => Unit) = {
@@ -141,7 +142,7 @@ trait DActivity extends AnyBase with Logging {
     id match {
       case id if id == Report.getId(activity) =>
         log.debug("prepare Report dialog with id " + id)
-        AppComponent.Inner.setDialogSafe(Some(Report.getClass.getName), Some(dialog))
+        //SafeDialog.set(Some(Report.getClass.getName), Some(dialog))
         val summary = dialog.findViewById(android.R.id.text1).asInstanceOf[TextView]
         onPrepareDialogStash.remove(id) match {
           case Some(stash) =>
@@ -157,11 +158,11 @@ trait DActivity extends AnyBase with Logging {
         true
       case id if id == InstallControl.getId(activity) =>
         log.debug("prepare InstallControl dialog with id " + id)
-        AppComponent.Inner.setDialogSafe(Some(InstallControl.getClass.getName), Some(dialog))
+        //SafeDialog.set(Some(InstallControl.getClass.getName), Some(dialog))
         true
       case id if id == FailedMarket.getId(activity) =>
         log.debug("prepare FailedMarket dialog with id " + id)
-        AppComponent.Inner.setDialogSafe(Some(FailedMarket.getClass.getName), Some(dialog))
+        //SafeDialog.set(Some(FailedMarket.getClass.getName), Some(dialog))
         true
       case _ =>
         false

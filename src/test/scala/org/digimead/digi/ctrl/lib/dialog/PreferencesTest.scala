@@ -16,12 +16,14 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
+import scala.annotation.implicitNotFound
+
 import org.digimead.digi.ctrl.lib.DigiLibTestDispatcher.dispatcher
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DOption
 import org.digimead.digi.ctrl.lib.log.AndroidLogger
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.PublicPreferences
 import org.scalatest.junit.JUnitSuite
 import org.scalatest.junit.ShouldMatchersForJUnit
@@ -55,10 +57,10 @@ class PreferencesTest
 
     Preferences.ShutdownTimeout.get(activity) should equal(300)
 
-    solo.searchText(Android.getString(activity, "preference_shutdown_timeout").get) should be(true)
+    solo.searchText(Util.getString(activity, "preference_shutdown_timeout").get) should be(true)
 
     activity.log.warn("click begin")
-    solo.clickOnText(Android.getString(activity, "preference_shutdown_timeout").get)
+    solo.clickOnText(Util.getString(activity, "preference_shutdown_timeout").get)
 
     Thread.sleep(1000)
 
@@ -90,10 +92,10 @@ class PreferencesTest
 
     Preferences.PreferredLayoutOrientation.get(activity) should equal(4)
 
-    solo.searchText(Android.getString(activity, "preference_layout").get) should be(true)
+    solo.searchText(Util.getString(activity, "preference_layout").get) should be(true)
 
     activity.log.warn("click begin")
-    solo.clickOnText(Android.getString(activity, "preference_layout").get)
+    solo.clickOnText(Util.getString(activity, "preference_layout").get)
 
     Thread.sleep(1000)
 
@@ -125,10 +127,10 @@ class PreferencesTest
 
     Preferences.DebugAndroidLogger.get(activity) should equal(false)
 
-    solo.searchText(Android.getString(activity, "preference_debug_android").get) should be(true)
+    solo.searchText(Util.getString(activity, "preference_debug_android").get) should be(true)
 
     activity.log.warn("click begin")
-    solo.clickOnText(Android.getString(activity, "preference_debug_android").get)
+    solo.clickOnText(Util.getString(activity, "preference_debug_android").get)
     activity.log.warn("click end")
 
     Thread.sleep(1000)
@@ -154,10 +156,10 @@ class PreferencesTest
 
     Preferences.DebugLogLevel.get(activity) should equal(5)
 
-    solo.searchText(Android.getString(activity, "preference_debug_level").get) should be(true)
+    solo.searchText(Util.getString(activity, "preference_debug_level").get) should be(true)
 
     activity.log.warn("click begin")
-    solo.clickOnText(Android.getString(activity, "preference_debug_level").get)
+    solo.clickOnText(Util.getString(activity, "preference_debug_level").get)
 
     Thread.sleep(1000)
 

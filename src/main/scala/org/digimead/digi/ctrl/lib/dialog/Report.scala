@@ -23,29 +23,26 @@ import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
-import scala.actors.Futures
 import scala.actors.Futures.future
 
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.DActivity
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
-import android.app.ProgressDialog
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat
 import android.graphics.Bitmap.Config
 import android.graphics.Canvas
-import android.text.Html
 import android.view.LayoutInflater
 import android.widget.Spinner
 import android.widget.TextView
@@ -57,26 +54,26 @@ import android.widget.Toast
 object Report extends Logging {
   val searchAndSubmitLock = new AtomicBoolean(false)
   val submitInProgressLock = new AtomicBoolean(false)
-  def getId(context: Context) = Android.getId(context, "report")
+  def getId(context: Context) = Util.getId(context, "report")
   @Loggable
   def createDialog(activity: Activity with DActivity): Dialog = {
     val inflater = LayoutInflater.from(activity)
-    val view = inflater.inflate(Android.getId(activity, "report", "layout"), null)
+    val view = inflater.inflate(Util.getId(activity, "report", "layout"), null)
     new AlertDialog.Builder(activity).
-      setTitle(Android.getString(activity, "send_report").
+      setTitle(Util.getString(activity, "send_report").
         getOrElse("Submit report")).
       setView(view).
       setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          AppComponent.Inner.replaceDialogSafe(getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
+          //AppComponent.Inner.replaceDialogSafe(getClass.getName, () => ProgressDialog.show(activity, "Please wait...", Html.fromHtml("uploading..."), true))
           future {
             AnyBase.info.get.foreach {
               info =>
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
-                  Android.withProcess({
+                  Util.withProcess({
                     case (name, uid, gid, pid, ppid, path) =>
                       val cmdLine = new File(path, "cmdline")
                       if (name == "bridge" && cmdLine.exists && cmdLine.canRead) {
@@ -111,13 +108,13 @@ object Report extends Logging {
                   writer.println("description: " + summary.getText.toString)
                   writer.println("generation time: " + date)
                   writer.println("generation time (long): " + time)
-                  writer.println("ps: \n" + (Android.collectCommandOutput("ps") match {
+                  writer.println("ps: \n" + (Util.collectCommandOutput("ps") match {
                     case result: Some[_] => result
-                    case None => Android.collectCommandOutputWithBusyBox("ps")
+                    case None => Util.collectCommandOutputWithBusyBox("ps")
                   }))
-                  writer.println("\nnetstat: \n" + (Android.collectCommandOutput("netstat") match {
+                  writer.println("\nnetstat: \n" + (Util.collectCommandOutput("netstat") match {
                     case result: Some[_] => result
-                    case None => Android.collectCommandOutputWithBusyBox("netstat")
+                    case None => Util.collectCommandOutputWithBusyBox("netstat")
                   }))
                   Thread.sleep(1000)
                 } catch {
@@ -129,23 +126,23 @@ object Report extends Logging {
                 }
                 val i = new AtomicInteger()
                 val submitResult = org.digimead.digi.ctrl.lib.base.Report.submit(activity, true, Some((f, n) => {
-                  AppComponent.Inner.getDialogSafe(0) match {
+                  /* AppComponent.Inner.getDialogSafe(0) match {
                     case Some(dialog) if dialog != null =>
                       activity.runOnUiThread(new Runnable {
                         def run = dialog.asInstanceOf[AlertDialog].setMessage("uploading " + i.incrementAndGet + "/" + n)
                       })
                     case dialog =>
                       log.warn("lost uploading dialog, got " + dialog)
-                  }
+                  }*/
                 }))
-                AppComponent.Inner.resetDialogSafe
+                //AppComponent.Inner.resetDialogSafe
                 searchAndSubmitLock.set(false)
                 if (submitResult)
                   org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
                 else {
                   log.warn("some reports submission failed, cleanAfterReview skipped")
                   activity.runOnUiThread(new Runnable {
-                    def run = Toast.makeText(activity, Android.getString(activity, "report_upload_failed").
+                    def run = Toast.makeText(activity, Util.getString(activity, "report_upload_failed").
                       getOrElse("Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later."), Toast.LENGTH_LONG).show()
                   })
                 }
@@ -156,7 +153,7 @@ object Report extends Logging {
       setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() with Logging {
         @Loggable
         def onClick(dialog: DialogInterface, which: Int) = {
-          AppComponent.Inner.resetDialogSafe
+          //AppComponent.Inner.resetDialogSafe
           searchAndSubmitLock.set(false)
           org.digimead.digi.ctrl.lib.base.Report.cleanAfterReview()
         }
@@ -169,21 +166,21 @@ object Report extends Logging {
     log.debug("lock report submit")
     if (activity != null) {
       activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
-      description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-      AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"), () => Futures.future {
+      description.foreach(description => activity.onPrepareDialogStash(Util.getId(activity, "report")) = description)
+      /* AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Util.getId(activity, "report"), () => Futures.future {
         Thread.sleep(DTimeout.normal)
         log.debug("unlock report submit")
         submitInProgressLock.set(false)
-      })
+      })*/
     } else {
       AppComponent.Context.foreach {
         case activity: Activity with DActivity =>
-          description.foreach(description => activity.onPrepareDialogStash(Android.getId(activity, "report")) = description)
-          AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Android.getId(activity, "report"), () => Futures.future {
+          description.foreach(description => activity.onPrepareDialogStash(Util.getId(activity, "report")) = description)
+        /*AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Util.getId(activity, "report"), () => Futures.future {
             Thread.sleep(DTimeout.normal)
             log.debug("unlock report submit")
             submitInProgressLock.set(false)
-          })
+          })*/
         case context =>
           log.fatal("unable to launch report dialog from illegal context")
           log.debug("unlock report submit")

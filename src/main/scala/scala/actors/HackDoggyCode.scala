@@ -28,11 +28,7 @@ package scala.actors
 import scala.actors.scheduler.ThreadPoolConfig
 import scala.actors.scheduler.ResizableThreadPoolScheduler
 
-import org.digimead.digi.ctrl.lib.log.Logging
-
-object HackDoggyCode extends Logging {
-  log.debug("alive")
-
+object HackDoggyCode {
   def getCurrentThreadPoolCoreSize = ThreadPoolConfig.corePoolSize
   def getCurrentThreadPoolMaxSize = ThreadPoolConfig.maxPoolSize
   def getResizableThreadPoolSchedulerCoreSize(pool: ResizableThreadPoolScheduler): Int =

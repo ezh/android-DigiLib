@@ -27,14 +27,13 @@ import scala.collection.JavaConversions._
 import org.digimead.digi.ctrl.ICtrlHost
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.DActivity
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
-import org.digimead.digi.ctrl.lib.dialog.InstallControl
 import org.digimead.digi.ctrl.lib.info.ComponentState
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.SyncVar
 
 import android.app.Activity
@@ -43,7 +42,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.os.Looper
 
 protected class AppControl private (packageName: String) extends Logging {
   /** profiling support */
@@ -249,7 +247,7 @@ protected class AppControl private (packageName: String) extends Logging {
           val text = if (ready.isSet && ready.get == None) {
             AppComponent.Context match {
               case Some(context) =>
-                Android.getString(context, "error_component_status_unavailable").
+                Util.getString(context, "error_component_status_unavailable").
                   getOrElse("%1$s component status unavailable").format(componentPackage)
               case None =>
                 componentPackage + "component status unavailable"
@@ -494,7 +492,8 @@ object AppControl extends Logging {
       log.info("bind to service " + DIntent.HostService)
       if (!isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
-          AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a))))
+          log.g_a_s_e("SHOW") //AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)))
+          ))
         serviceInstance.set(None)
       } else if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_bind_failed")))

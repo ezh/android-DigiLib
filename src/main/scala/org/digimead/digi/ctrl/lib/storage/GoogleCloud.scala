@@ -52,10 +52,10 @@ import org.apache.http.params.HttpConnectionParams
 import org.apache.http.params.HttpProtocolParams
 import org.apache.http.protocol.HTTP
 import org.apache.http.util.EntityUtils
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Common
 import org.digimead.digi.ctrl.lib.util.ExceptionHandler
 import org.json.JSONObject
@@ -113,10 +113,10 @@ object GoogleCloud extends Logging {
     context =>
       log.debug("upload files via Apache client with default credentials")
       for {
-        clientID_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_ID")
-        clientSecret_64 <- Android.getString(context, "APPLICATION_GS_CLIENT_SECRET")
-        refreshToken_64 <- Android.getString(context, "APPLICATION_GS_TOKEN")
-        backet_64 <- Android.getString(context, "APPLICATION_GS_BUCKET")
+        clientID_64 <- Util.getString(context, "APPLICATION_GS_CLIENT_ID")
+        clientSecret_64 <- Util.getString(context, "APPLICATION_GS_CLIENT_SECRET")
+        refreshToken_64 <- Util.getString(context, "APPLICATION_GS_TOKEN")
+        backet_64 <- Util.getString(context, "APPLICATION_GS_BUCKET")
         httpclient <- httpclient
       } yield try {
         val clientID = new String(Base64.decode(clientID_64, Base64.DEFAULT), "UTF-8")

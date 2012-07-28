@@ -18,6 +18,7 @@ package org.digimead.digi.ctrl.lib.dialog
 
 import scala.annotation.implicitNotFound
 
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DConstant
@@ -26,7 +27,6 @@ import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmMumble
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.Version
 
 import android.app.Activity
@@ -40,7 +40,7 @@ import android.net.Uri
 import android.text.Html
 
 object InstallControl extends Logging {
-  def getId(context: Context) = Android.getId(context, "install_digicontrol")
+  def getId(context: Context) = Util.getId(context, "install_digicontrol")
   @Loggable
   def createDialog(activity: Activity)(implicit logger: RichLogger, dispatcher: Dispatcher): Dialog = {
     // check whether the intent can be resolved. If not, we will see
@@ -55,27 +55,27 @@ object InstallControl extends Logging {
           val version = new Version(pi.versionName)
           log.debug(DConstant.controlPackage + " minimum version '" + minVersion + "' and current version '" + version + "'")
           if (version.compareTo(minVersion) == -1)
-            Android.getString(activity, "update").getOrElse("update")
+            Util.getString(activity, "update").getOrElse("update")
           else
-            Android.getString(activity, "reinstall").getOrElse("reinstall")
+            Util.getString(activity, "reinstall").getOrElse("reinstall")
         } catch {
           case e: NameNotFoundException =>
-            Android.getString(activity, "install").getOrElse("install")
+            Util.getString(activity, "install").getOrElse("install")
         }
         case None => try {
           val pm = activity.getPackageManager()
           val pi = pm.getPackageInfo(DConstant.controlPackage, 0)
-          Android.getString(activity, "update").getOrElse("update")
+          Util.getString(activity, "update").getOrElse("update")
         } catch {
           case e: NameNotFoundException =>
-            Android.getString(activity, "install").getOrElse("install")
+            Util.getString(activity, "install").getOrElse("install")
         }
       }
     new AlertDialog.Builder(activity).
-      setIcon(Android.getId(activity, "ic_control_icon", "drawable")).
-      setTitle(Android.getString(activity, "error_digicontrol_not_found_title").
+      setIcon(Util.getId(activity, "ic_control_icon", "drawable")).
+      setTitle(Util.getString(activity, "error_digicontrol_not_found_title").
         getOrElse("DigiControl failed")).
-      setMessage(Html.fromHtml(Android.getString(activity, "error_digicontrol_not_found_content").
+      setMessage(Html.fromHtml(Util.getString(activity, "error_digicontrol_not_found_content").
         getOrElse("DigiControl application not found on the device").format(action))).
       setPositiveButton(action(0).toUpper + action.substring(1), new DialogInterface.OnClickListener() {
         @Loggable
@@ -86,7 +86,8 @@ object InstallControl extends Logging {
             intent.addCategory(Intent.CATEGORY_BROWSABLE)
             activity.startActivity(intent)
           } catch {
-            case _ => AppComponent.Inner.showDialogSafe(activity, InstallControl.getClass.getName, FailedMarket.getId(activity))
+            case _ =>
+            //AppComponent.Inner.showDialogSafe(activity, InstallControl.getClass.getName, FailedMarket.getId(activity))
           }
         }
       }).

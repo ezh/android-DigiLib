@@ -18,9 +18,9 @@ package org.digimead.digi.ctrl.lib.block
 
 import java.util.ArrayList
 
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
-import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
@@ -39,13 +39,13 @@ class ThanksBlock(val context: Context) extends Block[ThanksBlock.Item] with Log
   val items = Seq(
     ThanksBlock.Item("Someone", "For everything"))
   private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
-    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+    inflate(Util.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new SimpleAdapter(context, ThanksBlock.getListValues(items), android.R.layout.simple_list_item_2,
     Array(ThanksBlock.name, ThanksBlock.description), Array(android.R.id.text1, android.R.id.text2))
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
-    header.setText(Html.fromHtml(Android.getString(context, "block_thanks_title").getOrElse("thanks")))
+    header.setText(Html.fromHtml(Util.getString(context, "block_thanks_title").getOrElse("thanks")))
     mergeAdapter.addView(header)
     mergeAdapter.addAdapter(adapter)
   }

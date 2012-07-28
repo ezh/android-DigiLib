@@ -25,6 +25,7 @@ import scala.actors.scheduler.DaemonScheduler
 import scala.actors.scheduler.ResizableThreadPoolScheduler
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.androidext.SafeDialog
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.base.AppControl
@@ -86,6 +87,9 @@ private[lib] trait AnyBase extends Logging {
  * @note startup duration is around 500ms
  */
 object AnyBase extends Logging {
+  // didn't work :-(, kick it before debug
+  // freeze application for 1.5 ~ 2s at startup ;-/
+  scala.util.HackDoggyCode.fixFreezeOnStartup
   /** profiling support  */
   @volatile private var stopWatchGroups = Seq[StopwatchGroup](Stopwatch)
   val (ppGroup, ppStartup, ppLoading) = {
@@ -139,6 +143,7 @@ object AnyBase extends Logging {
   def init(context: Context, stackTraceOnUnknownContext: Boolean = true): Unit = synchronized {
     if (AnyBase.info.get == None) {
       // dump profiling at startup
+      android.os.Debug.stopMethodTracing
       ppStartup.stop
       ppGroup.names.toSeq.sorted.foreach(name => log.debug(ppGroup.snapshot(name).toShortString))
     }
@@ -298,6 +303,17 @@ object AnyBase extends Logging {
       android.os.Process.sendSignal(android.os.Process.myPid(), 1)
     }
   }
+  def initializeDebug(trace: Boolean = false) {
+    if (trace)
+      android.os.Debug.startMethodTracing("digi", 20 * 1024 * 1024)
+    try {
+      val sMode = Class.forName("android.os.StrictMode")
+      val enableDefaults = sMode.getMethod("enableDefaults")
+      enableDefaults.invoke(null)
+    } catch {
+      case e => android.util.Log.v("StrictMode", "... not supported. Skipping...")
+    }
+  }
   private def updateContext(): Option[Context] = synchronized {
     contextPool = contextPool.filter(_.get != None).sortBy(n => n.get match {
       case Some(activity) if activity.isInstanceOf[Activity] => 1
@@ -367,8 +383,8 @@ object AnyBase extends Logging {
         inner.state.resetBusyCounter
         context match {
           case component: DActivity =>
-            if (inner.activitySafeDialog.isSet)
-              inner.activitySafeDialog.unset()
+            if (SafeDialog.container.isSet)
+              SafeDialog.container.unset()
             inner.bindedICtrlPool.keys.foreach(key => {
               inner.bindedICtrlPool.remove(key).map(record => {
                 log.debug("remove service connection to " + key + " from bindedICtrlPool")
@@ -380,6 +396,7 @@ object AnyBase extends Logging {
       case None =>
     }
   }
+
   case class Info(val reportPathInternal: File,
     val reportPathExternal: File,
     val appVersion: String,

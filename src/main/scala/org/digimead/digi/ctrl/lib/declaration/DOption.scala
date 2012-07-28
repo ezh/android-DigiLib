@@ -16,14 +16,14 @@
 
 package org.digimead.digi.ctrl.lib.declaration
 
-import org.digimead.digi.ctrl.lib.util.Android
+import org.digimead.digi.ctrl.lib.androidext.Util
 
 import android.content.Context
 
 trait DOption extends Enumeration {
   class OptVal(val tag: String, val kind: Class[_], val default: AnyRef, _name: String, _description: String) extends Val(nextId, tag) {
-    def name(context: Context) = Android.getString(context, _name).getOrElse(_name)
-    def description(context: Context) = Android.getString(context, _description).getOrElse(_description)
+    def name(context: Context) = Util.getString(context, _name).getOrElse(_name)
+    def description(context: Context) = Util.getString(context, _description).getOrElse(_description)
   }
   final def Value(id: String, kind: Class[_], default: AnyRef, _name: String = null, _description: String = null): OptVal = {
     val name = if (_name != null) _name else "option_" + id + "_name"

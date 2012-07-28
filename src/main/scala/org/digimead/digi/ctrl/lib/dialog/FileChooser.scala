@@ -28,11 +28,11 @@ import scala.collection.mutable.HashSet
 import scala.collection.mutable.SynchronizedSet
 import scala.ref.WeakReference
 
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
 import org.digimead.digi.ctrl.lib.message.Dispatcher
-import org.digimead.digi.ctrl.lib.util.Android
 import org.digimead.digi.ctrl.lib.util.SyncVar
 
 import android.app.Activity
@@ -61,18 +61,18 @@ object FileChooser extends Logging {
   @volatile private var onFileClickDismissCb = (a: Context, f: File) => false
   @volatile private var onResult: (Context, File, Seq[File], AnyRef) => Any = (context, dir, selected, stash) => {}
   private lazy val lv = new WeakReference(layout.map(_.findViewById(android.R.id.list).asInstanceOf[ListView]).getOrElse(null))
-  private lazy val path = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_path")).asInstanceOf[TextView]).getOrElse(null))
-  private lazy val home = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_home")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val up = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_up")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val filter = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_preference")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val order = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_order")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val paste = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_paste")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val clear = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_clear")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val copy = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_copy")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val cut = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_cut")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val delete = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_delete")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val cancel = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_cancel")).asInstanceOf[Button]).getOrElse(null))
-  private lazy val multiple = new WeakReference(layout.map(l => l.findViewById(Android.getId(l.getContext, "filechooser_multiple")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val path = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_path")).asInstanceOf[TextView]).getOrElse(null))
+  private lazy val home = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_home")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val up = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_up")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val filter = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_preference")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val order = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_order")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val paste = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_paste")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val clear = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_clear")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val copy = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_copy")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val cut = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_cut")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val delete = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_delete")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val cancel = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_cancel")).asInstanceOf[Button]).getOrElse(null))
+  private lazy val multiple = new WeakReference(layout.map(l => l.findViewById(Util.getId(l.getContext, "filechooser_multiple")).asInstanceOf[Button]).getOrElse(null))
   private val copiedFiles = new HashSet[File]() with SynchronizedSet[File]
   private val cutFiles = new HashSet[File]() with SynchronizedSet[File]
   private val selectionFiles = new HashSet[File]() with SynchronizedSet[File]
@@ -108,7 +108,7 @@ object FileChooser extends Logging {
     }
     val result = dialog orElse (for {
       inflater <- inflater.orElse({ inflater = Some(activity.getLayoutInflater()); inflater })
-      layout <- layout.orElse({ layout = Some(inflater.inflate(Android.getId(activity, "dialog_filechooser", "layout"), null).asInstanceOf[LinearLayout]); layout })
+      layout <- layout.orElse({ layout = Some(inflater.inflate(Util.getId(activity, "dialog_filechooser", "layout"), null).asInstanceOf[LinearLayout]); layout })
     } yield {
       log.debug("initialize new FileChooser dialog")
       val builder = new AlertDialog.Builder(activity).
@@ -156,7 +156,7 @@ object FileChooser extends Logging {
       home.setOnClickListener(new View.OnClickListener() {
         override def onClick(v: View) {
           activeDirectory = new File("/")
-          //          Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+          //          Toast.makeText(v.getContext, Util.getString(v.getContext, "filechooser_change_directory_to").
           //            getOrElse("change directory to %s").format(activeDirectory), Toast.LENGTH_SHORT).show()
           showDirectory(activeDirectory)
         }
@@ -165,11 +165,11 @@ object FileChooser extends Logging {
         override def onClick(v: View) = {
           activeDirectory.getParentFile match {
             case parent: File =>
-              //              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to").
+              //              Toast.makeText(v.getContext, Util.getString(v.getContext, "filechooser_change_directory_to").
               //                getOrElse("change directory to %s").format(parent), Toast.LENGTH_SHORT).show()
               showDirectory(parent)
             case null =>
-              Toast.makeText(v.getContext, Android.getString(v.getContext, "filechooser_change_directory_to_failed").
+              Toast.makeText(v.getContext, Util.getString(v.getContext, "filechooser_change_directory_to_failed").
                 getOrElse("unable to change directory to %s").format("outer of " + activeDirectory), Toast.LENGTH_SHORT).show()
           }
         }
@@ -302,11 +302,11 @@ object FileChooser extends Logging {
     }
     if (file.isDirectory) {
       if (file.canExecute && file.canRead) {
-        //        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to").
+        //        Toast.makeText(view.getContext, Util.getString(view.getContext, "filechooser_change_directory_to").
         //          getOrElse("change directory to %s").format(file), Toast.LENGTH_SHORT).show()
         showDirectory(file)
       } else {
-        Toast.makeText(view.getContext, Android.getString(view.getContext, "filechooser_change_directory_to_failed").
+        Toast.makeText(view.getContext, Util.getString(view.getContext, "filechooser_change_directory_to_failed").
           getOrElse("unable to change directory to %s").format(file), Toast.LENGTH_SHORT).show()
       }
     } else {

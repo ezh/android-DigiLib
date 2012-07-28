@@ -23,12 +23,12 @@ import scala.collection.JavaConversions._
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.androidext.Util
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.message.Dispatcher
 import org.digimead.digi.ctrl.lib.message.IAmYell
-import org.digimead.digi.ctrl.lib.util.Android
 
 import com.commonsware.cwac.merge.MergeAdapter
 
@@ -52,13 +52,13 @@ class LegalBlock(val context: Context,
   val lazyItems: List[Future[LegalBlock.Item]],
   _imageGetter: Html.ImageGetter = null,
   tagHandler: Html.TagHandler = null)(implicit val dispatcher: Dispatcher) extends Block[LegalBlock.Item] with Logging {
-  val items = lazyItems.map(_ => LegalBlock.Item(Android.getString(context, "loading").getOrElse("loading..."))(""))
+  val items = lazyItems.map(_ => LegalBlock.Item(Util.getString(context, "loading").getOrElse("loading..."))(""))
   private lazy val imageGetter = _imageGetter match {
     case null => new Block.ImageGetter(context)
     case getter => getter
   }
   private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
-    inflate(Android.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+    inflate(Util.getId(context, "header", "layout"), null).asInstanceOf[TextView]
   private lazy val adapter = new LegalBlock.Adapter(context, android.R.layout.simple_list_item_1, items, imageGetter, tagHandler)
   private val inflater: LayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   // fill adapter with lazyItems
@@ -67,7 +67,7 @@ class LegalBlock(val context: Context,
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
-    header.setText(Android.getString(context, "block_legal_title").getOrElse("legal"))
+    header.setText(Util.getString(context, "block_legal_title").getOrElse("legal"))
     mergeAdapter.addView(header)
     mergeAdapter.addAdapter(adapter)
   }
@@ -84,23 +84,23 @@ class LegalBlock(val context: Context,
   @Loggable
   override def onCreateContextMenu(menu: ContextMenu, v: View, menuInfo: ContextMenu.ContextMenuInfo, item: LegalBlock.Item) {
     log.debug("create context menu for " + item)
-    menu.setHeaderTitle(Android.getString(context, "block_legal_title").getOrElse("legal"))
-    Android.getId(context, "ic_launcher", "drawable") match {
+    menu.setHeaderTitle(Util.getString(context, "block_legal_title").getOrElse("legal"))
+    Util.getId(context, "ic_launcher", "drawable") match {
       case i if i != 0 =>
         menu.setHeaderIcon(i)
       case _ =>
     }
     if (item.uri.nonEmpty) {
-      menu.add(Menu.NONE, Android.getId(context, "block_legal_open"), 1,
-        Android.getString(context, "block_legal_open").getOrElse("Open license"))
-      menu.add(Menu.NONE, Android.getId(context, "block_legal_send"), 1,
-        Android.getString(context, "block_legal_send").getOrElse("Send link to ..."))
+      menu.add(Menu.NONE, Util.getId(context, "block_legal_open"), 1,
+        Util.getString(context, "block_legal_open").getOrElse("Open license"))
+      menu.add(Menu.NONE, Util.getId(context, "block_legal_send"), 1,
+        Util.getString(context, "block_legal_send").getOrElse("Send link to ..."))
     }
   }
   @Loggable
   override def onContextItemSelected(menuItem: MenuItem, item: LegalBlock.Item): Boolean = {
     menuItem.getItemId match {
-      case id if id == Android.getId(context, "block_legal_open") =>
+      case id if id == Util.getId(context, "block_legal_open") =>
         log.debug("open link from " + item.uri)
         try {
           val intent = new Intent(Intent.ACTION_VIEW, Uri.parse(item.uri))
@@ -115,7 +115,7 @@ class LegalBlock(val context: Context,
             IAmYell("Unable to open license link " + item.uri, e)
             false
         }
-      case id if id == Android.getId(context, "block_legal_send") =>
+      case id if id == Util.getId(context, "block_legal_send") =>
         log.debug("send link to " + item.uri)
         try {
           val intent = new Intent("Intent.ACTION_SEND")

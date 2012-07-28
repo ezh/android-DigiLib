@@ -20,10 +20,11 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 
+import scala.Array.canBuildFrom
+
+import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.Report
-import org.digimead.digi.ctrl.lib.util.Android
-import org.digimead.digi.ctrl.lib.AnyBase
 
 import android.content.Context
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.digimead.digi.ctrl.lib.util
+package org.digimead.digi.ctrl.lib.androidext
 
 import java.io.BufferedReader
 import java.io.File
@@ -26,29 +26,24 @@ import scala.ref.WeakReference
 import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
-import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.base.AppComponent
+import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.app.Activity
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.content.Context
-import android.os.Build
-import android.view.Surface
-import android.view.Display
-import android.view.WindowManager
-import android.widget.TextView
-import android.graphics.drawable.Drawable
-import android.text.SpannableString
-import android.graphics.drawable.LayerDrawable
-import android.text.style.LeadingMarginSpan
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.text.Layout
-import android.widget.ImageView
-import android.widget.ImageView.ScaleType
+import android.text.SpannableString
+import android.text.style.LeadingMarginSpan
+import android.view.Display
+import android.widget.TextView
 
-object Android extends Logging {
+object Util extends Logging {
   @volatile private var busybox: Option[File] = null
   def getString(context: WeakReference[Context], name: String): Option[String] =
     context.get.flatMap(ctx => getString(ctx, name))
