@@ -27,7 +27,8 @@ import scala.actors.Futures.future
 
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XAndroid
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
@@ -54,13 +55,13 @@ import android.widget.Toast
 object Report extends Logging {
   val searchAndSubmitLock = new AtomicBoolean(false)
   val submitInProgressLock = new AtomicBoolean(false)
-  def getId(context: Context) = Util.getId(context, "report")
+  def getId(context: Context) = XResource.getId(context, "report")
   @Loggable
   def createDialog(activity: Activity with DActivity): Dialog = {
     val inflater = LayoutInflater.from(activity)
-    val view = inflater.inflate(Util.getId(activity, "report", "layout"), null)
+    val view = inflater.inflate(XResource.getId(activity, "report", "layout"), null)
     new AlertDialog.Builder(activity).
-      setTitle(Util.getString(activity, "send_report").
+      setTitle(XResource.getString(activity, "send_report").
         getOrElse("Submit report")).
       setView(view).
       setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() with Logging {
@@ -73,7 +74,7 @@ object Report extends Logging {
                 var writer: PrintWriter = null
                 try {
                   val myUID = android.os.Process.myUid
-                  Util.withProcess({
+                  XAndroid.withProcess({
                     case (name, uid, gid, pid, ppid, path) =>
                       val cmdLine = new File(path, "cmdline")
                       if (name == "bridge" && cmdLine.exists && cmdLine.canRead) {
@@ -108,13 +109,13 @@ object Report extends Logging {
                   writer.println("description: " + summary.getText.toString)
                   writer.println("generation time: " + date)
                   writer.println("generation time (long): " + time)
-                  writer.println("ps: \n" + (Util.collectCommandOutput("ps") match {
+                  writer.println("ps: \n" + (XAndroid.collectCommandOutput("ps") match {
                     case result: Some[_] => result
-                    case None => Util.collectCommandOutputWithBusyBox("ps")
+                    case None => XAndroid.collectCommandOutputWithBusyBox("ps")
                   }))
-                  writer.println("\nnetstat: \n" + (Util.collectCommandOutput("netstat") match {
+                  writer.println("\nnetstat: \n" + (XAndroid.collectCommandOutput("netstat") match {
                     case result: Some[_] => result
-                    case None => Util.collectCommandOutputWithBusyBox("netstat")
+                    case None => XAndroid.collectCommandOutputWithBusyBox("netstat")
                   }))
                   Thread.sleep(1000)
                 } catch {
@@ -142,7 +143,7 @@ object Report extends Logging {
                 else {
                   log.warn("some reports submission failed, cleanAfterReview skipped")
                   activity.runOnUiThread(new Runnable {
-                    def run = Toast.makeText(activity, Util.getString(activity, "report_upload_failed").
+                    def run = Toast.makeText(activity, XResource.getString(activity, "report_upload_failed").
                       getOrElse("Some of the reports could not be uploaded to the Digimead Error Reporting service. Please try again later."), Toast.LENGTH_LONG).show()
                   })
                 }
@@ -166,8 +167,8 @@ object Report extends Logging {
     log.debug("lock report submit")
     if (activity != null) {
       activity.runOnUiThread(new Runnable { def run = takeScreenshot(activity) })
-      description.foreach(description => activity.onPrepareDialogStash(Util.getId(activity, "report")) = description)
-      /* AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Util.getId(activity, "report"), () => Futures.future {
+      description.foreach(description => activity.onPrepareDialogStash(XResource.getId(activity, "report")) = description)
+      /* AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, XResource.getId(activity, "report"), () => Futures.future {
         Thread.sleep(DTimeout.normal)
         log.debug("unlock report submit")
         submitInProgressLock.set(false)
@@ -175,8 +176,8 @@ object Report extends Logging {
     } else {
       AppComponent.Context.foreach {
         case activity: Activity with DActivity =>
-          description.foreach(description => activity.onPrepareDialogStash(Util.getId(activity, "report")) = description)
-        /*AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, Util.getId(activity, "report"), () => Futures.future {
+          description.foreach(description => activity.onPrepareDialogStash(XResource.getId(activity, "report")) = description)
+        /*AppComponent.Inner.showDialogSafe(activity, Report.getClass.getName, XResource.getId(activity, "report"), () => Futures.future {
             Thread.sleep(DTimeout.normal)
             log.debug("unlock report submit")
             submitInProgressLock.set(false)

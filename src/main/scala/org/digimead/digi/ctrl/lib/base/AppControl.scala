@@ -27,7 +27,7 @@ import scala.collection.JavaConversions._
 import org.digimead.digi.ctrl.ICtrlHost
 import org.digimead.digi.ctrl.lib.AnyBase
 import org.digimead.digi.ctrl.lib.DActivity
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DIntent
 import org.digimead.digi.ctrl.lib.declaration.DState
@@ -247,7 +247,7 @@ protected class AppControl private (packageName: String) extends Logging {
           val text = if (ready.isSet && ready.get == None) {
             AppComponent.Context match {
               case Some(context) =>
-                Util.getString(context, "error_component_status_unavailable").
+                XResource.getString(context, "error_component_status_unavailable").
                   getOrElse("%1$s component status unavailable").format(componentPackage)
               case None =>
                 componentPackage + "component status unavailable"
@@ -347,14 +347,16 @@ protected class AppControl private (packageName: String) extends Logging {
   private def initializeDirectories(timeout: Int) {
     val internalPath = new SyncVar[File]()
     val externalPath = new SyncVar[File]()
-    AppControl.Inner.callListDirectories(packageName)() match {
-      case Some((internal, external)) =>
-        internalPath.set(new File(internal))
-        externalPath.set(new File(external))
-      case r =>
-        log.warn("unable to get component directories, result " + r)
-        internalPath.set(null)
-        externalPath.set(null)
+    Futures.future {
+      AppControl.Inner.callListDirectories(packageName)() match {
+        case Some((internal, external)) =>
+          internalPath.set(new File(internal))
+          externalPath.set(new File(external))
+        case r =>
+          log.warn("unable to get component directories, result " + r)
+          internalPath.set(null)
+          externalPath.set(null)
+      }
     }
     for {
       internalPath <- internalPath.get(timeout) if internalPath != null

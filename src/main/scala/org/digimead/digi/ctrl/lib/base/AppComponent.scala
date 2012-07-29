@@ -32,7 +32,7 @@ import scala.xml.XML
 
 import org.digimead.digi.ctrl.ICtrlComponent
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XAndroid
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.declaration.DConstant
 import org.digimead.digi.ctrl.lib.declaration.DIntent
@@ -86,7 +86,7 @@ protected class AppComponent private () extends Logging {
   def disableRotation() = AppComponent.Context match {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       if (lockRotationCounter.getAndIncrement == 0)
-        Util.disableRotation(activity.asInstanceOf[Activity])
+        XAndroid.disableRotation(activity.asInstanceOf[Activity])
       log.trace("increment rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to disable rotation, invalid context " + context)
@@ -96,7 +96,7 @@ protected class AppComponent private () extends Logging {
     case Some(activity) if activity.isInstanceOf[Activity] =>
       lockRotationCounter.compareAndSet(0, 1)
       if (lockRotationCounter.decrementAndGet == 0)
-        Util.enableRotation(activity.asInstanceOf[Activity])
+        XAndroid.enableRotation(activity.asInstanceOf[Activity])
       log.trace("decrement rotation lock to " + lockRotationCounter.get)
     case context =>
       log.warn("unable to enable rotation, invalid context " + context)

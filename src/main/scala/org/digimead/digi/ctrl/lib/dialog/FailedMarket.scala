@@ -16,7 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.dialog
 
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 
@@ -27,13 +27,13 @@ import android.content.Context
 import android.content.DialogInterface
 
 object FailedMarket extends Logging {
-  def getId(context: Context) = Util.getId(context, "failed_market")
+  def getId(context: Context) = XResource.getId(context, "failed_market")
   @Loggable
   def createDialog(activity: Activity): Dialog = {
     new AlertDialog.Builder(activity).
-      setTitle(Util.getString(activity, "error_market_failed_title").
+      setTitle(XResource.getString(activity, "error_market_failed_title").
         getOrElse("Market failed")).
-      setMessage(Util.getString(activity, "error_market_failed_content").
+      setMessage(XResource.getString(activity, "error_market_failed_content").
         getOrElse("Market application not found on the device")).
       setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
         @Loggable

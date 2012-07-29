@@ -25,7 +25,7 @@ import scala.collection.mutable.SynchronizedMap
 import scala.collection.mutable.SynchronizedSet
 
 import org.digimead.digi.ctrl.lib.androidext.SafeDialog
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XAndroid
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.dialog.FailedMarket
@@ -92,7 +92,7 @@ trait DActivity extends AnyBase with Logging {
     log.trace("Activity::onPauseExt")
     AppComponent.Inner.lockRotationCounter.set(0)
     SafeDialog.disable
-    Util.enableRotation(activity)
+    XAndroid.enableRotation(activity)
     onPauseBase(activity)
   }
   def onStopExt(activity: Activity with DActivity, shutdownIfActive: Boolean, origUnregisterReceiver: (BroadcastReceiver) => Unit) = {

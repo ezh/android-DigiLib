@@ -21,7 +21,7 @@ import scala.collection.mutable.SynchronizedBuffer
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 
@@ -102,7 +102,7 @@ object Level extends Logging {
     def stripeGreen = AppComponent.Context.flatMap {
       context =>
         Option(new BitmapDrawable(BitmapFactory.decodeResource(context.getApplicationContext.getResources,
-          Util.getId(context, "stripe_green", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
+          XResource.getId(context, "stripe_green", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
     } getOrElse { log.fatal("unable to get drawable stripe_green"); new ColorDrawable() }
     def gradientGreen = AppComponent.Context.flatMap {
       context =>
@@ -121,7 +121,7 @@ object Level extends Logging {
     def stripeYellow = AppComponent.Context.flatMap {
       context =>
         Option(new BitmapDrawable(BitmapFactory.decodeResource(context.getApplicationContext.getResources,
-          Util.getId(context, "stripe_yellow", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
+          XResource.getId(context, "stripe_yellow", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
     } getOrElse { log.fatal("unable to get drawable stripe_yellow"); new ColorDrawable() }
     def gradientYellow = AppComponent.Context.flatMap {
       context =>
@@ -131,7 +131,7 @@ object Level extends Logging {
         Some(gradient.mutate)
     } getOrElse { log.fatal("unable to get drawable gradient_yellow"); new ColorDrawable() }
     def intermediateDrawable = AppComponent.Context.flatMap {
-      context => Option(context.getApplicationContext.getResources.getDrawable(Util.getId(context, "intermediate_mark", "drawable")))
+      context => Option(context.getApplicationContext.getResources.getDrawable(XResource.getId(context, "intermediate_mark", "drawable")))
     } match {
       case Some(drawable) =>
         new LayerDrawable(Array(stripeYellow.mutate, gradientYellow.mutate)).mutate
@@ -142,7 +142,7 @@ object Level extends Logging {
     def stripeRed = AppComponent.Context.flatMap {
       context =>
         Option(new BitmapDrawable(BitmapFactory.decodeResource(context.getApplicationContext.getResources,
-          Util.getId(context, "stripe_red", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
+          XResource.getId(context, "stripe_red", "drawable")))).map(d => { d.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT); d.mutate })
     } getOrElse { log.fatal("unable to get drawable stripe_red"); new ColorDrawable() }
     def gradientRed = AppComponent.Context.flatMap {
       context =>
@@ -152,7 +152,7 @@ object Level extends Logging {
         Some(gradient.mutate)
     } getOrElse { log.fatal("unable to get drawable gradient_red"); new ColorDrawable() }
     def professionalDrawable = AppComponent.Context.flatMap {
-      context => Option(context.getApplicationContext.getResources.getDrawable(Util.getId(context, "professional_mark", "drawable")))
+      context => Option(context.getApplicationContext.getResources.getDrawable(XResource.getId(context, "professional_mark", "drawable")))
     } match {
       case Some(drawable) =>
         new LayerDrawable(Array(stripeRed.mutate, gradientRed.mutate)).mutate

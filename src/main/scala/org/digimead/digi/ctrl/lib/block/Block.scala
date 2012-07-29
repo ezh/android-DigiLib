@@ -20,7 +20,7 @@ import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 import org.digimead.digi.ctrl.lib.log.RichLogger
@@ -60,7 +60,7 @@ object Block extends Logging {
   }
   class ImageGetter(context: Context) extends Html.ImageGetter with Logging {
     def getDrawable(source: String): Drawable = {
-      Util.getId(context, source, "drawable") match {
+      XResource.getId(context, source, "drawable") match {
         case i if i != 0 =>
           log.debug("load drawable \"" + source + "\" with id " + i)
           context.getResources.getDrawable(i)
@@ -74,7 +74,7 @@ object Block extends Logging {
     try {
       val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
       clipboard.setText(copyText)
-      val message = Util.getString(context, "block_copy_link_to_clipboard").
+      val message = XResource.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
       AnyBase.runOnUiThread { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }
       true
@@ -92,9 +92,9 @@ object Block extends Logging {
       intent.putExtra(Intent.EXTRA_TEXT, bodyText)
       AppComponent.Context match {
         case Some(activity) if activity.isInstanceOf[Activity] =>
-          activity.startActivity(Intent.createChooser(intent, Util.getString(activity, "share").getOrElse("share")))
+          activity.startActivity(Intent.createChooser(intent, XResource.getString(activity, "share").getOrElse("share")))
         case _ => context.startActivity(Intent.createChooser(intent,
-          Util.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+          XResource.getString(context, "share").getOrElse("share")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       }
       true
     } catch {

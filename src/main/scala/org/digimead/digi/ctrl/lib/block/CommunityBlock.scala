@@ -21,7 +21,7 @@ import scala.actors.Futures
 import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DTimeout
@@ -53,24 +53,24 @@ class CommunityBlock(val context: Context,
   val wikiUri: Option[Future[Uri]],
   val translationUri: Option[Future[Uri]],
   val translationCommonUri: Option[Future[Uri]])(implicit val dispatcher: Dispatcher) extends Block[CommunityBlock.Item] with Logging {
-  val itemXDA = CommunityBlock.Item(Util.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
-    Util.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
-  val itemWiki = CommunityBlock.Item(Util.getString(context, "block_community_wiki_title").getOrElse("wiki"),
-    Util.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
-  val itemTranslation = CommunityBlock.Item(Util.getString(context, "block_community_translate_title").getOrElse("translation of %s").
-    format(Util.getString(context, "app_name").getOrElse("Unknown")),
-    Util.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
-  val itemTranslationCommon = CommunityBlock.Item(Util.getString(context, "block_community_translate_title").getOrElse("translation of %s").format("DigiLib"),
-    Util.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
+  val itemXDA = CommunityBlock.Item(XResource.getString(context, "block_community_xda_title").getOrElse("XDA developers community"),
+    XResource.getString(context, "block_community_xda_description").getOrElse("XDA forum thread"), "ic_block_community_xda_logo")
+  val itemWiki = CommunityBlock.Item(XResource.getString(context, "block_community_wiki_title").getOrElse("wiki"),
+    XResource.getString(context, "block_community_wiki_description").getOrElse("collaborate on a documentation"), "ic_block_community_wiki")
+  val itemTranslation = CommunityBlock.Item(XResource.getString(context, "block_community_translate_title").getOrElse("translation of %s").
+    format(XResource.getString(context, "app_name").getOrElse("Unknown")),
+    XResource.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
+  val itemTranslationCommon = CommunityBlock.Item(XResource.getString(context, "block_community_translate_title").getOrElse("translation of %s").format("DigiLib"),
+    XResource.getString(context, "block_community_translate_description").getOrElse("your help with translation are very appreciated"), "ic_block_community_translate")
   val items = Seq() ++ (if (xdaUri != None) Seq(itemXDA) else Seq()) ++ (if (wikiUri != None) Seq(itemWiki) else Seq()) ++
     (if (translationUri != None) Seq(itemTranslation) else Seq()) ++ (if (translationCommonUri != None) Seq(itemTranslationCommon) else Seq())
   private lazy val header = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater].
-    inflate(Util.getId(context, "header", "layout"), null).asInstanceOf[TextView]
-  private lazy val adapter = new CommunityBlock.Adapter(context, Util.getId(context, "block_list_item", "layout"), items)
+    inflate(XResource.getId(context, "header", "layout"), null).asInstanceOf[TextView]
+  private lazy val adapter = new CommunityBlock.Adapter(context, XResource.getId(context, "block_list_item", "layout"), items)
   @Loggable
   def appendTo(mergeAdapter: MergeAdapter) = {
     log.debug("append " + getClass.getName + " to MergeAdapter")
-    header.setText(Html.fromHtml(Util.getString(context, "block_community_title").getOrElse("community")))
+    header.setText(Html.fromHtml(XResource.getString(context, "block_community_title").getOrElse("community")))
     mergeAdapter.addView(header)
     mergeAdapter.addAdapter(adapter)
   }
@@ -164,32 +164,32 @@ class CommunityBlock(val context: Context,
     log.debug("create context menu for " + item.name)
     menu.setHeaderTitle(item.name)
     if (item.icon.nonEmpty)
-      Util.getId(context, item.icon, "drawable") match {
+      XResource.getId(context, item.icon, "drawable") match {
         case i if i != 0 =>
           menu.setHeaderIcon(i)
         case _ =>
       }
     item match {
       case this.itemXDA =>
-        menu.add(Menu.NONE, Util.getId(context, "block_link_copy"), 1,
-          Util.getString(context, "block_link_copy").getOrElse("Copy link"))
-        menu.add(Menu.NONE, Util.getId(context, "block_link_send"), 2,
-          Util.getString(context, "block_link_send").getOrElse("Send link to ..."))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_copy"), 1,
+          XResource.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_send"), 2,
+          XResource.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case this.itemWiki =>
-        menu.add(Menu.NONE, Util.getId(context, "block_link_copy"), 1,
-          Util.getString(context, "block_link_copy").getOrElse("Copy link"))
-        menu.add(Menu.NONE, Util.getId(context, "block_link_send"), 2,
-          Util.getString(context, "block_link_send").getOrElse("Send link to ..."))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_copy"), 1,
+          XResource.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_send"), 2,
+          XResource.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case this.itemTranslation =>
-        menu.add(Menu.NONE, Util.getId(context, "block_link_copy"), 1,
-          Util.getString(context, "block_link_copy").getOrElse("Copy link"))
-        menu.add(Menu.NONE, Util.getId(context, "block_link_send"), 2,
-          Util.getString(context, "block_link_send").getOrElse("Send link to ..."))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_copy"), 1,
+          XResource.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_send"), 2,
+          XResource.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case this.itemTranslationCommon =>
-        menu.add(Menu.NONE, Util.getId(context, "block_link_copy"), 1,
-          Util.getString(context, "block_link_copy").getOrElse("Copy link"))
-        menu.add(Menu.NONE, Util.getId(context, "block_link_send"), 2,
-          Util.getString(context, "block_link_send").getOrElse("Send link to ..."))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_copy"), 1,
+          XResource.getString(context, "block_link_copy").getOrElse("Copy link"))
+        menu.add(Menu.NONE, XResource.getId(context, "block_link_send"), 2,
+          XResource.getString(context, "block_link_send").getOrElse("Send link to ..."))
       case item =>
         log.fatal("unsupported context menu item " + item)
     }
@@ -202,9 +202,9 @@ class CommunityBlock(val context: Context,
           xdaUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
             case List(Some(xdaUri)) =>
               menuItem.getItemId match {
-                case id if id == Util.getId(context, "block_link_copy") =>
+                case id if id == XResource.getId(context, "block_link_copy") =>
                   Block.copyLink(context, item, xdaUri.toString)
-                case id if id == Util.getId(context, "block_link_send") =>
+                case id if id == XResource.getId(context, "block_link_send") =>
                   Block.sendLink(context, item, item.name, xdaUri.toString)
                 case message =>
                   log.fatal("skip unknown message " + message)
@@ -219,9 +219,9 @@ class CommunityBlock(val context: Context,
           wikiUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
             case List(Some(wikiUri)) =>
               menuItem.getItemId match {
-                case id if id == Util.getId(context, "block_link_copy") =>
+                case id if id == XResource.getId(context, "block_link_copy") =>
                   Block.copyLink(context, item, wikiUri.toString)
-                case id if id == Util.getId(context, "block_link_send") =>
+                case id if id == XResource.getId(context, "block_link_send") =>
                   Block.sendLink(context, item, item.name, wikiUri.toString)
                 case message =>
                   log.fatal("skip unknown message " + message)
@@ -236,9 +236,9 @@ class CommunityBlock(val context: Context,
           translationUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
             case List(Some(translationUri)) =>
               menuItem.getItemId match {
-                case id if id == Util.getId(context, "block_link_copy") =>
+                case id if id == XResource.getId(context, "block_link_copy") =>
                   Block.copyLink(context, item, translationUri.toString)
-                case id if id == Util.getId(context, "block_link_send") =>
+                case id if id == XResource.getId(context, "block_link_send") =>
                   Block.sendLink(context, item, item.name, translationUri.toString)
                 case message =>
                   log.fatal("skip unknown message " + message)
@@ -254,9 +254,9 @@ class CommunityBlock(val context: Context,
           translationCommonUri.map(future => Futures.awaitAll(CommunityBlock.retriveTimeout, future).asInstanceOf[List[Option[Uri]]] match {
             case List(Some(translationCommonUri)) =>
               menuItem.getItemId match {
-                case id if id == Util.getId(context, "block_link_copy") =>
+                case id if id == XResource.getId(context, "block_link_copy") =>
                   Block.copyLink(context, item, translationCommonUri.toString)
-                case id if id == Util.getId(context, "block_link_send") =>
+                case id if id == XResource.getId(context, "block_link_send") =>
                   Block.sendLink(context, item, item.name, translationCommonUri.toString)
                 case message =>
                   log.fatal("skip unknown message " + message)
@@ -293,7 +293,7 @@ object CommunityBlock {
           text1.setText(Html.fromHtml(item.name))
           text2.setText(Html.fromHtml(item.description))
           if (item.icon.nonEmpty)
-            Util.getId(context, item.icon, "drawable") match {
+            XResource.getId(context, item.icon, "drawable") match {
               case i if i != 0 =>
                 icon.setVisibility(View.VISIBLE)
                 icon.setImageDrawable(context.getResources.getDrawable(i))

@@ -22,7 +22,6 @@ import java.io.IOException
 import java.io.InputStreamReader
 
 import scala.Array.canBuildFrom
-import scala.ref.WeakReference
 import scala.util.control.ControlThrowable
 
 import org.digimead.digi.ctrl.lib.aop.Loggable
@@ -30,7 +29,6 @@ import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.app.Activity
-import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Canvas
@@ -43,48 +41,8 @@ import android.text.style.LeadingMarginSpan
 import android.view.Display
 import android.widget.TextView
 
-object Util extends Logging {
+object XAndroid extends Logging {
   @volatile private var busybox: Option[File] = null
-  def getString(context: WeakReference[Context], name: String): Option[String] =
-    context.get.flatMap(ctx => getString(ctx, name))
-  def getString(context: Context, name: String): Option[String] =
-    getId(context, name, "string") match {
-      case 0 =>
-        None
-      case id =>
-        Option(context.getString(id))
-    }
-  def getString(context: WeakReference[Context], name: String, formatArgs: AnyRef*): Option[String] =
-    context.get.flatMap(ctx => getString(ctx, name, formatArgs: _*))
-  def getString(context: Context, name: String, formatArgs: AnyRef*): Option[String] =
-    getId(context, name, "string") match {
-      case 0 =>
-        None
-      case id =>
-        Option(context.getString(id, formatArgs: _*))
-    }
-  def getCapitalized(context: WeakReference[Context], name: String): Option[String] =
-    context.get.flatMap(ctx => getCapitalized(ctx, name))
-  def getCapitalized(context: Context, name: String) =
-    getString(context, name).map(s => if (s.length > 1)
-      s(0).toUpper + s.substring(1)
-    else
-      s.toUpperCase)
-  def getCapitalized(context: WeakReference[Context], name: String, formatArgs: AnyRef*): Option[String] =
-    context.get.flatMap(ctx => getCapitalized(ctx, name, formatArgs: _*))
-  def getCapitalized(context: Context, name: String, formatArgs: AnyRef*) =
-    getString(context, name, formatArgs: _*).map(s => if (s.length > 1)
-      s(0).toUpper + s.substring(1)
-    else
-      s.toUpperCase)
-  def getId(context: WeakReference[Context], name: String): Int =
-    getId(context, name, "id")
-  def getId(context: WeakReference[Context], name: String, scope: String): Int =
-    context.get.map(ctx => getId(ctx, name, scope)).getOrElse(0)
-  def getId(context: Context, name: String): Int =
-    getId(context, name, "id")
-  def getId(context: Context, name: String, scope: String): Int =
-    context.getResources().getIdentifier(name, scope, context.getPackageName())
   @Loggable
   def getScreenOrientation(display: Display): Int = if (display.getWidth() == display.getHeight()) {
     log.debug("get screen ORIENTATION_SQUARE/" + Configuration.ORIENTATION_SQUARE)

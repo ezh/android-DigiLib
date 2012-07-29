@@ -20,7 +20,7 @@ import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
 
 import org.digimead.digi.ctrl.lib.AnyBase
-import org.digimead.digi.ctrl.lib.androidext.Util
+import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.declaration.DOption
@@ -57,7 +57,7 @@ abstract class Preferences(implicit dispatcher: Dispatcher) extends PreferenceAc
     AnyBase.preventShutdown(this)
     ExceptionHandler.retry[Unit](1) {
       try {
-        addPreferencesFromResource(Util.getId(this, "options", "xml"))
+        addPreferencesFromResource(XResource.getId(this, "options", "xml"))
       } catch {
         case e: ClassCastException =>
           IAmWarn("reset broken preferences")
@@ -189,7 +189,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(false)
           Logging.setDebugEnabled(false)
           Logging.setTraceEnabled(false)
-          val message = Util.getString(context, "set_loglevel_none").getOrElse("set log level to NONE")
+          val message = XResource.getString(context, "set_loglevel_none").getOrElse("set log level to NONE")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -199,7 +199,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(false)
           Logging.setDebugEnabled(false)
           Logging.setTraceEnabled(false)
-          val message = Util.getString(context, "set_loglevel_error").getOrElse("set log level to ERROR")
+          val message = XResource.getString(context, "set_loglevel_error").getOrElse("set log level to ERROR")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -209,7 +209,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(false)
           Logging.setDebugEnabled(false)
           Logging.setTraceEnabled(false)
-          val message = Util.getString(context, "set_loglevel_warn").getOrElse("set log level to WARN")
+          val message = XResource.getString(context, "set_loglevel_warn").getOrElse("set log level to WARN")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -219,7 +219,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(true)
           Logging.setDebugEnabled(false)
           Logging.setTraceEnabled(false)
-          val message = Util.getString(context, "set_loglevel_info").getOrElse("set log level to INFO")
+          val message = XResource.getString(context, "set_loglevel_info").getOrElse("set log level to INFO")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -229,7 +229,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(true)
           Logging.setDebugEnabled(true)
           Logging.setTraceEnabled(false)
-          val message = Util.getString(context, "set_loglevel_debug").getOrElse("set log level to DEBUG")
+          val message = XResource.getString(context, "set_loglevel_debug").getOrElse("set log level to DEBUG")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -239,7 +239,7 @@ object Preferences extends Logging {
           Logging.setInfoEnabled(true)
           Logging.setDebugEnabled(true)
           Logging.setTraceEnabled(true)
-          val message = Util.getString(context, "set_loglevel_trace").getOrElse("set log level to TRACE")
+          val message = XResource.getString(context, "set_loglevel_trace").getOrElse("set log level to TRACE")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -291,10 +291,10 @@ object Preferences extends Logging {
       }
       val message = if (f) {
         Logging.addLogger(AndroidLogger)
-        Util.getString(context, "debug_android_on_notify").getOrElse("Android logging facility enabled")
+        XResource.getString(context, "debug_android_on_notify").getOrElse("Android logging facility enabled")
       } else {
         Logging.delLogger(AndroidLogger)
-        Util.getString(context, "debug_android_off_notify").getOrElse("Android logging facility disabled")
+        XResource.getString(context, "debug_android_off_notify").getOrElse("Android logging facility disabled")
       }
       if (notify)
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -338,31 +338,31 @@ object Preferences extends Logging {
       l match {
         case "0" => // SCREEN_ORIENTATION_LANDSCAPE
           AppComponent.Inner.preferredOrientation.set(0)
-          val message = Util.getString(context, "set_layout_landscape").getOrElse("set preferred orientation to landscape")
+          val message = XResource.getString(context, "set_layout_landscape").getOrElse("set preferred orientation to landscape")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
         case "1" => // SCREEN_ORIENTATION_PORTRAIT
           AppComponent.Inner.preferredOrientation.set(1)
-          val message = Util.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to portrait")
+          val message = XResource.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to portrait")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
         case "8" => // SCREEN_ORIENTATION_REVERSE_LANDSCAPE
           AppComponent.Inner.preferredOrientation.set(8)
-          val message = Util.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to reverse landscape")
+          val message = XResource.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to reverse landscape")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
         case "9" => // SCREEN_ORIENTATION_REVERSE_PORTRAIT
           AppComponent.Inner.preferredOrientation.set(9)
-          val message = Util.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to reverse portraint")
+          val message = XResource.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to reverse portraint")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
         case "4" => // SCREEN_ORIENTATION_SENSOR
           AppComponent.Inner.preferredOrientation.set(4)
-          val message = Util.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to dynamic")
+          val message = XResource.getString(context, "set_layout_portrait").getOrElse("set preferred orientation to dynamic")
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -413,7 +413,7 @@ object Preferences extends Logging {
             publicEditor.putString(DOption.ShutdownTimeout.tag, timeout)
             publicEditor.commit()
           }
-          val message = Util.getString(context, "set_shutdown_timeout_notify").getOrElse("set timeout to %s seconds").format(timeout)
+          val message = XResource.getString(context, "set_shutdown_timeout_notify").getOrElse("set timeout to %s seconds").format(timeout)
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -494,7 +494,7 @@ object Preferences extends Logging {
             publicEditor.putString(option.tag, value)
             publicEditor.commit()
           }
-          val message = Util.getString(context, messageID).getOrElse(messageFallBack).format(value)
+          val message = XResource.getString(context, messageID).getOrElse(messageFallBack).format(value)
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
@@ -556,7 +556,7 @@ object Preferences extends Logging {
             publicEditor.putBoolean(option.tag, value)
             publicEditor.commit()
           }
-          val message = Util.getString(context, messageID).getOrElse(messageFallBack).format(value)
+          val message = XResource.getString(context, messageID).getOrElse(messageFallBack).format(value)
           if (notify)
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           IAmMumble(message)(logger, dispatcher)
