@@ -128,13 +128,15 @@ object Common extends Logging {
                 out.write(testContent)
                 out.close()
                 assert(testFile.length == testContent.length)
-                if (scala.io.Source.fromFile(testFile).getLines.mkString == testContent) {
+                val source = scala.io.Source.fromFile(testFile)
+                if (source.getLines.mkString == testContent) {
                   log.debug("external storge test successful")
                   externalStorageDisabled = Some(false)
                 } else {
                   log.debug("external storge test failed")
                   externalStorageDisabled = Some(true)
                 }
+                source.close
                 testFile.delete()
               } catch {
                 case e =>

@@ -79,7 +79,9 @@ object Report extends Logging {
                       val cmdLine = new File(path, "cmdline")
                       if (name == "bridge" && cmdLine.exists && cmdLine.canRead) {
                         try {
-                          val cmd = scala.io.Source.fromFile(cmdLine).getLines.mkString.trim
+                          val source = scala.io.Source.fromFile(cmdLine)
+                          val cmd = source.getLines.mkString.trim
+                          source.close
                           if (cmd.startsWith("/data/data/org.digimead.digi.ctrl/files/armeabi/bridge")) {
                             log.debug("found bridge with UID " + uid + " and PID " + pid)
                             if (uid == 0) {

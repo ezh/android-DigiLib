@@ -223,7 +223,8 @@ object XAndroid extends Logging {
         var pid: Option[Int] = None
         var ppid: Option[Int] = None
         try {
-          scala.io.Source.fromFile(status).getLines.foreach(l => l.trim.toUpperCase.split("""[:\s]+""") match {
+          val source = scala.io.Source.fromFile(status)
+          source.getLines.foreach(l => l.trim.toUpperCase.split("""[:\s]+""") match {
             case Array("NAME", n) =>
               name = Some(l.trim.split("""[:\s]+""").last)
             case Array("PID", n) =>
@@ -236,6 +237,7 @@ object XAndroid extends Logging {
               gid = Some(n1.toInt)
             case _ =>
           })
+          source.close
         } catch {
           case e =>
             log.warn(e.getMessage)
