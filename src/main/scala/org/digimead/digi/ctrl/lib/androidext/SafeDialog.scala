@@ -254,14 +254,16 @@ object SafeDialog extends Logging {
     enabled.synchronized { enabled.notifyAll }
   }
   @Loggable
-  def disable() = Futures.future {
+  def disable() = {
     log.debug("disable safe dialogs")
     enabled.set(None)
-    enabled.synchronized { enabled.notifyAll }
     container.set(Entry(None, None, None)) // throw signal for unlock onMessageShowDialog, ..., dismiss safe dialog if any
+    Futures.future { enabled.synchronized { enabled.notifyAll } }
     Thread.sleep(10) // gap for onMessageShowDialog
     container.unset()
   }
+  @Loggable
+  def isEnabled() = enabled.get == Some(true)
   @Loggable
   private def onMessageShowDialog[T <: SafeDialog](activity: FragmentActivity, tag: String, dialog: () => T, ftWrapper: WithTransactionWrapper,
     bundle: Option[Bundle], onDismiss: Option[() => Any])(implicit m: scala.reflect.Manifest[T]): Option[T] = try {
@@ -338,9 +340,10 @@ object SafeDialog extends Logging {
         WithTransactionWrapper.this.ftCallback(ft, fragment, target)
       })
   }
+  // fragment.toString must return dialog tag
   private[SafeDialog] object DefaultTransactionWrapper
     extends WithTransactionWrapper((ft, fragment, target) => if (target.nonEmpty)
-      ft.replace(target.get, fragment))
+      ft.replace(target.get, fragment, fragment.toString))
   class Container private[SafeDialog] () extends SyncVar[Entry] with Logging {
     @volatile private var activityDialogGuard: ScheduledExecutorService = null
     private val replaceFlag = new AtomicBoolean(false)
