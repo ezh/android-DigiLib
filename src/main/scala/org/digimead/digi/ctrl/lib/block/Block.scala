@@ -16,10 +16,10 @@
 
 package org.digimead.digi.ctrl.lib.block
 
-import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.androidext.XAPI
 import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
@@ -33,7 +33,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.graphics.drawable.Drawable
-import android.text.ClipboardManager
 import android.text.Html
 import android.view.ContextMenu
 import android.view.MenuItem
@@ -72,8 +71,7 @@ object Block extends Logging {
   }
   def copyLink(context: Context, item: Item, copyText: CharSequence)(implicit logger: RichLogger, dispatcher: Dispatcher): Boolean = {
     try {
-      val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-      clipboard.setText(copyText)
+      XAPI.clipboardManager(context).setText(copyText)
       val message = XResource.getString(context, "block_copy_link_to_clipboard").
         getOrElse("Copy link to clipboard")
       AnyBase.runOnUiThread { Toast.makeText(context, message, Toast.LENGTH_LONG).show() }

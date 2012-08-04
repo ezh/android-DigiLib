@@ -114,7 +114,7 @@ object XAndroid extends Logging {
     container.setLayerInset(0, text.getPaddingLeft, text.getPaddingTop,
       text.getWidth - width - text.getPaddingLeft,
       text.getHeight - height - text.getPaddingTop)
-    text.setBackgroundDrawable(container)
+    XAPI.setViewBackground(text, container)
   }
   @Loggable
   def findBusyBox(): Option[File] = {

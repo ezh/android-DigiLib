@@ -21,6 +21,7 @@ import scala.collection.mutable.SynchronizedBuffer
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.androidext.XAPI
 import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.base.AppComponent
 import org.digimead.digi.ctrl.lib.log.Logging
@@ -46,51 +47,51 @@ object Level extends Logging {
   def novice(view: View) {
     noviceControlViews.append(new WeakReference(view))
     if (isEnable)
-      view.setBackgroundDrawable(Resources.noviceDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.noviceDrawable.mutate)
     else
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
   }
   def intermediate(view: View) {
     intermediateControlViews.append(new WeakReference(view))
     if (isEnable)
-      view.setBackgroundDrawable(Resources.intermediateDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.intermediateDrawable.mutate)
     else
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
   }
   def professional(view: View) {
     professionalControlViews.append(new WeakReference(view))
     if (isEnable)
-      view.setBackgroundDrawable(Resources.professionalDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.professionalDrawable.mutate)
     else
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
   }
   def isEnable = highlight
   def setEnable(switch: Boolean) = highlight = switch
   def hlOn(context: Context) = AnyBase.runOnUiThread {
     noviceControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(Resources.noviceDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.noviceDrawable.mutate)
       view.invalidate
     }))
     intermediateControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(Resources.intermediateDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.intermediateDrawable.mutate)
       view.invalidate
     }))
     professionalControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(Resources.professionalDrawable.mutate)
+      XAPI.setViewBackground(view, Resources.professionalDrawable.mutate)
       view.invalidate
     }))
   }
   def hlOff(context: Context) = AnyBase.runOnUiThread {
     noviceControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
       view.invalidate
     }))
     intermediateControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
       view.invalidate
     }))
     professionalControlViews.foreach(_.get.foreach(view => {
-      view.setBackgroundDrawable(null)
+      XAPI.setViewBackground(view, null)
       view.invalidate
     }))
   }

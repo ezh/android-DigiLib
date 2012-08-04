@@ -99,8 +99,8 @@ object AnyBase extends Logging {
     (group, group.start("startup"), group.start("AnyBase$"))
   }
   System.setProperty("actors.enableForkJoin", "false")
-  System.setProperty("actors.corePoolSize", "16")
-  System.setProperty("actors.maxPoolSize", "16")
+  System.setProperty("actors.corePoolSize", "32")
+  System.setProperty("actors.maxPoolSize", "32")
   private lazy val uncaughtExceptionHandler = new ExceptionHandler()
   @volatile private var contextPool = Seq[WeakReference[Context]]()
   @volatile private var currentContext: WeakReference[Context] = new WeakReference(null)

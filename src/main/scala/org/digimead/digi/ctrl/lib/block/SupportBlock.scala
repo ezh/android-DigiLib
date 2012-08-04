@@ -26,6 +26,7 @@ import scala.annotation.implicitNotFound
 import scala.ref.WeakReference
 
 import org.digimead.digi.ctrl.lib.AnyBase
+import org.digimead.digi.ctrl.lib.androidext.XAPI
 import org.digimead.digi.ctrl.lib.androidext.XResource
 import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.base.AppComponent
@@ -239,8 +240,7 @@ class SupportBlock(val context: Context,
                       getOrElse("Copy to clipboard phone \"" + voicePhone + "\"")
                     AnyBase.runOnUiThread {
                       try {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                        clipboard.setText(voicePhone)
+                        XAPI.clipboardManager(context).setText(voicePhone)
                         Toast.makeText(context, message, DConstant.toastTimeout).show()
                       } catch {
                         case e =>
@@ -258,8 +258,7 @@ class SupportBlock(val context: Context,
                       getOrElse("Copy to clipboard Skype account \"" + skypeUser + "\"")
                     AnyBase.runOnUiThread {
                       try {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                        clipboard.setText(skypeUser)
+                        XAPI.clipboardManager(context).setText(skypeUser)
                         Toast.makeText(context, message, DConstant.toastTimeout).show()
                       } catch {
                         case e =>
@@ -277,8 +276,7 @@ class SupportBlock(val context: Context,
                       getOrElse("Copy to clipboard ICQ account \"" + icqUser + "\"")
                     AnyBase.runOnUiThread {
                       try {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
-                        clipboard.setText(icqUser)
+                        XAPI.clipboardManager(context).setText(icqUser)
                         Toast.makeText(context, message, DConstant.toastTimeout).show()
                       } catch {
                         case e =>
