@@ -13,22 +13,12 @@
   ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
   ~ See the License for the specific language governing permissions and limitations under the License.
 -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android" >
+<shape xmlns:android="http://schemas.android.com/apk/res/android" >
 
-    <item>
-        <bitmap
-            android:dither="true"
-            android:src="@drawable/stripe_yellow"
-            android:tileMode="repeat" />
-    </item>
-    <item>
-        <shape android:shape="rectangle" >
-            <gradient
-                android:endColor="#00222200"
-                android:gradientRadius="500"
-                android:startColor="#55999900"
-                android:type="radial" />
-        </shape>
-    </item>
+    <gradient
+        android:angle="0"
+        android:centerColor="@android:color/transparent"
+        android:endColor="@android:color/secondary_text_dark"
+        android:startColor="@android:color/transparent" />
 
-</layer-list>
+</shape>

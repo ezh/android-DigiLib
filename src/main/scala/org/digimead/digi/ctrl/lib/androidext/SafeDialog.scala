@@ -89,12 +89,12 @@ trait SafeDialog extends Logging {
     beforeMark = 0 // clear
     afterListener.foreach {
       l =>
-        if (beforeMark == this.hashCode) {
+        if (afterMark == this.hashCode) {
           log.debug("'after' already fired")
         } else {
           val hash = hashCode
           log.debug("fire 'after' event for " + this.tag + " with hash " + hash)
-          beforeMark = hashCode
+          afterMark = hashCode
           l(this)
         }
     }
