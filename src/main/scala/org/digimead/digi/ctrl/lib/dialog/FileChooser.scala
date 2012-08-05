@@ -106,6 +106,15 @@ trait FileChooser extends XAlertDialog with FCHome with FCUp with FCFilter with 
     super.onResume
     initialize
   }
+  override def onDestroyView() {
+    super.onDestroyView
+    activeDirectory = null
+    copiedFiles.clear
+    cutFiles.clear
+    selectionFiles.clear
+    fileList.clear
+    fileChooserResult.unset()
+  }
   def initialize(): Unit = try {
     initializeHome
     initializeUp

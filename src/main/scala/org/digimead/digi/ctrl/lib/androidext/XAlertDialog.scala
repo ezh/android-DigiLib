@@ -16,6 +16,8 @@
 
 package org.digimead.digi.ctrl.lib.androidext
 
+import java.util.concurrent.atomic.AtomicReference
+
 import scala.Option.option2Iterable
 
 import org.digimead.digi.ctrl.lib.R
@@ -24,8 +26,8 @@ import org.digimead.digi.ctrl.lib.log.Logging
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
+import android.content.DialogInterface
 import android.os.Bundle
-import android.support.v4.app.DialogFragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -50,7 +52,10 @@ trait XAlertDialog extends XDialog with Logging {
   val icon: Option[Int]
   val extContent: Option[View]
 
-  @volatile protected var customContent: Option[View] = None
+  protected val contentView = new AtomicReference[Option[View]](None)
+  protected val positiveView = new AtomicReference[Option[View]](None)
+  protected val neutralView = new AtomicReference[Option[View]](None)
+  protected val negativeView = new AtomicReference[Option[View]](None)
   private lazy val (cachedModal: AlertDialog,
     modalContent: Option[TextView],
     modalCustomContent: Option[View],
@@ -81,7 +86,10 @@ trait XAlertDialog extends XDialog with Logging {
       val context = getDialogActivity
       Option(cachedEmbedded.getParent).foreach(_.asInstanceOf[ViewGroup].removeView(cachedEmbedded))
       cachedEmbeddedAttr.foreach(attr => cachedEmbedded.setLayoutParams(container.generateLayoutParams(attr)))
-      customContent = embeddedCustomContent
+      contentView.set(embeddedCustomContent)
+      positiveView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button3))))
+      neutralView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button2))))
+      negativeView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button1))))
       cachedEmbedded
     }
   }
@@ -107,8 +115,18 @@ trait XAlertDialog extends XDialog with Logging {
         }
     }
     cachedModal.setTitle(title)
-    customContent = modalCustomContent
+    contentView.set(modalCustomContent)
+    positiveView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_POSITIVE)))
+    neutralView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_NEUTRAL)))
+    negativeView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_NEGATIVE)))
     cachedModal
+  }
+  override def onDestroyView() {
+    log.debug("XAlertDialog::onDestroyView")
+    super.onDestroyView
+    positiveView.set(None)
+    neutralView.set(None)
+    negativeView.set(None)
   }
 }
 
@@ -147,6 +165,18 @@ object XAlertDialog extends Logging {
         None
     }
     val dialog = builder.create()
+    /*
+     * ABSOLUTELY CRAZY BEHAVIOR, emulator, API 10
+     * without dialog.show most of the time (sometimes, rarely not)
+     * 
+     * android.util.AndroidRuntimeException: requestFeature() must be called before adding content
+     * at com.android.internal.policy.impl.PhoneWindow.requestFeature(PhoneWindow.java:181)
+     * at com.android.internal.app.AlertController.installContent(AlertController.java:199)
+     * at android.app.AlertDialog.onCreate(AlertDialog.java:251)
+     * at android.app.Dialog.dispatchOnCreate(Dialog.java:307)
+     * at android.app.Dialog.show(Dialog.java:225)
+     * at android.support.v4.app.DialogFragment.onStart(DialogFragment.java:385)
+     */
     dialog.show
     val negativeView = negative.flatMap(n => Option(dialog.getButton(0)))
     val neutralView = neutral.flatMap(n => Option(dialog.getButton(1)))
