@@ -59,7 +59,7 @@ import android.widget.Toast
 
 trait FileChooser extends XAlertDialog with FCHome with FCUp with FCFilter with FCOrder with FCPaste with FCClear
   with FCCopy with FCCut with FCDelete with FCCancel with FCMultiple {
-  override val extContent = AppComponent.Context.flatMap {
+  override lazy val extContent = AppComponent.Context.flatMap {
     case activity: Activity if FileChooser.maximize =>
       log.debug("maximize FileChooser")
       val inflater = activity.getApplicationContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]

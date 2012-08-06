@@ -16,8 +16,6 @@
 
 package org.digimead.digi.ctrl.lib.androidext
 
-import java.util.concurrent.atomic.AtomicReference
-
 import scala.Option.option2Iterable
 
 import org.digimead.digi.ctrl.lib.R
@@ -25,150 +23,93 @@ import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.app.AlertDialog
 import android.app.Dialog
-import android.content.DialogInterface
+import android.content.Context
 import android.os.Bundle
-import android.support.v4.app.FragmentActivity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.TextView
 
-/*
- * Example:
- * abstract class CustomAlertDialog(icon: Option[Int], extContent: Option[View]) extends SherlockDialogFragment with XAlertDialog {
- *  def this(icon: Option[Int], extContent: Int) =
- *   this(icon, AppComponent.AppContext.flatMap {
- *     context =>
- *       val inflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
- *       Option(inflater.inflate(extContent, null))
- *   })
- *  def this(icon: Option[Int]) = this(icon, None)
- *  def this() = this(None, None)
- */
-
-trait XAlertDialog extends XDialog with Logging {
-  val icon: Option[Int]
-  val extContent: Option[View]
-
-  protected val contentView = new AtomicReference[Option[View]](None)
-  protected val customView = new AtomicReference[Option[View]](None)
-  protected val positiveView = new AtomicReference[Option[View]](None)
-  protected val neutralView = new AtomicReference[Option[View]](None)
-  protected val negativeView = new AtomicReference[Option[View]](None)
-  protected lazy val (cachedModal,
+trait XListDialog extends XAlertDialog {
+  protected val adapter: BaseAdapter
+  final val extContent = None
+  override protected lazy val (cachedModal,
     modalContent,
     modalCustomContent,
     modalNegative,
     modalNeutral,
     modalPositive) =
-    XAlertDialog.buildModal(getDialogActivity, title, message, extContent, icon, positive, neutral, negative, tag)
-  protected lazy val (cachedEmbedded,
+    XListDialog.buildModal(getDialogActivity, title, message, extContent, icon, positive, neutral, negative, tag)
+  override protected lazy val (cachedEmbedded,
     embeddedContent,
     embeddedCustomContent,
     embeddedNegative,
     embeddedNeutral,
     embeddedPositive) =
-    XAlertDialog.buildEmbedded(getDialogActivity, title, message, extContent, icon,
-      positive, neutral, negative, R.layout.fragment_dialog, tag)
-  protected lazy val cachedEmbeddedAttr = XResource.getAttributeSet(getDialogActivity, R.layout.fragment_dialog)
-  protected lazy val positive: Option[(Int, XDialog.ButtonListener[_ <: XDialog])] = None
-  protected lazy val neutral: Option[(Int, XDialog.ButtonListener[_ <: XDialog])] = None
-  protected lazy val negative: Option[(Int, XDialog.ButtonListener[_ <: XDialog])] = None
+    XListDialog.buildEmbedded(getDialogActivity, title, message, extContent, icon, positive, neutral, negative, R.layout.fragment_dialog, tag)
+  override protected lazy val cachedEmbeddedAttr = XResource.getAttributeSet(getDialogActivity, R.layout.fragment_dialog_list)
 
-  def title: CharSequence
-  def message: Option[CharSequence]
-  override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
-    log.debug("XAlertDialog::onCreateView")
-    super.onCreateView(inflater, container, savedInstanceState)
-    if (getShowsDialog) {
-      null
-    } else {
-      val context = getDialogActivity
-      Option(cachedEmbedded.getParent).foreach(_.asInstanceOf[ViewGroup].removeView(cachedEmbedded))
-      cachedEmbeddedAttr.foreach(attr => cachedEmbedded.setLayoutParams(container.generateLayoutParams(attr)))
-      contentView.set(embeddedContent)
-      customView.set(embeddedCustomContent)
-      positiveView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button3))))
-      neutralView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button2))))
-      negativeView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button1))))
-      cachedEmbedded
-    }
-  }
   override def onCreateDialog(savedInstanceState: Bundle): Dialog = {
     log.debug("XAlertDialog::onCreateDialog")
-    super.onCreateDialog(savedInstanceState)
-    cachedModal.show
-    (modalContent, message) match {
-      case (Some(content), Some(message)) =>
-        content.setVisibility(View.VISIBLE)
-        content.setText(message)
-      case (Some(content), None) =>
-        content.setVisibility(View.GONE)
-      case (None, Some(message)) =>
-        cachedModal.setMessage(message)
-      case (None, None) =>
-        try {
-          cachedModal.setMessage(null)
-        } catch {
-          case e =>
-            log.warn("unable to reset dialog content")
-            cachedModal.setMessage("")
+    val dialog = super.onCreateDialog(savedInstanceState)
+    val result = modalCustomContent.map {
+      case list: ListView =>
+        embeddedCustomContent.map {
+          case list: ListView =>
+            if (list.getAdapter != null)
+              log.debug("reset adapter " + list.getAdapter + " in embedded ListView")
+            list.setAdapter(null)
+          case view =>
+            log.fatal("unexpected ListView in embeddedCustomContent " + view + " for " + tag)
         }
+        if (list.getAdapter != adapter)
+          list.setAdapter(adapter)
+      case view =>
+        log.fatal("unexpected ListView in modalCustomContent " + view + " for " + tag)
     }
-    cachedModal.setTitle(title)
-    contentView.set(modalContent)
-    customView.set(modalCustomContent)
-    positiveView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_POSITIVE)))
-    neutralView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_NEUTRAL)))
-    negativeView.set(Option(cachedModal.getButton(DialogInterface.BUTTON_NEGATIVE)))
-    cachedModal
-  }
-  override def onDestroyView() {
-    log.debug("XAlertDialog::onDestroyView")
-    super.onDestroyView
-    positiveView.set(None)
-    neutralView.set(None)
-    negativeView.set(None)
+    result.getOrElse { log.fatal("ListView not found for " + tag) }
+    dialog
   }
 }
 
-object XAlertDialog extends Logging {
-  protected def buildModal(context: FragmentActivity, title: CharSequence,
+object XListDialog extends Logging {
+  protected[androidext] def buildModal(context: Context, title: CharSequence,
     message: Option[CharSequence], extContent: Option[View], icon: Option[Int],
     positive: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     neutral: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     negative: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     tag: String): (AlertDialog, Option[TextView], Option[View], Option[Button], Option[Button], Option[Button]) = {
-    log.debug("XAlertDialog::buildModal for " + tag)
+    log.debug("XListDialog::buildModal for " + tag)
     val scale = context.getResources().getDisplayMetrics().density
     val padding = (10 * scale).toInt
     val builder = new AlertDialog.Builder(context).setTitle(title)
-    val customContentView = extContent.map(extContent => {
-      extContent.setPadding(padding, padding, padding, padding)
-      builder.setView(extContent)
+    val customContentView = {
+      val extContentContainer = new LinearLayout(context)
+      val extContent = new ListView(context)
+      extContentContainer.addView(extContent, new ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+      extContentContainer.setPadding(padding, padding, padding, padding)
+      builder.setView(extContentContainer)
       extContent
-    })
+    }
     icon.foreach(builder.setIcon)
     negative.foreach(t => builder.setNegativeButton(t._1, t._2))
     neutral.foreach(t => builder.setNeutralButton(t._1, t._2))
     positive.foreach(t => builder.setPositiveButton(t._1, t._2))
 
-    val contentView = customContentView match {
-      case Some(customContentView) =>
-        Option(customContentView.findViewById(android.R.id.custom).asInstanceOf[ViewGroup]).map {
-          extViewContent =>
-            val contentView = new TextView(context)
-            contentView.setTextAppearance(context, android.R.style.TextAppearance_Medium)
-            contentView.setPadding(0, 0, 0, padding)
-            extViewContent.addView(contentView, 0, new ViewGroup.LayoutParams(
-              ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            contentView
-        }
-      case None =>
-        message.foreach(builder.setMessage)
-        None
+    val contentView = {
+      val container = customContentView.getParent.asInstanceOf[ViewGroup]
+      val contentView = new TextView(context)
+      contentView.setTextAppearance(context, android.R.style.TextAppearance_Medium)
+      contentView.setPadding(0, 0, 0, padding)
+      container.addView(contentView, 0, new ViewGroup.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+      contentView
     }
     val dialog = builder.create()
     /*
@@ -187,15 +128,15 @@ object XAlertDialog extends Logging {
     val negativeView = negative.flatMap(n => Option(dialog.getButton(0)))
     val neutralView = neutral.flatMap(n => Option(dialog.getButton(1)))
     val positiveView = positive.flatMap(n => Option(dialog.getButton(2)))
-    (dialog, contentView, customContentView, negativeView, neutralView, positiveView)
+    (dialog, Some(contentView), Some(customContentView), negativeView, neutralView, positiveView)
   }
-  protected def buildEmbedded(context: FragmentActivity, title: CharSequence,
+  protected def buildEmbedded(context: Context, title: CharSequence,
     message: Option[CharSequence], extContent: Option[View], icon: Option[Int],
     positive: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     neutral: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     negative: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     baseView: Int, tag: String): (View, Option[TextView], Option[View], Option[Button], Option[Button], Option[Button]) = {
-    log.debug("XAlertDialog::buildEmbedded for " + tag)
+    log.debug("XListDialog::buildEmbedded for " + tag)
     def setButtonListener(bView: Button, title: Int, callback: XDialog.ButtonListener[_ <: XDialog]) {
       bView.setVisibility(View.VISIBLE)
       bView.setText(title)
