@@ -190,7 +190,7 @@ protected class AppComponent private () extends Logging {
   @Loggable
   def synchronizeStateWithICtrlHost(onFinish: (DState.Value, DState.Value, Boolean) => Unit = null): Unit = AppComponent.Context.foreach {
     activity =>
-      if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isAvailable == Some(false)) {
+      if (AppComponent.this.state.get.value == DState.Broken && AppControl.Inner.isBound == Some(false)) {
         log.warn("DigiControl unavailable and state already broken")
         if (onFinish != null) onFinish(DState.Broken, DState.Unknown, false)
         return

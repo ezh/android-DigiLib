@@ -75,7 +75,7 @@ protected class AppControl private (packageName: String) extends Logging {
    * Some(true) - yes
    * Some(false) - no / DigiControl unavailable
    */
-  def isAvailable(): Option[Boolean] =
+  def isBound(): Option[Boolean] =
     if (ready.isSet) {
       if (ready.get != None)
         Some(true)
@@ -443,6 +443,7 @@ object AppControl extends Logging {
   def Inner = inner
   def ICtrlHost = inner.get()
   def isSuspend = deinitializationLock.get(0) == None
+  def isBound = Option(inner).map(_.isBound == Some(true)).getOrElse(false)
   @Loggable
   def isICtrlHostInstalled(ctx: Context): Boolean = {
     val pm = ctx.getPackageManager()

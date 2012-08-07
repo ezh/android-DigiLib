@@ -40,7 +40,7 @@ import android.widget.ImageView
 import android.widget.TextView
 
 trait XDialog extends DialogFragment with SafeDialog with Logging {
-  protected lazy val defaultNegativeButtonCallback: (XDialog => Any) =
+  protected lazy val defaultButtonCallback: (XDialog => Any) =
     (dialog) => if (!dialog.getShowsDialog)
       dialog.getDialogActivity.getSupportFragmentManager.
         popBackStackImmediate(dialog.toString, FragmentManager.POP_BACK_STACK_INCLUSIVE)

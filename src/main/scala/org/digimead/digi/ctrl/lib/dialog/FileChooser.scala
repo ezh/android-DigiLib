@@ -79,12 +79,13 @@ trait FileChooser extends XAlertDialog with FCHome with FCUp with FCFilter with 
   override protected lazy val positive = Some((android.R.string.ok,
     new XDialog.ButtonListener(new WeakReference(FileChooser.this),
       Some((dialog: FileChooser) => {
+        defaultButtonCallback(dialog)
         fileChooserResult.set((activeDirectory, Seq()))
         callbackOnResult(activeDirectory, Seq())
       }))))
   override protected lazy val negative = Some((android.R.string.cancel,
     new XDialog.ButtonListener(new WeakReference(FileChooser.this),
-      Some(defaultNegativeButtonCallback))))
+      Some(defaultButtonCallback))))
   protected lazy val lv = new WeakReference(extContent.map(_.findViewById(android.R.id.list).asInstanceOf[ListView]).getOrElse(null))
   private lazy val path = new WeakReference(extContent.map(l => l.findViewById(XResource.getId(l.getContext,
     "filechooser_path")).asInstanceOf[TextView]).getOrElse(null))
