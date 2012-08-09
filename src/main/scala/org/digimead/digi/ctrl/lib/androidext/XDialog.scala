@@ -43,7 +43,7 @@ trait XDialog extends DialogFragment with SafeDialog with Logging {
   protected lazy val defaultButtonCallback: (XDialog => Any) =
     (dialog) => if (!dialog.getShowsDialog)
       dialog.getDialogActivity.getSupportFragmentManager.
-        popBackStackImmediate(dialog.toString, FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        popBackStackImmediate(dialog.tag, FragmentManager.POP_BACK_STACK_INCLUSIVE)
 
   def getDialogActivity(): FragmentActivity
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {

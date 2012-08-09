@@ -26,6 +26,7 @@ object XAPI {
   def clipboardManager(context: Context): android.text.ClipboardManager =
     context.getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[android.text.ClipboardManager]
   def setViewBackground(view: View, background: Drawable) {
+    assert(view != null, { "view == null" })
     try {
       val setBackground = classOf[View].getMethod("setBackground", Array[Class[_]](classOf[Drawable]): _*)
       setBackground.invoke(view, background)
@@ -37,6 +38,7 @@ object XAPI {
     }
   }
   def getDisplaySize(display: Display): Point = {
+    assert(display != null, { "display == null" })
     val size = new Point
     try {
       val getSizeMethod = classOf[Display].getMethod("getSize", Array[Class[_]](classOf[Point]): _*)
