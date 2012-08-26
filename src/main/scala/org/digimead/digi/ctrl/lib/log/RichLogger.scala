@@ -27,10 +27,16 @@ import org.slf4j.Marker
 class RichLogger(val name: String) extends org.slf4j.Logger {
   override def getName(): String = name
   // fast look while development, highlight it in your IDE
-  def g_a_s_e(msg: String) {
+  def ___gaze(msg: String) {
     val t = new Throwable(msg)
     t.fillInStackTrace()
-    error("GASE: " + msg + "\n" + t.getStackTraceString)
+    error("<<< " + msg + " >>>\n" + t.getStackTraceString)
+  }
+  // fast look while development, highlight it in your IDE
+  def ___glance(msg: String) {
+    val t = new Throwable(msg)
+    t.fillInStackTrace()
+    error("<<< " + msg + " >>>")
   }
   // error with stack trace
   def fatal(msg: String) {

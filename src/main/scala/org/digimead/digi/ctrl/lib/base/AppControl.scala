@@ -495,7 +495,7 @@ object AppControl extends Logging {
       log.info("bind to service " + DIntent.HostService)
       if (!isICtrlHostInstalled(caller)) {
         AppComponent.Inner.state.set(AppComponent.State(DState.Broken, Seq("error_digicontrol_not_found"), (a) =>
-          log.g_a_s_e("SHOW") //AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)))
+          log.___gaze("SHOW") //AppComponent.Inner.showDialogSafe(a, InstallControl.getClass.getName, InstallControl.getId(a)))
           ))
         serviceInstance.set(None)
       } else if (!caller.bindService(intent, ctrlConnection, Context.BIND_AUTO_CREATE)) {

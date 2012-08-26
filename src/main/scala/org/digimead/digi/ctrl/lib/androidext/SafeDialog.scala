@@ -42,6 +42,7 @@ import android.support.v4.app.Fragment
 import android.support.v4.app.FragmentActivity
 import android.support.v4.app.FragmentManager
 import android.support.v4.app.FragmentTransaction
+import android.view.View
 
 trait SafeDialog extends Logging {
   this: DialogFragment =>
@@ -56,12 +57,9 @@ trait SafeDialog extends Logging {
    *
    * @param listener The callback to use.
    */
-  private[SafeDialog] def setBeforeListener(listener: SafeDialog => Any) = {
-    assert(Thread.currentThread.getId == AnyBase.uiThreadID, { "set beforeListener out of UI thread" })
-    beforeListener = Some(listener)
-  }
-  protected def notifyBefore() = {
-    assert(Thread.currentThread.getId == AnyBase.uiThreadID, { "call beforeListener out of UI thread" })
+  private[SafeDialog] def setBeforeListener(listener: SafeDialog => Any) =
+    synchronized { beforeListener = Some(listener) }
+  protected def notifyBefore() = synchronized {
     afterMark = 0 // clear
     beforeListener.foreach {
       l =>
@@ -80,12 +78,9 @@ trait SafeDialog extends Logging {
    *
    * @param listener The callback to use.
    */
-  private[SafeDialog] def setAfterListener(listener: SafeDialog => Any) = {
-    assert(Thread.currentThread.getId == AnyBase.uiThreadID, { "set afterListener out of UI thread" })
-    afterListener = Some(listener)
-  }
+  private[SafeDialog] def setAfterListener(listener: SafeDialog => Any) =
+    synchronized { afterListener = Some(listener) }
   protected def notifyAfter() = {
-    assert(Thread.currentThread.getId == AnyBase.uiThreadID, { "call afterListener out of UI thread" })
     beforeMark = 0 // clear
     afterListener.foreach {
       l =>
@@ -100,9 +95,9 @@ trait SafeDialog extends Logging {
     }
   }
   private[SafeDialog] def setOnDismissListener(listener: DialogInterface.OnDismissListener) =
-    onDismissListener = Some(listener)
+    synchronized { onDismissListener = Some(listener) }
   protected def notifySafeDialogDismissed(dialog: DialogInterface) =
-    onDismissListener.foreach(_.onDismiss(dialog))
+    synchronized { onDismissListener.foreach(_.onDismiss(dialog)) }
   def dismiss()
   def show(transaction: FragmentTransaction, tag: String): Int
   def show(manager: FragmentManager, tag: String)
@@ -120,8 +115,8 @@ object SafeDialog extends Logging {
       def act = {
         loop {
           react {
-            case Message.ShowDialog(builder) =>
-              val s = sender
+            case Message.ShowDialog(builder, waitForResult) =>
+              val s = if (waitForResult) Some(sender) else None
               log.info("receive message ShowDialog " + builder.tag)
               // wait for previous dialog
               log.debug("wait container lock")
@@ -141,11 +136,10 @@ object SafeDialog extends Logging {
           }
         }
       }
-      private def show[T <: SafeDialog](builder: Builder[T], sender: OutputChannel[Any])(implicit m: scala.reflect.Manifest[T]) {
-        val result = builder.onMessageShowDialog()
+      private def show[T <: SafeDialog](builder: Builder[T], sender: Option[OutputChannel[Any]])(implicit m: scala.reflect.Manifest[T]) {
+        val result = builder.showModalDialog()
         log.debug("return from message ShowDialog with result " + result)
-        if (sender.receiver.getState == Actor.State.Blocked)
-          sender ! result // only for ShowDialogSafeWait
+        sender.foreach(_ ! result)
       }
     }
     actor.start
@@ -217,7 +211,7 @@ object SafeDialog extends Logging {
     val dialog: () => T)(implicit m: scala.reflect.Manifest[T]) extends Logging {
     type Transaction = (FragmentTransaction, Fragment, Option[Int]) => Any
     var defaultTransaction: Option[Transaction] = Some((ft, fragment, target) => if (target.nonEmpty)
-      ft.replace(target.get, fragment, fragment.toString))
+      ft.replace(target.get, fragment, tag))
     var transactions = Seq[Transaction]()
     var target: Option[Int] = None
     var before: Option[(T) => Any] = None
@@ -235,110 +229,78 @@ object SafeDialog extends Logging {
         activity <- activity.get
         view <- Option(activity.findViewById(target)) if view.isShown
       } yield {
-        val dialogInstance: T = if (Thread.currentThread.getId == AnyBase.uiThreadID) {
-          try { dialog() } catch { case e => log.error(e.getMessage, e); null.asInstanceOf[T] }
-        } else {
-          val result = SyncVar[T]()
-          AnyBase.runOnUiThread {
-            try {
-              Option(dialog()) match {
-                case Some(dialog) =>
-                  before.foreach(d => dialog.setBeforeListener(d.asInstanceOf[SafeDialog => Any]))
-                  after.foreach(d => dialog.setAfterListener(d.asInstanceOf[SafeDialog => Any]))
-                  result.set(dialog)
-                case None =>
-                  result.set(null.asInstanceOf[T])
-              }
-            } catch {
-              case e =>
-                log.error(e.getMessage, e)
-                result.set(null.asInstanceOf[T])
-            }
-          }
-          result.get
-        }
-        dialogInstance match {
-          case dialog: SafeDialog => try {
-            log.trace("SafeDialog::show inline %s, tag[%s]".format(m.erasure.getName, tag))
-            assert(dialog.tag == tag, { "dialog tag [%s] is unequal to builder tag [%s]".format(dialog.tag, tag) })
-            val ft = activity.getSupportFragmentManager.beginTransaction
-            try {
-              transactions.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
-              defaultTransaction.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
-            } catch {
-              case e =>
-                log.error(e.getMessage, e)
-            }
-            ft.commit()
-          } catch {
-            case e =>
-              log.error(e.getMessage, e)
-          }
-          case dialog =>
-            log.trace("SafeDialog::show skip %s, tag[%s], dialog is %s".format(m.erasure.getName, tag, dialog))
-        }
+        log.trace("SafeDialog::show inline %s, tag[%s]".format(m.erasure.getName, tag))
+        showInlineDialog(target, activity, view)
       }
     } getOrElse {
       log.trace("SafeDialog::show modal %s, tag[%s]".format(m.erasure.getName, tag))
-      actor ! Message.ShowDialog(this)
+      actor ! Message.ShowDialog(this, false)
     }
     @Loggable
-    def showWait(): Option[T] = try {
+    def showWait(): Option[T] = {
       assert(AnyBase.uiThreadID != Thread.currentThread.getId, { "unexpected thread == UI, " + Thread.currentThread.getId })
-      val result = for {
+      for {
         target <- target
         activity <- activity.get
         view <- Option(activity.findViewById(target)) if view.isShown
       } yield {
-        val dialogInstance = { // always outside of the UI thread in showWait
-          val result = SyncVar[T]()
-          AnyBase.runOnUiThread {
-            try {
-              Option(dialog()) match {
-                case Some(dialog) =>
-                  before.foreach(d => dialog.setBeforeListener(d.asInstanceOf[SafeDialog => Any]))
-                  after.foreach(d => dialog.setAfterListener(d.asInstanceOf[SafeDialog => Any]))
-                  result.set(dialog)
-                case None =>
-                  result.set(null.asInstanceOf[T])
-              }
-            } catch {
-              case e =>
-                log.error(e.getMessage, e)
-                result.set(null.asInstanceOf[T])
+        log.trace("SafeDialog::show inline %s, tag[%s]".format(m.erasure.getName, tag))
+        showInlineDialog(target, activity, view)
+      }
+    } getOrElse {
+      log.trace("SafeDialog::show modal %s, tag[%s]".format(m.erasure.getName, tag))
+      (actor !? Message.ShowDialog(this, true)).asInstanceOf[Option[T]]
+    }
+    @Loggable
+    private[SafeDialog] def showInlineDialog(target: Int, activity: FragmentActivity, view: View): Option[T] = try {
+      // get dialog instance
+      val dialogInstance: T = if (Thread.currentThread.getId == AnyBase.uiThreadID) {
+        try { dialog() } catch { case e => log.error(e.getMessage, e); null.asInstanceOf[T] }
+      } else {
+        val result = SyncVar[T]()
+        AnyBase.runOnUiThread {
+          try {
+            Option(dialog()) match {
+              case Some(dialog) => result.set(dialog)
+              case None => result.set(null.asInstanceOf[T])
             }
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+              result.set(null.asInstanceOf[T])
           }
-          result.get
         }
-        dialogInstance match {
-          case dialog: DialogFragment =>
-            log.trace("SafeDialog::showWait inline %s, tag[%s], thread %d".format(m.erasure.getName, tag, Thread.currentThread.getId))
-            assert(dialog.tag == tag, { "dialog tag [%s] is unequal to builder tag [%s]".format(dialog.tag, tag) })
-            val ft = activity.getSupportFragmentManager.beginTransaction
-            try {
-              transactions.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
-              defaultTransaction.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
-            } catch {
-              case e =>
-                log.error(e.getMessage, e)
-            }
-            ft.commit()
-            Some(dialog.asInstanceOf[T])
-          case dialog =>
-            log.trace("SafeDialog::show skip %s, tag[%s], thread %d, dialog is %s".format(m.erasure.getName, tag, Thread.currentThread.getId, dialog))
-            None
+        result.get
+      }
+      dialogInstance match {
+        case dialog: SafeDialog => try {
+          assert(dialog.tag == tag, { "dialog tag [%s] is unequal to builder tag [%s]".format(dialog.tag, tag) })
+          before.foreach(d => dialog.setBeforeListener(d.asInstanceOf[SafeDialog => Any]))
+          after.foreach(d => dialog.setAfterListener(d.asInstanceOf[SafeDialog => Any]))
+          val ft = activity.getSupportFragmentManager.beginTransaction
+          try {
+            transactions.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
+            defaultTransaction.foreach(_(ft, dialog.asInstanceOf[Fragment], Some(target)))
+          } catch {
+            case e =>
+              log.error(e.getMessage, e)
+          }
+          ft.commit()
+        } catch {
+          case e =>
+            log.error(e.getMessage, e)
         }
+        case dialog =>
+          log.trace("SafeDialog::show skip %s, tag[%s], dialog is %s".format(m.erasure.getName, tag, dialog))
       }
-      result.getOrElse {
-        (actor !? Message.ShowDialog(this)).asInstanceOf[Option[T]]
-      }
+      Option(dialogInstance)
     } catch {
       case e =>
         log.error(e.getMessage, e)
         None
     }
     @Loggable
-    private[SafeDialog] def onMessageShowDialog(): Option[T] = try {
+    private[SafeDialog] def showModalDialog(): Option[T] = try {
       activity.get.flatMap {
         activity =>
           // for example: pause activity in the middle of the process
@@ -531,6 +493,6 @@ object SafeDialog extends Logging {
     val dialog: Option[SafeDialog],
     val dismissCb: Option[() => Any])
   object Message {
-    case class ShowDialog[T <: SafeDialog](builder: Builder[T])
+    case class ShowDialog[T <: SafeDialog](builder: Builder[T], waitResult: Boolean)
   }
 }

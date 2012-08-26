@@ -65,18 +65,9 @@ protected class AppComponent private () extends Logging {
   // -rwx--x--x 711
   lazy val externalStorage = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, "var", false, Some(false), Some(false), Some(true)))
   // -rwx------ 711
-  lazy val appNativePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.apkNativePath, true, Some(false), Some(false), Some(true)))
-  lazy val appNativeManifest = appNativePath.map(appNativePath => new File(appNativePath, "NativeManifest.xml"))
-  lazy val nativeManifest: Option[scala.xml.Elem] = try {
-    AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/NativeManifest.xml")))
-  } catch {
-    case e => log.error(e.getMessage, e); None
-  }
-  lazy val applicationManifest: Option[scala.xml.Elem] = try {
-    AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open(DConstant.apkNativePath + "/ApplicationManifest.xml")))
-  } catch {
-    case e => log.error(e.getMessage, e); None
-  }
+  lazy val enginePath = AppComponent.Context.flatMap(ctx => Common.getDirectory(ctx, DConstant.enginePath, true, Some(false), Some(false), Some(true)))
+  lazy val engineManifestPath = enginePath.map(enginePath => new File(enginePath, "EngineManifest.xml"))
+  lazy val wrapperManifest: Option[scala.xml.Elem] = AppComponent.Context.map(ctx => XML.load(ctx.getAssets().open("WrapperManifest.xml")))
   lazy val preferredOrientation = new AtomicInteger(ActivityInfo.SCREEN_ORIENTATION_SENSOR)
   private[lib] lazy val bindedICtrlPool = new HashMap[String, (Context, ServiceConnection, ICtrlComponent)] with SynchronizedMap[String, (Context, ServiceConnection, ICtrlComponent)]
   private[lib] lazy val lockRotationCounter = new AtomicInteger(0)
@@ -120,7 +111,7 @@ protected class AppComponent private () extends Logging {
           }
       }
     }): Option[ComponentInfo] = AppComponent.synchronized {
-    applicationManifest.flatMap {
+    wrapperManifest.flatMap {
       appManifest =>
         AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString + locale + localeLanguage) match {
           case Some(info) =>
@@ -152,7 +143,7 @@ protected class AppComponent private () extends Logging {
       }
     }): Option[ComponentInfo] = {
     for {
-      appManifest <- applicationManifest
+      appManifest <- wrapperManifest
     } yield {
       AppCache.actor !? AppCache.Message.GetByID(0, appManifest.hashCode.toString) match {
         case Some(info) =>
@@ -214,7 +205,7 @@ protected class AppComponent private () extends Logging {
           case Left(error) =>
             val appState = if (error == "error_digicontrol_not_found")
               AppComponent.State(DState.Broken, Seq(error), (a) => {
-                log.g_a_s_e("SHOW")
+                log.___gaze("SHOW")
                 //SafeDialog.show(a, InstallControl.getClass.getName, InstallControl.getId(a))
               })
             else
@@ -226,7 +217,7 @@ protected class AppComponent private () extends Logging {
   }
   @Loggable
   def minVersionRequired(componentPackage: String): Option[Version] = try {
-    applicationManifest.flatMap {
+    wrapperManifest.flatMap {
       xml =>
         val node = xml \\ "required" find { _.text == componentPackage }
         node.flatMap(_.attribute("version"))

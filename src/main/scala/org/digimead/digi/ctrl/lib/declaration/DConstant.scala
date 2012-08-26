@@ -21,7 +21,7 @@ object DConstant {
   final val controlPackage = "org.digimead.digi.ctrl"
   final val prefix = controlPackage + "."
   final val serviceContentProviderSuffix = ".data"
-  final val apkNativePath = "armeabi"
+  final val enginePath = "spool"
   final val SessionAuthority = prefix + "Session"
   final val ComponentAuthority = prefix + "Component"
   final val PublicPreferencesAuthority = prefix + "PublicPreferences"

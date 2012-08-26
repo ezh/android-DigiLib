@@ -90,9 +90,9 @@ trait XAlertDialog extends XDialog with Logging {
       cachedEmbeddedAttr.foreach(attr => cachedEmbedded.setLayoutParams(container.generateLayoutParams(attr)))
       contentView.set(embeddedContent)
       customView.set(embeddedCustomContent)
-      positiveView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button3))))
-      neutralView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button2))))
-      negativeView.set(embeddedCustomContent.flatMap(v => Option(v.findViewById(android.R.id.button1))))
+      positiveView.set(Option(cachedEmbedded.findViewById(android.R.id.button3)))
+      neutralView.set(Option(cachedEmbedded.findViewById(android.R.id.button2)))
+      negativeView.set(Option(cachedEmbedded.findViewById(android.R.id.button1)))
       cachedEmbedded
     }
   }
@@ -184,6 +184,7 @@ object XAlertDialog extends Logging {
      * at android.support.v4.app.DialogFragment.onStart(DialogFragment.java:385)
      */
     dialog.show
+    dialog.hide
     val negativeView = negative.flatMap(n => Option(dialog.getButton(0)))
     val neutralView = neutral.flatMap(n => Option(dialog.getButton(1)))
     val positiveView = positive.flatMap(n => Option(dialog.getButton(2)))
@@ -196,10 +197,10 @@ object XAlertDialog extends Logging {
     negative: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     baseView: Int, tag: String): (View, Option[TextView], Option[View], Option[Button], Option[Button], Option[Button]) = {
     log.debug("XAlertDialog::buildEmbedded for " + tag)
-    def setButtonListener(bView: Button, title: Int, callback: XDialog.ButtonListener[_ <: XDialog]) {
+    def setButtonListener(bView: Button, title: Int, callback: XDialog.ButtonListener[_ <: XDialog], whichButton: Int) {
       bView.setVisibility(View.VISIBLE)
       bView.setText(title)
-      bView.setOnClickListener(new View.OnClickListener { def onClick(v: View) = callback })
+      bView.setOnClickListener(new View.OnClickListener { def onClick(v: View) = callback.onClick(null, whichButton) })
     }
     val view = LayoutInflater.from(context).inflate(baseView, null)
     val contentView = view.findViewById(android.R.id.custom).asInstanceOf[TextView]
@@ -226,17 +227,17 @@ object XAlertDialog extends Logging {
       view.findViewById(android.R.id.summary).setVisibility(View.VISIBLE)
     val negativeView = negative.map(t => {
       val buttonView = view.findViewById(android.R.id.button1).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_NEGATIVE)
       buttonView
     })
     val neutralView = neutral.map(t => {
       val buttonView = view.findViewById(android.R.id.button2).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_NEUTRAL)
       buttonView
     })
     val positiveView = positive.map(t => {
       val buttonView = view.findViewById(android.R.id.button3).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_POSITIVE)
       buttonView
     })
     (view, Some(contentView), customContentView, negativeView, neutralView, positiveView)

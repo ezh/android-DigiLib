@@ -90,15 +90,15 @@ trait XDialog extends DialogFragment with SafeDialog with Logging {
     notifyAfter
   }
   @Loggable
-  def isInBackStack(manager: FragmentManager): Boolean = {
-    val tag = toString
-    if (manager.findFragmentByTag(tag) == null)
-      return false
-    for (i <- 0 until manager.getBackStackEntryCount)
-      if (manager.getBackStackEntryAt(i).getName == tag)
-        return true
-    false
-  }
+  def isDialogInBackStack(): Boolean = Option(getFragmentManager()).map {
+    manager =>
+      if (manager.findFragmentByTag(tag) == null)
+        return false
+      for (i <- 0 until manager.getBackStackEntryCount)
+        if (manager.getBackStackEntryAt(i).getName == tag)
+          return true
+      false
+  } getOrElse false
 }
 
 object XDialog {

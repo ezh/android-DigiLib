@@ -19,11 +19,13 @@ package org.digimead.digi.ctrl.lib.androidext
 import scala.Option.option2Iterable
 
 import org.digimead.digi.ctrl.lib.R
+import org.digimead.digi.ctrl.lib.aop.Loggable
 import org.digimead.digi.ctrl.lib.log.Logging
 
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
+import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -51,11 +53,34 @@ trait XListDialog extends XAlertDialog {
     embeddedNegative,
     embeddedNeutral,
     embeddedPositive) =
-    XListDialog.buildEmbedded(getDialogActivity, title, message, extContent, icon, positive, neutral, negative, R.layout.fragment_dialog, tag)
+    XListDialog.buildEmbedded(getDialogActivity, title, message, extContent, icon, positive, neutral, negative, R.layout.fragment_dialog_list, tag)
   override protected lazy val cachedEmbeddedAttr = XResource.getAttributeSet(getDialogActivity, R.layout.fragment_dialog_list)
 
+  override def onCreateView(inflater: LayoutInflater, container: ViewGroup, savedInstanceState: Bundle): View = {
+    log.debug("XListDialog::onCreateView")
+    val result = super.onCreateView(inflater, container, savedInstanceState)
+    if (!getShowsDialog) {
+      val result = embeddedCustomContent.map {
+        case list: ListView =>
+          modalCustomContent.map {
+            case list: ListView =>
+              if (list.getAdapter != null)
+                log.debug("reset adapter " + list.getAdapter + " in modal ListView")
+              list.setAdapter(null)
+            case view =>
+              log.fatal("unexpected ListView in modalCustomContent " + view + " for " + tag)
+          }
+          if (list.getAdapter != adapter)
+            list.setAdapter(adapter)
+        case view =>
+          log.fatal("unexpected ListView in embeddedCustomContent " + view + " for " + tag)
+      }
+      result.getOrElse { log.fatal("ListView not found for " + tag) }
+    }
+    result
+  }
   override def onCreateDialog(savedInstanceState: Bundle): Dialog = {
-    log.debug("XAlertDialog::onCreateDialog")
+    log.debug("XListDialog::onCreateDialog")
     val dialog = super.onCreateDialog(savedInstanceState)
     val result = modalCustomContent.map {
       case list: ListView =>
@@ -125,6 +150,7 @@ object XListDialog extends Logging {
      * at android.support.v4.app.DialogFragment.onStart(DialogFragment.java:385)
      */
     dialog.show
+    dialog.hide
     val negativeView = negative.flatMap(n => Option(dialog.getButton(0)))
     val neutralView = neutral.flatMap(n => Option(dialog.getButton(1)))
     val positiveView = positive.flatMap(n => Option(dialog.getButton(2)))
@@ -137,13 +163,13 @@ object XListDialog extends Logging {
     negative: Option[(Int, XDialog.ButtonListener[_ <: XDialog])],
     baseView: Int, tag: String): (View, Option[TextView], Option[View], Option[Button], Option[Button], Option[Button]) = {
     log.debug("XListDialog::buildEmbedded for " + tag)
-    def setButtonListener(bView: Button, title: Int, callback: XDialog.ButtonListener[_ <: XDialog]) {
+    def setButtonListener(bView: Button, title: Int, callback: XDialog.ButtonListener[_ <: XDialog], whichButton: Int) {
       bView.setVisibility(View.VISIBLE)
       bView.setText(title)
-      bView.setOnClickListener(new View.OnClickListener { def onClick(v: View) = callback })
+      bView.setOnClickListener(new View.OnClickListener { def onClick(v: View) = callback.onClick(null, whichButton) })
     }
     val view = LayoutInflater.from(context).inflate(baseView, null)
-    val contentView = view.findViewById(android.R.id.custom).asInstanceOf[TextView]
+    val contentView = view.findViewById(android.R.id.content).asInstanceOf[TextView]
     val titleView = view.findViewById(android.R.id.title).asInstanceOf[TextView]
     titleView.setText(title)
     icon.foreach {
@@ -152,11 +178,7 @@ object XListDialog extends Logging {
         iconContainer.setImageResource(icon)
         iconContainer.setVisibility(View.VISIBLE)
     }
-    val customContentView = extContent.map(extContent => {
-      val parent = contentView.getParent.asInstanceOf[ViewGroup]
-      parent.addView(extContent, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-      extContent
-    })
+    val customContentView = Option(view.findViewById(android.R.id.custom).asInstanceOf[ListView])
     message match {
       case Some(message) =>
         contentView.setText(message)
@@ -167,17 +189,17 @@ object XListDialog extends Logging {
       view.findViewById(android.R.id.summary).setVisibility(View.VISIBLE)
     val negativeView = negative.map(t => {
       val buttonView = view.findViewById(android.R.id.button1).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_NEGATIVE)
       buttonView
     })
     val neutralView = neutral.map(t => {
       val buttonView = view.findViewById(android.R.id.button2).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_NEUTRAL)
       buttonView
     })
     val positiveView = positive.map(t => {
       val buttonView = view.findViewById(android.R.id.button3).asInstanceOf[Button]
-      setButtonListener(buttonView, t._1, t._2)
+      setButtonListener(buttonView, t._1, t._2, DialogInterface.BUTTON_POSITIVE)
       buttonView
     })
     (view, Some(contentView), customContentView, negativeView, neutralView, positiveView)

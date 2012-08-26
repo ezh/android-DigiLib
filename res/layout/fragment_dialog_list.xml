@@ -51,6 +51,13 @@
         android:paddingTop="3dip"
         android:src="@drawable/divider_h_alt" />
 
+    <TextView
+        android:id="@android:id/content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:paddingTop="7dip" />
+
     <ListView
         android:id="@android:id/custom"
         android:layout_width="match_parent"
