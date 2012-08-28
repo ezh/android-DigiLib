@@ -1,4 +1,4 @@
-lib/
+/lib/
 project/lib_managed/
 project/boot/
 build/

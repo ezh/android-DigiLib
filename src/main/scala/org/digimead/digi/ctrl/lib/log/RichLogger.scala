@@ -46,12 +46,12 @@ class RichLogger(val name: String) extends org.slf4j.Logger {
   }
   def isTraceExtraEnabled(): Boolean = Logging.isTraceExtraEnabled
   // trace
-  def isTraceEnabled(marker: Marker) = isTraceEnabled
-  def trace(marker: Marker, msg: String) = trace(msg)
-  def trace(marker: Marker, format: String, arg: Object) = trace(format, arg)
-  def trace(marker: Marker, format: String, arg1: Object, arg2: Object) = trace(format, arg1, arg2)
-  def trace(marker: Marker, format: String, argArray: Array[AnyRef]) = trace(format, argArray)
-  def trace(marker: Marker, msg: String, t: Throwable) = trace(msg, t)
+  protected def isTraceEnabled(marker: Marker) = isTraceEnabled
+  protected def trace(marker: Marker, msg: String) = trace(msg)
+  protected def trace(marker: Marker, format: String, arg: Object) = trace(format, arg)
+  protected def trace(marker: Marker, format: String, arg1: Object, arg2: Object) = trace(format, arg1, arg2)
+  protected def trace(marker: Marker, format: String, argArray: Array[AnyRef]) = trace(format, argArray)
+  protected def trace(marker: Marker, msg: String, t: Throwable) = trace(msg, t)
   /* @see org.slf4j.Logger#isTraceEnabled() */
   def isTraceEnabled(): Boolean = Logging.isTraceEnabled
   def trace(msg: String) = if (Logging.isTraceEnabled)
@@ -83,12 +83,12 @@ class RichLogger(val name: String) extends org.slf4j.Logger {
       trace(msg)
 
   // debug
-  def isDebugEnabled(marker: Marker) = isDebugEnabled
-  def debug(marker: Marker, msg: String) = debug(msg)
-  def debug(marker: Marker, format: String, arg: Object) = debug(format, arg)
-  def debug(marker: Marker, format: String, arg1: Object, arg2: Object) = debug(format, arg1, arg2)
-  def debug(marker: Marker, format: String, argArray: Array[AnyRef]) = debug(format, argArray)
-  def debug(marker: Marker, msg: String, t: Throwable) = debug(msg, t)
+  protected def isDebugEnabled(marker: Marker) = isDebugEnabled
+  protected def debug(marker: Marker, msg: String) = debug(msg)
+  protected def debug(marker: Marker, format: String, arg: Object) = debug(format, arg)
+  protected def debug(marker: Marker, format: String, arg1: Object, arg2: Object) = debug(format, arg1, arg2)
+  protected def debug(marker: Marker, format: String, argArray: Array[AnyRef]) = debug(format, argArray)
+  protected def debug(marker: Marker, msg: String, t: Throwable) = debug(msg, t)
   /* @see org.slf4j.Logger#isDebugEnabled() */
   def isDebugEnabled(): Boolean = Logging.isDebugEnabled
   def debug(msg: String) = if (Logging.isDebugEnabled)
@@ -119,12 +119,12 @@ class RichLogger(val name: String) extends org.slf4j.Logger {
       debug(msg)
 
   // info
-  def isInfoEnabled(marker: Marker) = isInfoEnabled
-  def info(marker: Marker, msg: String) = info(msg)
-  def info(marker: Marker, format: String, arg: Object) = info(format, arg)
-  def info(marker: Marker, format: String, arg1: Object, arg2: Object) = info(format, arg1, arg2)
-  def info(marker: Marker, format: String, argArray: Array[AnyRef]) = info(format, argArray)
-  def info(marker: Marker, msg: String, t: Throwable) = info(msg, t)
+  protected def isInfoEnabled(marker: Marker) = isInfoEnabled
+  protected def info(marker: Marker, msg: String) = info(msg)
+  protected def info(marker: Marker, format: String, arg: Object) = info(format, arg)
+  protected def info(marker: Marker, format: String, arg1: Object, arg2: Object) = info(format, arg1, arg2)
+  protected def info(marker: Marker, format: String, argArray: Array[AnyRef]) = info(format, argArray)
+  protected def info(marker: Marker, msg: String, t: Throwable) = info(msg, t)
   /* @see org.slf4j.Logger#isInfoEnabled() */
   def isInfoEnabled: Boolean = Logging.isInfoEnabled
   def info(msg: String) = if (Logging.isInfoEnabled)
@@ -155,12 +155,12 @@ class RichLogger(val name: String) extends org.slf4j.Logger {
       info(msg)
 
   // warn
-  def isWarnEnabled(marker: Marker) = isWarnEnabled
-  def warn(marker: Marker, msg: String) = warn(msg)
-  def warn(marker: Marker, format: String, arg: Object) = warn(format, arg)
-  def warn(marker: Marker, format: String, arg1: Object, arg2: Object) = warn(format, arg1, arg2)
-  def warn(marker: Marker, format: String, argArray: Array[AnyRef]) = warn(format, argArray)
-  def warn(marker: Marker, msg: String, t: Throwable) = warn(msg, t)
+  protected def isWarnEnabled(marker: Marker) = isWarnEnabled
+  protected def warn(marker: Marker, msg: String) = warn(msg)
+  protected def warn(marker: Marker, format: String, arg: Object) = warn(format, arg)
+  protected def warn(marker: Marker, format: String, arg1: Object, arg2: Object) = warn(format, arg1, arg2)
+  protected def warn(marker: Marker, format: String, argArray: Array[AnyRef]) = warn(format, argArray)
+  protected def warn(marker: Marker, msg: String, t: Throwable) = warn(msg, t)
   /* @see org.slf4j.Logger#isWarnEnabled() */
   def isWarnEnabled: Boolean = Logging.isWarnEnabled
   def warn(msg: String) = if (Logging.isWarnEnabled)
@@ -191,12 +191,12 @@ class RichLogger(val name: String) extends org.slf4j.Logger {
       warn(msg)
 
   // error
-  def isErrorEnabled(marker: Marker) = isErrorEnabled
-  def error(marker: Marker, msg: String) = error(msg)
-  def error(marker: Marker, format: String, arg: Object) = error(format, arg)
-  def error(marker: Marker, format: String, arg1: Object, arg2: Object) = error(format, arg1, arg2)
-  def error(marker: Marker, format: String, argArray: Array[AnyRef]) = error(format, argArray)
-  def error(marker: Marker, msg: String, t: Throwable) = error(msg, t)
+  protected def isErrorEnabled(marker: Marker) = isErrorEnabled
+  protected def error(marker: Marker, msg: String) = error(msg)
+  protected def error(marker: Marker, format: String, arg: Object) = error(format, arg)
+  protected def error(marker: Marker, format: String, arg1: Object, arg2: Object) = error(format, arg1, arg2)
+  protected def error(marker: Marker, format: String, argArray: Array[AnyRef]) = error(format, argArray)
+  protected def error(marker: Marker, msg: String, t: Throwable) = error(msg, t)
   /* @see org.slf4j.Logger#isErrorEnabled() */
   def isErrorEnabled: Boolean = Logging.isErrorEnabled
   def error(msg: String) = if (Logging.isErrorEnabled)
