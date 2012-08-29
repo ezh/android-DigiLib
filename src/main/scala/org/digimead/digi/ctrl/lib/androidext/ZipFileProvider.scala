@@ -16,6 +16,7 @@
 
 package org.digimead.digi.ctrl.lib.androidext
 
+import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
@@ -35,7 +36,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 
-abstract class ZipFileProvider extends ContentProvider with ContentProvider.PipeDataWriter[InputStream] with Logging {
+abstract class ZipFileProvider extends ContentProvider with ContentProvider.PipeDataWriter[ZipFileProvider.ZipHandler] with Logging {
   def onCreate() = true
   def query(uri: Uri, projection: Array[String], selection: String, selectionArgs: Array[String], sortOrder: String): Cursor =
     throw new UnsupportedOperationException("Not supported by this provider")
@@ -48,14 +49,17 @@ abstract class ZipFileProvider extends ContentProvider with ContentProvider.Pipe
   def getType(uri: Uri): String =
     throw new UnsupportedOperationException("Not supported by this provider")
   override def openAssetFile(uri: Uri, mode: String): AssetFileDescriptor = {
-    getZip() match {
+    ZipFileProvider.zip.map(file => new ZipFile(file)) orElse getZip() match {
       case Some(zip) =>
+        if (ZipFileProvider.zip == None)
+          ZipFileProvider.zip = Some(new File(zip.getName))
         val path = uri.getPath().substring(1) // path without leading '/'
         log.debug("open " + path + " from " + zip.getName())
         // iterate through zip file until filename has been reach
         Option(zip.getInputStream(new ZipEntry(path))) match {
           case Some(in) =>
-            new AssetFileDescriptor(openPipeHelper(null, null, null, in, this), 0, AssetFileDescriptor.UNKNOWN_LENGTH)
+            new AssetFileDescriptor(openPipeHelper(null, null, null,
+              ZipFileProvider.ZipHandler(in, zip), this), 0, AssetFileDescriptor.UNKNOWN_LENGTH)
           case None =>
             zip.close()
             val message = "\"" + path + "\" not found in \"" + zip.getName() + "\""
@@ -66,23 +70,27 @@ abstract class ZipFileProvider extends ContentProvider with ContentProvider.Pipe
         throw new FileNotFoundException("unable to open " + uri)
     }
   }
-  def writeDataToPipe(output: ParcelFileDescriptor, uri: Uri, s: String, bundle: Bundle, in: InputStream) {
+  def writeDataToPipe(output: ParcelFileDescriptor, uri: Uri, s: String, bundle: Bundle, source: ZipFileProvider.ZipHandler) {
     val buffer = new Array[Byte](8192)
     val fout = new FileOutputStream(output.getFileDescriptor())
     try {
-      Common.writeToStream(in, fout)
+      Common.writeToStream(source.in, fout)
     } catch {
       case e: ZipException =>
         log.error(e.getMessage(), e)
       case e: IOException =>
         log.error(e.getMessage(), e)
     } finally {
-      try {
-        fout.close()
-      } catch {
-        case e: IOException =>
-      }
+      try { fout.close() } catch { case e: IOException => }
+      try { source.in.close() } catch { case e: IOException => }
+      try { source.zip.close() } catch { case e: IOException => }
     }
   }
   protected def getZip(): Option[ZipFile]
+  protected def resetZip() = ZipFileProvider.zip = None
+}
+
+object ZipFileProvider {
+  case class ZipHandler(in: InputStream, zip: ZipFile)
+  @volatile private var zip: Option[File] = None
 }
